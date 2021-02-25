@@ -8,7 +8,7 @@ setup_check = input('Have you updated the rootDir, the allDat and the save funct
 disp(' ');
 
 if setup_check == 'n'
-    disp('Please stop, update and restart your script.');
+    disp('Please update and restart your script.');
     disp(' ');
     run_script = 0;
 end
@@ -235,3 +235,5 @@ switch action
 end %End of Operation/Action Switch
 
 end %End of While Loop
+disp(' ')
+disp('SCRIPT TERMINATED')

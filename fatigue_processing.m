@@ -2,17 +2,19 @@
 % Fatigue | Approach 2 | v3 - Process EMG Data %
 
 %% Setup
+run_script = 1;
 
 setup_check = input('Have you updated the rootDir, the allDat and the save function? [y/n] ','s');
 disp(' ');
 
 if setup_check == 'n'
-    disp('Please stop, update and restart your script.');
+    disp('Please update and restart your script.');
     disp(' ');
+    run_script = 0;
 end
 
-% rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/Try 2/data/'; % mac root
-rootDir = 'D:/Joshua/fatigue/data'; % windows root
+rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/Try 2/data/'; % mac root
+% rootDir = 'D:/Joshua/fatigue/data'; % windows root
 
 % Processing Parameters
 SRATE = 5000;
@@ -25,8 +27,8 @@ LENGTH = 100000;
 
 %Create required arrays & load Parameters and Missing Trial Index
 
-% Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_sample.tsv'));
-Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_modified.tsv'));
+Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_sample.tsv'));
+%Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_modified.tsv'));
 
 Missing_Trials = dload(fullfile(rootDir,'0 Parameters','missing_trials.tsv'));
 
@@ -40,21 +42,23 @@ end
 
 %Display available operations
 disp('Available operations:')
+disp(' ')
 disp('  - Process Raw Cut Trial EMG Data -> Creates EMG_Clean (1)')
 disp('  - Load EMG_clean (2)')
 disp(' ')
 disp(' Requires EMG_clean:')
 disp('  - Standardise processed trial vectors for time (3)')
 disp('  - Calculate mean Trial Vector per Block (4)')
+disp(' ')
+disp(' Requires mean Trial Vectors:')
 disp('  - Calculate Spearman Correlation & Euclidean Distance for every Trial (5)')
-disp('  - Add Spearman Correlation & Euclidean Distance to Blocks & Days (6)')
 disp(' ')
 disp('  - Save EMG_clean (8)')
-disp('  - Save Correlations & Euclidean Distances only (9)')
+disp('  - Save Correlations & Euclidean Distances(9)')
+disp(' ')
 disp('  - Terminate Script (666)')
 
 %% process EMG Data
-run_script = 1;
 
 while run_script == 1
     
@@ -146,7 +150,7 @@ switch action
         disp(' ')
         
         %End of Case 2: Load EMG_Clean
-       
+  
 %Case 3
     case 3 %Standardise processed trial vectors for time
         
@@ -304,6 +308,10 @@ switch action
         %DB_Correlation
         DB_Correlation = table('Size',[1 9],'VariableTypes',{'string','int8','int8','int8','double','double','double','double','double'});
         DB_Correlation.Properties.VariableNames = {'Subject' 'Day' 'Block' 'Trial' 'Corr_ADM' 'Corr_APB' 'Corr_FDI' 'Corr_BIC' 'Corr_FCR'};
+        
+        %DB_Correlation
+        DB_Euclidean = table('Size',[1 9],'VariableTypes',{'string','int8','int8','int8','double','double','double','double','double'});
+        DB_Euclidean.Properties.VariableNames = {'Subject' 'Day' 'Block' 'Trial' 'Corr_ADM' 'Corr_APB' 'Corr_FDI' 'Corr_BIC' 'Corr_FCR'};
 
         
         %Calculate Spearman Correlation & Euclidean Distance for every Trial
@@ -357,20 +365,7 @@ switch action
                 eucdist_trial.BIC = dist([trial.BIC,trial_mean.BIC]);
                 eucdist_trial.FCR = dist([trial.FCR,trial_mean.FCR]);
                 
-                DB_Correlation(height(DB_Correlation)+1,:) = table(id, day, block, j, eucdist_trial.ADM(1,2), eucdist_trial.APB(1,2), eucdist_trial.FDI(1,2), eucdist_trial.BIC(1,2), eucdist_trial.FCR(1,2));
-                
-    %ADM
-                %corr
-%                 corr_trial = corr(trial.ADM,trial_mean.ADM);
-%                 EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).corr.ADM = corr_trial;
-%                 block_corr.ADM = [block_corr.ADM; corr_trial];
-                
-                %Euclidean Distance
-%                 eucdist_trial = dist([trial_mean.ADM trial.ADM]);
-%                 eucdist_trial = eucdist_trial(1,2);
-%                 EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).eucdist.ADM = eucdist_trial;
-%                 block_eucdist.ADM = [block_eucdist.ADM; eucdist_trial];
-
+                DB_Euclidean(height(DB_Euclidean)+1,:) = table(id, day, block, j, eucdist_trial.ADM(1,2), eucdist_trial.APB(1,2), eucdist_trial.FDI(1,2), eucdist_trial.BIC(1,2), eucdist_trial.FCR(1,2));
     
                 %Update Progress bar
                 counter = counter+1;
@@ -385,129 +380,6 @@ switch action
         
       %End of Case 5: Calculate Spearman Correlation & Euclidean Distance for every Trial
       
-%Case 6
-    case 6 %Add Spearman Correlation & Euclidean Distance to Blocks & Days
-
-        subj = fields(EMG_clean.stnd_len);
-        array_legend = ["d1 b1" "d1 b2" "d1 b3" "d1 b4" "d2 b1" "d2 b2" "d2 b3" "d2 b4"];
-
-        for i = 1:length(subj)
-
-            %subj_array = NaN(30,8);
-            subj_corr.ADM = nan(30,8);
-            subj_corr.APB = nan(30,8);
-            subj_corr.FDI = nan(30,8);
-            subj_corr.BIC = nan(30,8);
-            subj_corr.FCR = nan(30,8);
-            
-            subj_eucdist.ADM = nan(30,8);
-            subj_eucdist.APB = nan(30,8);
-            subj_eucdist.FDI = nan(30,8);
-            subj_eucdist.BIC = nan(30,8);
-            subj_eucdist.FCR = nan(30,8);
-            
-            subj_parameters = [];
-
-            %enter each day
-            days = fields(EMG_clean.stnd_len.(char(subj(i))));
-            days(strcmp('corr_array',days)) = [];
-            days(strcmp('eucdist_array',days)) = [];
-            days(strcmp('parameters',days)) = [];
-            
-            for j = 1:length(days)
-                %enter each block
-                blocks = fields(EMG_clean.stnd_len.(char(subj(i))).(char(days(j))));
-                blocks(strcmp('corr_array',blocks)) = [];
-                blocks(strcmp('eucdist_array',blocks)) = [];
-                blocks(strcmp('parameters',blocks)) = [];
-            
-                %subj_array = NaN(30,8);
-                block_corr.ADM = nan(30,4);
-                block_corr.APB = nan(30,4);
-                block_corr.FDI = nan(30,4);
-                block_corr.BIC = nan(30,4);
-                block_corr.FCR = nan(30,4);
-
-                block_eucdist.ADM = nan(30,4);
-                block_eucdist.APB = nan(30,4);
-                block_eucdist.FDI = nan(30,4);
-                block_eucdist.BIC = nan(30,4);
-                block_eucdist.FCR = nan(30,4);
-                
-                block_parameters = [];
-
-                for k = 1:length(blocks) %Block Itteration
-                    
-                  %code to be executed in each block
-
-                    block_row = find(string([char(days(j)), ' ', char(blocks(k))]) == array_legend);
-                    
-                    if block_row > 4
-                        block_row_2 = block_row - 4;
-                    else
-                        block_row_2 = block_row;
-                    end
-                    
-                    %Fill Subj_Corr
-                    insert = EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).corr_array;
-
-                    subj_corr.ADM(1:length(insert.ADM),block_row) = insert.ADM;
-                    subj_corr.APB(1:length(insert.APB),block_row) = insert.APB;
-                    subj_corr.FDI(1:length(insert.FDI),block_row) = insert.FDI;
-                    subj_corr.BIC(1:length(insert.BIC),block_row) = insert.BIC;
-                    subj_corr.FCR(1:length(insert.FCR),block_row) = insert.FCR;
-
-                    %Fill Subj_EucDist
-                    insert = EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).eucdist_array;
-
-                    subj_eucdist.ADM(1:length(insert.ADM),block_row) = insert.ADM;
-                    subj_eucdist.APB(1:length(insert.APB),block_row) = insert.APB;
-                    subj_eucdist.FDI(1:length(insert.FDI),block_row) = insert.FDI;
-                    subj_eucdist.BIC(1:length(insert.BIC),block_row) = insert.BIC;
-                    subj_eucdist.FCR(1:length(insert.FCR),block_row) = insert.FCR;
-                    
-                    %Fill Block_Corr
-                    insert = EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).corr_array;
-
-                    block_corr.ADM(1:length(insert.ADM),block_row_2) = insert.ADM;
-                    block_corr.APB(1:length(insert.APB),block_row_2) = insert.APB;
-                    block_corr.FDI(1:length(insert.FDI),block_row_2) = insert.FDI;
-                    block_corr.BIC(1:length(insert.BIC),block_row_2) = insert.BIC;
-                    block_corr.FCR(1:length(insert.FCR),block_row_2) = insert.FCR;
-
-                    %Fill Block_EucDist
-                    insert = EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).eucdist_array;
-
-                    block_eucdist.ADM(1:length(insert.ADM),block_row_2) = insert.ADM;
-                    block_eucdist.APB(1:length(insert.APB),block_row_2) = insert.APB;
-                    block_eucdist.FDI(1:length(insert.FDI),block_row_2) = insert.FDI;
-                    block_eucdist.BIC(1:length(insert.BIC),block_row_2) = insert.BIC;
-                    block_eucdist.FCR(1:length(insert.FCR),block_row_2) = insert.FCR;
-                    
-                    %Add parameters
-                    block_parameters.(char(blocks(k))) = EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).parameters;
-                    subj_parameters.(char(days(j))).(char(blocks(k))) = EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).parameters;
-
-                  %end of block code
-
-                end %End of Block Itteration
-                
-                EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).corr_array = block_corr;
-                EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).eucdist_array = block_eucdist;
-                EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).parameters = block_parameters;
-            
-            end %End of Day Itteration
-
-            EMG_clean.stnd_len.(char(subj(i))).corr_array = subj_corr;
-            EMG_clean.stnd_len.(char(subj(i))).eucdist_array = subj_eucdist;
-            EMG_clean.stnd_len.(char(subj(i))).parameters = subj_parameters;
-            
-        end %End of Subject Itteration
-      
-        disp('--- Add Spearman Correlation & Euclidean Distance to Blocks & Days: Completed ---')
-        disp(' ')
-        
-      %End of Case 6: Add Spearman Correlation & Euclidean Distance to Blocks & Days
 
 %Case 8
     case 8 %Save EMG_clean
@@ -521,70 +393,17 @@ switch action
     %End of Case 8: Save EMG_clean
     
 %Case 9
-    case 9 %Save Correlation & Euclidean Distances only
-        output = [];
+    case 9 %Save Correlation & Euclidean Distances
         
-        subj = fields(EMG_clean.stnd_len);
-
-        for i = 1:length(subj)
-
-            %enter each day
-            days = fields(EMG_clean.stnd_len.(char(subj(i))));
-            days(strcmp('corr_array',days)) = [];
-            days(strcmp('eucdist_array',days)) = [];
-            days(strcmp('parameters',days)) = [];
-            
-            for j = 1:length(days)
-                
-                %enter each block
-                blocks = fields(EMG_clean.stnd_len.(char(subj(i))).(char(days(j))));
-                blocks(strcmp('corr_array',blocks)) = [];
-                blocks(strcmp('eucdist_array',blocks)) = [];
-                blocks(strcmp('parameters',blocks)) = [];
-                
-
-                for k = 1:length(blocks) %Block Itteration
-                    
-                  %enter each trial
-                  trials = fields(EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))));
-                  trials(strcmp('parameters',trials)) = [];
-                  trials(strcmp('trial_mean',trials)) = [];
-                  trials(strcmp('corr_array',trials)) = [];
-                  trials(strcmp('eucdist_array',trials)) = [];
-                  
-                  for l = 1:length(trials)
-                      
-                      trial = EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).(char(trials(l)));
-                      output.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).(char(trials(l))).corr = trial.corr;
-                      output.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).(char(trials(l))).eucdist = trial.eucdist;
-                      
-                  end %End of Trial Itteration
-                  
-                  block = EMG_clean.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k)));
-                  output.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).corr_array = block.corr_array;
-                  output.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).eucdist_array = block.eucdist_array;
-                  output.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).parameters = block.parameters;
-
-                end %End of Block Itteration
-            
-                day = EMG_clean.stnd_len.(char(subj(i))).(char(days(j)));
-                output.stnd_len.(char(subj(i))).(char(days(j))).corr_array = day.corr_array;
-                output.stnd_len.(char(subj(i))).(char(days(j))).eucdist_array = day.eucdist_array;
-                output.stnd_len.(char(subj(i))).(char(days(j))).parameters = day.parameters;
-                output.stnd_len.(char(subj(i))).parameters.(char(days(j))) = day.parameters;
-                  
-            end %End of Day Itteration
-            
-            subject = EMG_clean.stnd_len.(char(subj(i)));
-            output.stnd_len.(char(subj(i))).corr_array = subject.corr_array;
-            output.stnd_len.(char(subj(i))).eucdist_array = subject.eucdist_array;
-                
-        end %End of Subject Itteration
+        d = datestr(datetime(now,'ConvertFrom','datenum'));
         
-        file_name = input('What should I name the file? ','s')
-        save(fullfile(rootDir,file_name),'-struct','output')
+        mkdir(fullfile(rootDir,'Database'), d);
+        
+        writetable(DB_Correlation,fullfile(rootDir,'Database',d,'DB_Correlation.csv'));
+        writetable(DB_Correlation,fullfile(rootDir,'Database',d,'DB_Euclidean.csv'));
+        
         disp(' ')
-        disp('--- Save Correlation & Euclidean Distances only: Completed ---')
+        disp('--- Correlation & Euclidean Distances saved to Database Folder ---')
         disp(' ')
         
      %End of Case 9: Save Correlation & Euclidean Distances only
@@ -597,3 +416,5 @@ switch action
 end %End of Operation/Action Switch
 
 end %End of While Loop
+disp(' ')
+disp('SCRIPT TERMINATED')
