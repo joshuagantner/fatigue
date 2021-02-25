@@ -1,8 +1,8 @@
 
 % Fatigue | Approach 2 | v3 - Statistics %
-%test edit for github
 
 %% Setup
+run_script = 1;
 
 setup_check = input('Have you updated the rootDir, the allDat and the save function? [y/n] ','s');
 disp(' ');
@@ -10,6 +10,7 @@ disp(' ');
 if setup_check == 'n'
     disp('Please stop, update and restart your script.');
     disp(' ');
+    run_script = 0;
 end
 
 rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/Try 2/data/'; % mac root
@@ -27,7 +28,6 @@ array_legend = ["d1 b1" "d1 b2" "d1 b3" "d1 b4" "d2 b1" "d2 b2" "d2 b3" "d2 b4"]
 
 
 %% process EMG Data
-run_script = 1;
 
 fatigue_statset = []; %Set up struct to hold all Info relevant to our statistics analysis
 
