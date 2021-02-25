@@ -180,27 +180,28 @@ switch action
                     day_index = find(string([char(days(j)), ' ', char(blocks(k))]) == array_legend);
                     
                     if day_index > 4
-                        block_row = day_index - 4;
+                        day_index_sub = day_index - 4;
                     else
-                        block_row = day_index;
+                        day_index_sub = day_index;
                     end
                     
-                    %Enter every Trial of the Block and Add it to the
-                    %day_var Array
+                    %Enter every Trial of the Block and Add it
                     trials = fields(fatigue_corr_eucdist_only.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))));
                     trials(strcmp('corr_array',trials)) = [];
                     trials(strcmp('eucdist_array',trials)) = [];
                     trials(strcmp('parameters',trials)) = [];
                     
+                    block_varr = [];
+                    
                     for l = 1:length(trials)
                         %Load and Add Trial to day_varr and subj_varr
                         trial2add = fatigue_corr_eucdist_only.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).(char(trials(l)));
-                        trial_length = length(trial2add);
                         
                         for m = ["corr" "eucdist"]
                             for n = ["ADM","APB","FDI","BIC","FCR"]
-                                day_varr.(m).(n)(1:trial_length,block_row) = trial2add;
-                                subj_varr.(m).(n)(1:trial_length,day_index) = trial2add;
+                                block_varr = [block_varr; trial2add];
+%                                 day_varr.(m).(n)(1:trial_length,day_index_sub) = trial2add;
+%                                 subj_varr.(m).(n)(1:trial_length,day_index) = trial2add;
                             end
                         end
                         
@@ -219,7 +220,7 @@ switch action
             
         end %End of Subject Itteration
       
-        disp('--- Add Spearman Correlation & Euclidean Distance to Blocks & Days: Completed ---')
+        disp('--- Gathered Varriance on Block, Day and Subject level: Completed ---')
         disp(' ')
         
       %End of Case 6: Add Spearman Correlation & Euclidean Distance to Blocks & Days
