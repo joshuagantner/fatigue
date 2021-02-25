@@ -217,6 +217,7 @@ switch action
         h = waitbar(counter,['Calculate mean Trial Vector per Block ', num2str(counter*100),'%']);
         total = length(Parameters.SessN)*30;
         
+        
         %Calculate mean Trial Vector per Block
         for i = 1:length(Parameters.SessN)
     
@@ -299,6 +300,12 @@ switch action
         h = waitbar(counter,['Calculate Spearman Correlation & Euclidean ', num2str(counter*100),'%']);
         total = length(Parameters.SessN)*30;
         
+        %Setup DB_Tables
+        %DB_Correlation
+        DB_Correlation = table('Size',[1 9],'VariableTypes',{'string','int8','int8','int8','double','double','double','double','double'});
+        DB_Correlation.Properties.VariableNames = {'Subject' 'Day' 'Block' 'Trial' 'Corr_ADM' 'Corr_APB' 'Corr_FDI' 'Corr_BIC' 'Corr_FCR'};
+
+        
         %Calculate Spearman Correlation & Euclidean Distance for every Trial
         for i = 1:length(Parameters.SessN)
     
@@ -321,21 +328,6 @@ switch action
             %load trial mean
             trial_mean = EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).trial_mean;
             
-            %Arrays for Block Results
-            block_corr = [];
-            block_corr.ADM = [];
-            block_corr.APB = [];
-            block_corr.FDI = [];
-            block_corr.BIC = [];
-            block_corr.FCR = [];
-            
-            block_eucdis = [];
-            block_eucdist.ADM = [];
-            block_eucdist.APB = [];
-            block_eucdist.FDI = [];
-            block_eucdist.BIC = [];
-            block_eucdist.FCR = [];
-            
             for j = 1:30
                 
                 %check for missing trial and skip if true
@@ -347,78 +339,43 @@ switch action
 %%              %load trial and compare to mean
                 trial = EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]);
                 
+                %Correlation
+                corr_trial = [];
+                corr_trial.ADM = corr(trial.ADM,trial_mean.ADM);
+                corr_trial.APB = corr(trial.APB,trial_mean.APB);
+                corr_trial.FDI = corr(trial.FDI,trial_mean.FDI);
+                corr_trial.BIC = corr(trial.BIC,trial_mean.BIC);
+                corr_trial.FCR = corr(trial.FCR,trial_mean.FCR);
+                
+                DB_Correlation(height(DB_Correlation)+1,:) = table(id, day, block, j, corr_trial.ADM, corr_trial.APB, corr_trial.FDI, corr_trial.BIC, corr_trial.FCR);
+                
+                %Euclidean Distance
+                eucdist_trial = [];
+                eucdist_trial.ADM = dist([trial.ADM,trial_mean.ADM]);
+                eucdist_trial.APB = dist([trial.APB,trial_mean.APB]);
+                eucdist_trial.FDI = dist([trial.FDI,trial_mean.FDI]);
+                eucdist_trial.BIC = dist([trial.BIC,trial_mean.BIC]);
+                eucdist_trial.FCR = dist([trial.FCR,trial_mean.FCR]);
+                
+                DB_Correlation(height(DB_Correlation)+1,:) = table(id, day, block, j, eucdist_trial.ADM(1,2), eucdist_trial.APB(1,2), eucdist_trial.FDI(1,2), eucdist_trial.BIC(1,2), eucdist_trial.FCR(1,2));
+                
     %ADM
                 %corr
-                corr_trial = corr(trial.ADM,trial_mean.ADM);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).corr.ADM = corr_trial;
-                block_corr.ADM = [block_corr.ADM; corr_trial];
+%                 corr_trial = corr(trial.ADM,trial_mean.ADM);
+%                 EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).corr.ADM = corr_trial;
+%                 block_corr.ADM = [block_corr.ADM; corr_trial];
                 
                 %Euclidean Distance
-                eucdist_trial = dist([trial_mean.ADM trial.ADM]);
-                eucdist_trial = eucdist_trial(1,2);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).eucdist.ADM = eucdist_trial;
-                block_eucdist.ADM = [block_eucdist.ADM; eucdist_trial];
-                
-    %APB
-                %corr
-                corr_trial = corr(trial.APB,trial_mean.APB);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).corr.APB = corr_trial;
-                block_corr.APB = [block_corr.APB; corr_trial];
-                
-                %Euclidean Distance
-                eucdist_trial = dist([trial_mean.APB trial.APB]);
-                eucdist_trial = eucdist_trial(1,2);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).eucdist.APB = eucdist_trial;
-                block_eucdist.APB = [block_eucdist.APB; eucdist_trial];
-            
-    %FDI
-                %corr
-                corr_trial = corr(trial.FDI,trial_mean.FDI);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).corr.FDI = corr_trial;
-                block_corr.FDI = [block_corr.FDI; corr_trial];
-                
-                %Euclidean Distance
-                eucdist_trial = dist([trial_mean.FDI trial.FDI]);
-                eucdist_trial = eucdist_trial(1,2);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).eucdist.FDI = eucdist_trial;
-                block_eucdist.FDI = [block_eucdist.FDI; eucdist_trial];
-                
-    %BIC
-                %corr
-                corr_trial = corr(trial.BIC,trial_mean.BIC);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).corr.BIC = corr_trial;
-                block_corr.BIC = [block_corr.BIC; corr_trial];
-                
-                %Euclidean Distance
-                eucdist_trial = dist([trial_mean.BIC trial.BIC]);
-                eucdist_trial = eucdist_trial(1,2);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).eucdist.BIC = eucdist_trial;
-                block_eucdist.BIC = [block_eucdist.BIC; eucdist_trial];
-                
-    %FCR
-                %corr
-                corr_trial = corr(trial.FCR,trial_mean.FCR);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).corr.FCR = corr_trial;
-                block_corr.FCR = [block_corr.FCR; corr_trial];
-                
-                %Euclidean Distance
-                eucdist_trial = dist([trial_mean.FCR trial.FCR]);
-                eucdist_trial = eucdist_trial(1,2);
-                EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).eucdist.FCR = eucdist_trial;
-                block_eucdist.FCR = [block_eucdist.FCR; eucdist_trial];
-                
-    %End of: Compare all 5 leads to mean
+%                 eucdist_trial = dist([trial_mean.ADM trial.ADM]);
+%                 eucdist_trial = eucdist_trial(1,2);
+%                 EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).(['t',num2str(j)]).eucdist.ADM = eucdist_trial;
+%                 block_eucdist.ADM = [block_eucdist.ADM; eucdist_trial];
+
     
                 %Update Progress bar
                 counter = counter+1;
                 waitbar(counter/total, h,['Calculate Spearman Correlation & Euclidean ', num2str(counter/total*100),'%']);
             end
-            
-            %Add Corr_Array to Block
-            EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).corr_array = block_corr;      
-            EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).eucdist_array = block_eucdist;      
-            
-%             EMG_clean.stnd_len.(char(id)).(['d',num2str(day)]).(['b',num2str(block)]).eucdis_array = block_eucdis;
  
         end %End of Parameter Iteration for Spearman Corr & Euclidean Distance
         
