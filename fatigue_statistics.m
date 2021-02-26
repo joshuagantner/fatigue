@@ -35,8 +35,8 @@ fatigue_statset = []; %Set up struct to hold all Info relevant to our statistics
 disp('Available operations:')
 disp(' ')
 disp('SET UP')
-disp('  - Load fatigue_corr&eucdist (1)')
-disp('  - Load EMG_clean (2)')
+disp('  - Load data (1)')
+disp('  - Build Identifiers (2)')
 disp(' ')
 disp('OPERATIONS')
 disp('  - Calculate Variance (3)')
@@ -56,25 +56,23 @@ switch action
 %% Setup Actions
 %Case 1: Load fatigue_corr&eucdist
     case 1
-        file_name = input('What fatigue_corr&eucdist file should I load? ','s');
+        file_name = input('What file should I load? ','s');
         
-        fatigue_corr_eucdist_only = load(fullfile(rootDir,file_name));
+        v2p = load(fullfile(rootDir,file_name));
         
-        disp('--- Load fatigue_corr&eucdist: completed ---')
+        disp('--- Loading file: completed ---')
         disp(' ')
-        
+
   %End of Case 1: Load fatigue_corr&eucdist
   
-%Case 2: Load EMG_clean
+%Case 2: Build unique identifiers for blocks and days
     case 2
-        file_name = input('What EMG_clean file should I load? ','s');
+        for i = 1:height(v2p)
+            v2p.ID_block(i) = strcat(string(v2p.Subject(i)), num2str(v2p.Day(i)), num2str(v2p.Block(i)));
+            v2p.ID_day(i) = strcat(string(v2p.Subject(i)), num2str(v2p.Day(i)));
+        end
         
-        EMG_clean = load(fullfile(rootDir,file_name));
-        
-        disp('--- Load EMG_clean: completed ---')
-        disp(' ')
-        
-  %End of Case 2: Load EMG_clean
+  %End of Case 2
   
 %% Operations
 
@@ -82,148 +80,21 @@ switch action
     case 3
 
         %Calculate Variance
-        subj = fields(fatigue_corr_eucdist_only.stnd_len);
-        for i = 1:length(subj)
-
-            %enter each day
-            days = fields(fatigue_corr_eucdist_only.stnd_len.(char(subj(i))));
-            days(strcmp('corr_array',days)) = [];
-            days(strcmp('eucdist_array',days)) = [];
-            days(strcmp('parameters',days)) = [];
-
-            for j = 1:length(days)
-                %enter each block
-                blocks = fields(fatigue_corr_eucdist_only.stnd_len.(char(subj(i))).(char(days(j))));
-                blocks(strcmp('corr_array',blocks)) = [];
-                blocks(strcmp('eucdist_array',blocks)) = [];
-                blocks(strcmp('parameters',blocks)) = [];
-
-                for k = 1:length(blocks) %Block Itteration
-
-                  %enter corr & eucdist arrays
-                  arrays = ["corr_array" "eucdist_array"];
-                  arrays_2 = ["corr" "eucdist"];
-                  
-                    for l = 1:2
-                        
-                    %enter leads
-                        leads = ["ADM","APB","FDI","BIC","FCR"];
-                        
-                        for m = 1:5
-                            fatigue_corr_eucdist_only.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).variance.(char(arrays_2(l))).(char(leads(m))) = var(fatigue_corr_eucdist_only.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).(char(arrays(l))).(char(leads(m))));
-                        end%End of Lead Itteration 
-                    
-                    end%End of corr & eucdist arrays
-
-                end %End of Block Itteration
-
-            end %End of Day Itteration
-
-        end %End of Subject Itteration
+        DB_Varriance = table('Size',[1 8],'VariableTypes',{'string','int8','int8','double','double','double','double','double'});
+        DB_Varriance.Properties.VariableNames = {'Subject' 'Day' 'Block' 'Varr_Corr_ADM' 'Varr_Corr_APB' 'Varr_Corr_FDI' 'Varr_Corr_BIC' 'Varr_Corr_FCR'};
+        
+        blocks = unique(v2p.ID_block);
+        
+        for i = 1:length(blocks)
+            b = v2p(v2p.ID_block == blocks(i),:);
+            DB_Varriance(height(DB_Varriance)+1,:) = table(unique(b.Subject), unique(b.Day), unique(b.Block), var(b.Corr_ADM), var(b.Corr_APB), var(b.Corr_FDI), var(b.Corr_BIC), var(b.Corr_FCR));
+        end
 
         disp('--- Calculate Variance: Completed ---')
         disp(' ')
 
   %End of Case 3: Create nanMean Group Arrays for Correlation & Euclidean Distance
 
-  
-%Case 6
-    case 6 %Add Spearman Correlation & Euclidean Distance to Blocks & Days
-
-        subj = fields(fatigue_corr_eucdist_only.stnd_len);
-        array_legend = ["d1 b1" "d1 b2" "d1 b3" "d1 b4" "d2 b1" "d2 b2" "d2 b3" "d2 b4"];
-
-        %Create Templates for Group Arrays
-        
-%                TODO
-        
-        %Subject Itteration
-        for i = 1:length(subj)
-
-            %Create Template fo Subjects Varriance Arrays
-            for j = ["corr" "eucdist"]
-                for k = ["ADM","APB","FDI","BIC","FCR"]
-                    subj_varr.(j).(k) = nan(30,8);
-                end
-            end
-
-            %enter each day
-            days = fields(fatigue_corr_eucdist_only.stnd_len.(char(subj(i))));
-            days(strcmp('corr_array',days)) = [];
-            days(strcmp('eucdist_array',days)) = [];
-            days(strcmp('parameters',days)) = [];
-            
-            %Day Itteration
-            for j = 1:length(days)
-                
-                %Create Templates for Block Varriance Arrays
-                for k = ["corr" "eucdist"]
-                    for l = ["ADM","APB","FDI","BIC","FCR"]
-                        day_varr.(k).(l) = nan(30,4);
-                    end
-                end
-                
-                %enter each block
-                blocks = fields(fatigue_corr_eucdist_only.stnd_len.(char(subj(i))).(char(days(j))));
-                blocks(strcmp('corr_array',blocks)) = [];
-                blocks(strcmp('eucdist_array',blocks)) = [];
-                blocks(strcmp('parameters',blocks)) = [];
-            
-
-                %Block Itteration
-                for k = 1:length(blocks)
-                    
-                    %code to be executed in each block
-
-                    %Determine the position of open Block within whole
-                    %Experiment and within the open Day
-                    day_index = find(string([char(days(j)), ' ', char(blocks(k))]) == array_legend);
-                    
-                    if day_index > 4
-                        day_index_sub = day_index - 4;
-                    else
-                        day_index_sub = day_index;
-                    end
-                    
-                    %Enter every Trial of the Block and Add it
-                    trials = fields(fatigue_corr_eucdist_only.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))));
-                    trials(strcmp('corr_array',trials)) = [];
-                    trials(strcmp('eucdist_array',trials)) = [];
-                    trials(strcmp('parameters',trials)) = [];
-                    
-                    block_varr = [];
-                    
-                    for l = 1:length(trials)
-                        %Load and Add Trial to day_varr and subj_varr
-                        trial2add = fatigue_corr_eucdist_only.stnd_len.(char(subj(i))).(char(days(j))).(char(blocks(k))).(char(trials(l)));
-                        
-                        for m = ["corr" "eucdist"]
-                            for n = ["ADM","APB","FDI","BIC","FCR"]
-                                block_varr = [block_varr; trial2add];
-%                                 day_varr.(m).(n)(1:trial_length,day_index_sub) = trial2add;
-%                                 subj_varr.(m).(n)(1:trial_length,day_index) = trial2add;
-                            end
-                        end
-                        
-                    end
-                    
-                    
-                  %end of block code
-
-                end %End of Block Itteration
-                
-                fatigue_statset.stnd_len.(char(subj(i))).(char(days(j))).varriance = day_varr;
-            
-            end %End of Day Itteration
-
-            fatigue_statset.stnd_len.(char(subj(i))).varriance = subj_varr;
-            
-        end %End of Subject Itteration
-      
-        disp('--- Gathered Varriance on Block, Day and Subject level: Completed ---')
-        disp(' ')
-        
-      %End of Case 6: Add Spearman Correlation & Euclidean Distance to Blocks & Days
 
 
 %% End Script  
