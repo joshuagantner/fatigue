@@ -35,11 +35,12 @@ fatigue_statset = []; %Set up struct to hold all Info relevant to our statistics
 disp('Available operations:')
 disp(' ')
 disp('SET UP')
-disp('  - Load data (1)')
+disp('  - set varr_type (1)')
 disp('  - Build Identifiers (2)')
 disp(' ')
 disp('OPERATIONS')
 disp('  - Calculate Variance (3)')
+disp('  - Save DB_Variance (9)')
 disp(' ')
 disp('END SCRIPT')
 disp('  - Terminate Script (666)')
@@ -56,11 +57,13 @@ switch action
 %% Setup Actions
 %Case 1: Load fatigue_corr&eucdist
     case 1
-        file_name = input('What file should I load? ','s');
+        varr_type = input('Correlation or Euclidean Distance? (c/e) ','s');
         
-        v2p = load(fullfile(rootDir,file_name));
+        if not(varr_type == 'c' | varr_type == 'e')
+            disp('incorrect varr_type')
+            run_script = 0;
+        end
         
-        disp('--- Loading file: completed ---')
         disp(' ')
 
   %End of Case 1: Load fatigue_corr&eucdist
@@ -81,7 +84,13 @@ switch action
 
         %Calculate Variance
         DB_Varriance = table('Size',[1 8],'VariableTypes',{'string','int8','int8','double','double','double','double','double'});
-        DB_Varriance.Properties.VariableNames = {'Subject' 'Day' 'Block' 'Varr_Corr_ADM' 'Varr_Corr_APB' 'Varr_Corr_FDI' 'Varr_Corr_BIC' 'Varr_Corr_FCR'};
+        
+        if varr_type == 'c'
+            DB_Varriance.Properties.VariableNames = {'Subject' 'Day' 'Block' 'Varr_Corr_ADM' 'Varr_Corr_APB' 'Varr_Corr_FDI' 'Varr_Corr_BIC' 'Varr_Corr_FCR'};
+        else 
+            DB_Varriance.Properties.VariableNames = {'Subject' 'Day' 'Block' 'Varr_Corr_ADM' 'Varr_Corr_APB' 'Varr_Corr_FDI' 'Varr_Corr_BIC' 'Varr_Corr_FCR'};
+        end
+            
         
         blocks = unique(v2p.ID_block);
         
@@ -96,6 +105,25 @@ switch action
   %End of Case 3: Create nanMean Group Arrays for Correlation & Euclidean Distance
 
 
+%Case 9
+    case 9 %Save Varriance
+        
+        d = datestr(datetime(now,'ConvertFrom','datenum'));
+        d = strrep(d, ':', '_');
+        
+        mkdir(fullfile(rootDir,'Database'), d);
+        
+        if varr_type == 'c'
+            writetable(DB_Varriance,fullfile(rootDir,'Database',d,'DB_Varriance_Correlation.csv'));
+        else 
+            writetable(DB_Varriance,fullfile(rootDir,'Database',d,'DB_Varriance_Euclidean.csv'));
+        end
+        
+        disp(' ')
+        disp('--- Varriance saved to Database Folder ---')
+        disp(' ')
+        
+     %End of Case 9: Save Correlation & Euclidean Distances only
 
 %% End Script  
 %Case 666      
