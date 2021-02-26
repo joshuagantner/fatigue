@@ -37,6 +37,7 @@ disp(' ')
 disp('SET UP')
 disp('  - set varr_type (1)')
 disp('  - Build Identifiers (2)')
+disp('  - Load Parameters (4)')
 disp(' ')
 disp('OPERATIONS')
 disp('  - Calculate Variance (3)')
@@ -65,6 +66,8 @@ switch action
         end
         
         disp(' ')
+        disp(' varr_type has been set')
+        disp(' ')
 
   %End of Case 1: Load fatigue_corr&eucdist
   
@@ -75,7 +78,32 @@ switch action
             v2p.ID_day(i) = strcat(string(v2p.Subject(i)), num2str(v2p.Day(i)));
         end
         
+        disp(' ')
+        disp(' Identifiers added to v2p')
+        disp(' ')
+        
   %End of Case 2
+
+  
+%Case 4: Load Parameters
+    case 4
+        
+        file_name = input('What parameter file should I load? ','s');
+        p = readtable(fullfile(rootDir,'Database','Parameters',file_name));
+        
+        disp(' ')
+        disp(' parameters loaded')
+        
+        for i = 1:height(p)
+            p.ID_block(i) = strcat(string(p.ID(i)), num2str(p.day(i)), num2str(p.BN(i)));
+            p.ID_day(i) = strcat(string(p.ID(i)), num2str(p.BN(i)));
+        end
+        
+        disp(' day & block identifiers added to parameters ')
+        disp(' ')
+        
+  %End of Case 4
+  
   
 %% Operations
 
@@ -98,11 +126,29 @@ switch action
             b = v2p(v2p.ID_block == blocks(i),:);
             DB_Varriance(height(DB_Varriance)+1,:) = table(unique(b.Subject), unique(b.Day), unique(b.Block), var(b.Corr_ADM), var(b.Corr_APB), var(b.Corr_FDI), var(b.Corr_BIC), var(b.Corr_FCR));
         end
+        
+        v2p = DB_Varriance;
 
         disp('--- Calculate Variance: Completed ---')
         disp(' ')
 
   %End of Case 3: Create nanMean Group Arrays for Correlation & Euclidean Distance
+  
+  
+%Case 5: Add Parameters to v2'
+    case 5
+        
+        datatypes = varfun(@class,p,'OutputFormat','cell');
+        p2add = table('Size',[1 width(p)],'VariableTypes',datatypes);
+        
+        for i = 1:height(v2p)
+            p2add(i,:) = p(p.ID_block == v2p.ID_block(i),:);
+        end
+
+        disp('--- Parameters added to v2p ---')
+        disp(' ')
+
+  %End of Case 5: Add Parameters to v2p
 
 
 %Case 9
