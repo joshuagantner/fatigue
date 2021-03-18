@@ -399,8 +399,8 @@ switch action
         
         mkdir(fullfile(rootDir,'Database'), d);
         
-        writetable(DB_Correlation,fullfile(rootDir,'Database',d,'DB_Correlation.csv'));
-        writetable(DB_Correlation,fullfile(rootDir,'Database',d,'DB_Euclidean.csv'));
+        writetable(DB_Correlation,fullfile(rootDir,'Database','fatigue_processing output',d,'DB_Correlation.csv'));
+        writetable(DB_Euclidean,fullfile(rootDir,'Database','fatigue_processing output',d,'DB_Euclidean.csv'));
         
         disp(' ')
         disp('--- Correlation & Euclidean Distances saved to Database Folder ---')
