@@ -26,11 +26,6 @@ array_legend = ["d1 b1" "d1 b2" "d1 b3" "d1 b4" "d2 b1" "d2 b2" "d2 b3" "d2 b4"]
 %Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_sample.tsv'));
 %Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters.tsv'));
 
-
-%% process EMG Data
-
-fatigue_statset = []; %Set up struct to hold all Info relevant to our statistics analysis
-
 %Display available operations
 disp('Available operations:')
 disp(' ')
@@ -57,6 +52,8 @@ disp(' ')
 disp('END SCRIPT')
 disp('  - Terminate Script (666)')
 disp(' ')
+
+%% process EMG Data
 
 while run_script == 1
     
@@ -301,7 +298,7 @@ switch action
             end
         end
         
-        writetable(DB_output,fullfile(rootDir,'Database','fatigue_statistics output',file_name));
+        writetable(DB_repeated_measure,fullfile(rootDir,'Database','fatigue_statistics output',file_name));
         
     %End of Case 12: Save DB_Output for mANOVA repeated measuer without Parameters
     
