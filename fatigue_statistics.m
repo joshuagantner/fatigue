@@ -29,11 +29,8 @@ array_legend = ["d1 b1" "d1 b2" "d1 b3" "d1 b4" "d2 b1" "d2 b2" "d2 b3" "d2 b4"]
 %Display available operations
 disp('Available operations:')
 disp(' ')
-disp(' manually load DB_Correlation or DB_Euclidean into "DB_input" with readtable')
-disp(' ')
 disp('SET UP')
-disp('  - set varr_type (1)')
-disp('  - Build Identifiers (2)')
+disp('  - load DB_correlation oder DB_euclidean (1)')
 disp('  - Load Parameters (4)')
 disp(' ')
 disp('OPERATIONS')
@@ -64,50 +61,54 @@ disp(' ')
 switch action
 
 %% Setup Actions
-%Case 1: Load fatigue_corr&eucdist
+%Case 1: Load DB_correlation or DB_euclidean
     case 1
-        varr_type = input('Correlation or Euclidean Distance? (c/e) ','s');
         
-        if not(varr_type == 'c' | varr_type == 'e')
-            disp('incorrect varr_type')
-            run_script = 0;
+        [file, path] = uigetfile('*.*');
+        DB_input = readtable(fullfile(path,file));
+        
+        varr_type_mandatory = 1;
+        while varr_type_mandatory == 1
+            
+            varr_type = input('Did you load correlation or euclidean data? (c/e) ','s');
+            varr_type_mandatory = 0;
+            
+            if not(varr_type == 'c' | varr_type == 'e')
+                disp('incorrect varr_type')
+                disp('varr_type has to be specified as "c" oder "e" to proceed')
+                varr_type_mandatory = 1;
+            end
+            
+            disp(' ')
+        
         end
         
-        disp(' ')
-        disp(' varr_type has been set')
-        disp(' ')
-
-  %End of Case 1: Load fatigue_corr&eucdist
-  
-%Case 2: Build unique identifiers for blocks and days
-    case 2
+        %Build unique identifiers
         for i = 1:height(DB_input)
             DB_input.ID_block(i) = strcat(string(DB_input.Subject(i)), num2str(DB_input.Day(i)), num2str(DB_input.Block(i)));
             DB_input.ID_day(i) = strcat(string(DB_input.Subject(i)), num2str(DB_input.Day(i)));
         end
         
+        disp(' DB loaded & varr_type set')
         disp(' ')
-        disp(' Identifiers added to DB_input')
-        disp(' ')
-        
-  %End of Case 2
+
+  %End of Case 1: Load DB_correlation or DB_euclidean
 
   
 %Case 4: Load Parameters
     case 4
         
-        file_name = input('What parameter file should I load? ','s');
-        p = readtable(fullfile(rootDir,'Database','Parameters',file_name));
+        [file, path] = uigetfile('*.*');
+        p = readtable(fullfile(path,file));
         
-        disp(' ')
-        disp(' parameters loaded')
-        
+        %Build unique identifiers
         for i = 1:height(p)
             p.ID_block(i) = strcat(string(p.ID(i)), num2str(p.day(i)), num2str(p.BN(i)));
             p.ID_day(i) = strcat(string(p.ID(i)), num2str(p.BN(i)));
         end
         
-        disp(' day & block identifiers added to parameters ')
+        disp(' ')
+        disp(' parameters loaded')
         disp(' ')
         
   %End of Case 4
