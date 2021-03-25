@@ -16,15 +16,9 @@ end
 rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/Try 2/data/'; % mac root
 % rootDir = 'D:/Joshua/fatigue/data'; % windows root
 
-% Processing Parameters
-array_legend = ["d1 b1" "d1 b2" "d1 b3" "d1 b4" "d2 b1" "d2 b2" "d2 b3" "d2 b4"];
+output = [];
 
 %% Code
-
-%Create required arrays & load Parameters and Missing Trial Index
-
-%Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_sample.tsv'));
-%Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters.tsv'));
 
 %Display available operations
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
@@ -33,11 +27,12 @@ disp(' ')
 disp('SET UP')
 disp('  1  load DB_correlation oder DB_euclidean')
 disp('  2  load Parameters')
+disp('  3  combine DB & Parameters')
 disp(' ')
 disp('OUTPUT')
 disp(' rmANOVA')
-disp('  3  Correlation / Euclidean Distance')
-disp('  4  Variance of Correlation / Euclidean Distance')
+disp('  4  Correlation / Euclidean Distance - no Parameters')
+disp('  5  Variance of Correlation / Euclidean Distance - no Parameters')
 disp(' ')
 disp('* 666 to terminate script *')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
@@ -49,17 +44,16 @@ disp(' ')
 while run_script == 1
     
 %Select Operation
-action = input('What would you like me to do? ');
-disp(' ')
+action = input('• What would you like me to do? ');
 
 switch action
-
-%% Setup Actions
+    
+%% Setup
 %Case 1: Load DB_correlation or DB_euclidean
     case 1
         
         [file, path] = uigetfile('*.*');
-        DB_input = readtable(fullfile(path,file));
+        DB = readtable(fullfile(path,file));
         
         varr_type_mandatory = 1;
         while varr_type_mandatory == 1
@@ -78,12 +72,12 @@ switch action
         end
         
         %Build unique identifiers
-        for i = 1:height(DB_input)
-            DB_input.ID_block(i) = strcat(string(DB_input.Subject(i)), num2str(DB_input.Day(i)), num2str(DB_input.Block(i)));
-            DB_input.ID_day(i) = strcat(string(DB_input.Subject(i)), num2str(DB_input.Day(i)));
+        for i = 1:height(DB)
+            DB.ID_block(i) = strcat(string(DB.Subject(i)), num2str(DB.Day(i)), num2str(DB.Block(i)));
+            DB.ID_day(i) = strcat(string(DB.Subject(i)), num2str(DB.Day(i)));
         end
         
-        disp(' DB loaded & varr_type set')
+        disp('   -> DB loaded & varr_type set')
         disp(' ')
 
   
@@ -99,67 +93,62 @@ switch action
             p.ID_day(i) = strcat(string(p.ID(i)), num2str(p.BN(i)));
         end
         
-        disp(' parameters loaded')
+        disp('   -> parameters loaded')
         disp(' ')
-  
+        
+%Case 3: Combine DB & Parameters
+    case 3
+        datatypes = varfun(@class,p,'OutputFormat','cell');
+        p2add = table('Size',[1 width(p)],'VariableTypes',datatypes);
+        p2add.Properties.VariableNames = p.Properties.VariableNames;
+        
+        for i = 1:height(DB)
+            p2add(i,:) = p(p.ID_block == DB.ID_block(i),:);
+        end
+
+        DB = [DB p2add(:,[1:58])];
+        D = table2struct(DB,'ToScalar',true);
+        
+        disp('   -> DB & Parameters combined')
+        disp(' ')
   
 %% Output
 
-%% rmANOVA
-
-%Case 3: Output rmANOVA Correlation / Euclidean
-    case 3
+% rmANOVA
+    case 4 %output for rmANOVA of Mean
+        output.mean = tapply(...
+            D,...
+            {'label','Subject'},...
+            {'Corr_ADM', 'mean', 'subset', D.Day == 1 & D.Block == 1 , 'name','ADM_Corr_d1b1'},...
+            {'Corr_ADM', 'mean', 'subset', D.Day == 1 & D.Block == 2 , 'name','ADM_Corr_d1b2'},...
+            {'Corr_ADM', 'mean', 'subset', D.Day == 1 & D.Block == 3 , 'name','ADM_Corr_d1b3'},...
+            {'Corr_ADM', 'mean', 'subset', D.Day == 1 & D.Block == 4 , 'name','ADM_Corr_d1b4'},...
+            {'Corr_ADM', 'mean', 'subset', D.Day == 2 & D.Block == 1 , 'name','ADM_Corr_d2b1'},...
+            {'Corr_ADM', 'mean', 'subset', D.Day == 2 & D.Block == 2 , 'name','ADM_Corr_d2b2'},...
+            {'Corr_ADM', 'mean', 'subset', D.Day == 2 & D.Block == 3 , 'name','ADM_Corr_d2b3'},...
+            {'Corr_ADM', 'mean', 'subset', D.Day == 2 & D.Block == 4 , 'name','ADM_Corr_d2b4'});
         
-        %Merge Input & Parameters
-        datatypes = varfun(@class,p,'OutputFormat','cell');
-        p2add = table('Size',[1 width(p)],'VariableTypes',datatypes);
-        p2add.Properties.VariableNames = p.Properties.VariableNames;
-        
-        for i = 1:height(DB_input)
-            p2add(i,:) = p(p.ID_block == DB_input.ID_block(i),:);
-        end
-
-        DB_output = [DB_input p2add(:,[1:58])];
-        
-        %Format for rmANOVE
-        D = table2struct(DB_output,'ToScalar',true);
-
-        if var_type == 'c'
-            disp(' Your Pivot: Correlation')
-        else
-            disp(' Your Pivot: Euclidean Distance')
-        end
-        
-        pivottable([D.label D.SubjN], [D.Day D.Block], [D.Corr_ADM], "mean");
+        disp('   -> rmANOVA for mean saved to Database')
         disp(' ')
-        
-%Case 3: Output rmANOVA Variance Correlation / Euclidean
-    case 4
-        
-        %Merge Input & Parameters
-        datatypes = varfun(@class,p,'OutputFormat','cell');
-        p2add = table('Size',[1 width(p)],'VariableTypes',datatypes);
-        p2add.Properties.VariableNames = p.Properties.VariableNames;
-        
-        for i = 1:height(DB_input)
-            p2add(i,:) = p(p.ID_block == DB_input.ID_block(i),:);
-        end
 
-        DB_output = [DB_input p2add(:,[1:58])];
+    case 5 %output for rmANOVA of Variance
+        output.var = tapply(...
+            D,...
+            {'label','Subject'},...
+            {'Corr_ADM', 'var', 'subset', D.Day == 1 & D.Block == 1 , 'name','ADM_Corr_d1b1'},...
+            {'Corr_ADM', 'var', 'subset', D.Day == 1 & D.Block == 2 , 'name','ADM_Corr_d1b2'},...
+            {'Corr_ADM', 'var', 'subset', D.Day == 1 & D.Block == 3 , 'name','ADM_Corr_d1b3'},...
+            {'Corr_ADM', 'var', 'subset', D.Day == 1 & D.Block == 4 , 'name','ADM_Corr_d1b4'},...
+            {'Corr_ADM', 'var', 'subset', D.Day == 2 & D.Block == 1 , 'name','ADM_Corr_d2b1'},...
+            {'Corr_ADM', 'var', 'subset', D.Day == 2 & D.Block == 2 , 'name','ADM_Corr_d2b2'},...
+            {'Corr_ADM', 'var', 'subset', D.Day == 2 & D.Block == 3 , 'name','ADM_Corr_d2b3'},...
+            {'Corr_ADM', 'var', 'subset', D.Day == 2 & D.Block == 4 , 'name','ADM_Corr_d2b4'});
         
-        %Format for rmANOVE
-        D = table2struct(DB_output,'ToScalar',true);
-
-        if var_type == 'c'
-            disp(' Your Pivot: Variance of Correlation')
-        else
-            disp(' Your Pivot: Variance of Euclidean Distance')
-        end
-        pivottable([D.label D.SubjN], [D.Day D.Block], [D.Corr_ADM], "var");
+        disp('   -> rmANOVA for var saved to Database')
         disp(' ')
-        
         
 %% End Script  
+
 %Case 666      
     case 666 %Terminate Script
         run_script = 0;
