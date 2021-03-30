@@ -13,7 +13,7 @@ if setup_check == 'n'
     run_script = 0;
 end
 
-rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/Try 2/data/'; % mac root
+rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
 % rootDir = 'D:/Joshua/fatigue/data'; % windows root
 
 % Processing Parameters
@@ -27,24 +27,27 @@ LENGTH = 100000;
 
 %Create required arrays & load Parameters and Missing Trial Index
 
-Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_sample.tsv'));
+%Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_sample.tsv'));
 %Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_modified.tsv'));
 
-Missing_Trials = dload(fullfile(rootDir,'0 Parameters','missing_trials.tsv'));
+%Missing_Trials = dload(fullfile(rootDir,'0 Parameters','missing_trials.tsv'));
 
 %create list of missing trials
-missing_trials = [];
-
-for i = 1:length(Missing_Trials.ID)
-    trial = [char(Missing_Trials.ID(i)),'.',num2str(Missing_Trials.day(i)),'.',char(Missing_Trials.BN(i)),'.',char(Missing_Trials.trial(i))];
-    missing_trials = [missing_trials; string(trial)];
-end
+% % missing_trials = [];
+% % 
+% % for i = 1:length(Missing_Trials.ID)
+% %     trial = [char(Missing_Trials.ID(i)),'.',num2str(Missing_Trials.day(i)),'.',char(Missing_Trials.BN(i)),'.',char(Missing_Trials.trial(i))];
+% %     missing_trials = [missing_trials; string(trial)];
+% % end
 
 %Display available operations
 disp('Available operations:')
 disp(' ')
 disp('  - Process Raw Cut Trial EMG Data -> Creates EMG_Clean (1)')
+disp('        • requires Parameters & Missing Trials')
 disp('  - Load EMG_clean (2)')
+disp('  - Load Parameters (6)')
+disp('  - Load Mising Trials (7)')
 disp(' ')
 disp(' Requires EMG_clean:')
 disp('  - Standardise processed trial vectors for time (3)')
@@ -69,6 +72,23 @@ disp(' ')
 
 switch action
 
+%Case 6 || Load Parameters
+    case 6
+        [f,p] = uigetfile('*.*','Select the Fatigue Parameter File');
+        Parameters = dload(fullfile(p,f));
+        
+%Case 7 || Load Missing Trials
+    case 7
+        [f,p] = uigetfile('*.*','Select the Missing Trials List');
+        Missing_Trials = dload(fullfile(p,f));
+        
+        missing_trials = [];
+
+        for i = 1:length(Missing_Trials.ID)
+            trial = [char(Missing_Trials.ID(i)),'.',num2str(Missing_Trials.day(i)),'.',char(Missing_Trials.BN(i)),'.',char(Missing_Trials.trial(i))];
+            missing_trials = [missing_trials; string(trial)];
+        end
+        
 %Case 1   
     case 1 %Process Raw Cut Trial EMG Data
         
@@ -142,10 +162,10 @@ switch action
 
 %Case 2
     case 2 %Load EMG_clean
-        file_name = input('What file would you like to load as EMG_clean? ','s');
-        EMG_clean = load(fullfile(rootDir,file_name));
+        [f,p] = uigetfile('Select the EMG_Clean matlab file');
+        EMG_clean = load(fullfile(p,f));
         disp(' ')
-        disp(['--- ',file_name,' has been loaded successfully ---'])
+        disp(['--- ',f,' has been loaded successfully ---'])
         disp('  You can now access it as "EMG_clean" in your code')
         disp(' ')
         
@@ -383,11 +403,9 @@ switch action
 
 %Case 8
     case 8 %Save EMG_clean
-        disp('EMG_clean will be saved to your rootDir.')
-        disp(' ')
-        file_name = input('What should I name the file? ','s');
-        file_name = [file_name, '.mat'];
-        save(fullfile(rootDir,file_name),'-struct','EMG_clean','-v7.3')
+        filename_suggestion = ['EMG_clean_',datestr(now,'YYYY-MM-DD_hhmmss'),'.mat'];
+        [f,p] = uiputfile('','Where to save new EMG_Clean…',filename_suggestion);
+        save(fullfile(p,f),'-struct','EMG_clean','-v7.3')
         disp('Saved succesfully')
         disp(' ')
     %End of Case 8: Save EMG_clean
@@ -395,12 +413,16 @@ switch action
 %Case 9
     case 9 %Save Correlation & Euclidean Distances
         
-        d = datestr(datetime(now,'ConvertFrom','datenum'));
+        d = datestr(now,'YYYY-MM-DD_hhmmss');
         
-        mkdir(fullfile(rootDir,'Database'), d);
+        filename = fullfile(rootDir,'fatigue_processing output',['DB_Correlation',d,'.csv']);
+        dsave(filename,table2struct(DB_Correlation,'ToScalar',true));
         
-        writetable(DB_Correlation,fullfile(rootDir,'Database','fatigue_processing output',d,'DB_Correlation.csv'));
-        writetable(DB_Euclidean,fullfile(rootDir,'Database','fatigue_processing output',d,'DB_Euclidean.csv'));
+        filename = fullfile(rootDir,'fatigue_processing output',['DB_Euclidean',d,'.csv']);
+        dsave(filename,table2struct(DB_Euclidean,'ToScalar',true));
+        
+        %writetable(DB_Correlation,fullfile(rootDir,'fatigue_processing output','DB_Correlation.csv'));
+        %writetable(DB_Euclidean,fullfile(rootDir,'fatigue_processing output','DB_Euclidean.csv'));
         
         disp(' ')
         disp('--- Correlation & Euclidean Distances saved to Database Folder ---')
