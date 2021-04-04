@@ -3,82 +3,52 @@
 
 %% Setup
 run_script = 1;
-
-setup_check = input('Have you updated the rootDir, the allDat and the save function? [y/n] ','s');
-disp(' ');
-
-if setup_check == 'n'
-    disp('Please update and restart your script.');
-    disp(' ');
-    run_script = 0;
-end
-
 rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
 % rootDir = 'D:/Joshua/fatigue/data'; % windows root
 
-% Processing Parameters
-SRATE = 5000;
-freq_h = 10;
-freq_l = 6;
-ORDER = 4;
-LENGTH = 100000;
-
 %% Code
 
-%Create required arrays & load Parameters and Missing Trial Index
-
-%Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_sample.tsv'));
-%Parameters = dload(fullfile(rootDir,'0 Parameters','fatigue_parameters_modified.tsv'));
-
-%Missing_Trials = dload(fullfile(rootDir,'0 Parameters','missing_trials.tsv'));
-
-%create list of missing trials
-% % missing_trials = [];
-% % 
-% % for i = 1:length(Missing_Trials.ID)
-% %     trial = [char(Missing_Trials.ID(i)),'.',num2str(Missing_Trials.day(i)),'.',char(Missing_Trials.BN(i)),'.',char(Missing_Trials.trial(i))];
-% %     missing_trials = [missing_trials; string(trial)];
-% % end
-
 %Display available operations
+disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
 disp('Available operations:')
 disp(' ')
-disp('  - Process Raw Cut Trial EMG Data -> Creates EMG_Clean (1)')
+disp('SETUP')
+disp(' 1  Load Parameters')
+disp(' 2  Load Mising Trial')
+disp(' 3  Load EMG_clean')
+disp(' 4  Process Raw Cut Trial EMG Data -> Creates EMG_Clean')
 disp('        • requires Parameters & Missing Trials')
-disp('  - Load EMG_clean (2)')
-disp('  - Load Parameters (6)')
-disp('  - Load Mising Trials (7)')
 disp(' ')
-disp(' Requires EMG_clean:')
-disp('  - Standardise processed trial vectors for time (3)')
-disp('  - Calculate mean Trial Vector per Block (4)')
+disp('OPERATIONS')
+disp(' 5  Standardise processed trial vectors for time')
+disp(' 6  Calculate mean Trial Vector per Block')
+disp(' 7  Calculate Spearman Correlation & Euclidean Distance for every Trial')
 disp(' ')
-disp(' Requires mean Trial Vectors:')
-disp('  - Calculate Spearman Correlation & Euclidean Distance for every Trial (5)')
+disp('SAVE')
+disp(' 8  Save EMG_clean')
+disp(' 9  Save Correlations & Euclidean Distances')
 disp(' ')
-disp('  - Save EMG_clean (8)')
-disp('  - Save Correlations & Euclidean Distances(9)')
+disp('terminate script with 666')
+disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
 disp(' ')
-disp('  - Terminate Script (666)')
 
 %% process EMG Data
 
 while run_script == 1
     
 %Select Operation
-disp(' ')
 action = input('What would you like me to do? ');
-disp(' ')
+
 
 switch action
 
-%Case 6 || Load Parameters
-    case 6
+%Case 1: Load Parameters
+    case 1
         [f,p] = uigetfile('*.*','Select the Fatigue Parameter File');
         Parameters = dload(fullfile(p,f));
         
-%Case 7 || Load Missing Trials
-    case 7
+%Case 2: Load Missing Trials
+    case 2
         [f,p] = uigetfile('*.*','Select the Missing Trials List');
         Missing_Trials = dload(fullfile(p,f));
         
@@ -89,9 +59,25 @@ switch action
             missing_trials = [missing_trials; string(trial)];
         end
         
-%Case 1   
-    case 1 %Process Raw Cut Trial EMG Data
+%Case 3: Load EMG_clean
+    case 3
+        [f,p] = uigetfile('Select the EMG_Clean matlab file');
+        EMG_clean = load(fullfile(p,f));
+        disp(' ')
+        disp(['--- ',f,' has been loaded successfully ---'])
+        disp('  You can now access it as "EMG_clean" in your code')
+        disp(' ')
         
+%Case 4: Process Raw Cut Trial EMG Data
+    case 4
+        
+        % Processing Parameters
+        SRATE = 5000;
+        freq_h = 10;
+        freq_l = 6;
+        ORDER = 4;
+        LENGTH = 100000;
+
         %Setup Progress bar
         counter = 0;
         h = waitbar(0,['Processing Cut Trial EMG Data ', num2str(counter*100),'%']);
@@ -157,22 +143,9 @@ switch action
         close(h);
         disp('--- Process Raw Cut Trial EMG Data: Completed ---')
         disp(' ')
-        
-        %End of Case 1: Process Raw Cut Trial EMG Data
-
-%Case 2
-    case 2 %Load EMG_clean
-        [f,p] = uigetfile('Select the EMG_Clean matlab file');
-        EMG_clean = load(fullfile(p,f));
-        disp(' ')
-        disp(['--- ',f,' has been loaded successfully ---'])
-        disp('  You can now access it as "EMG_clean" in your code')
-        disp(' ')
-        
-        %End of Case 2: Load EMG_Clean
   
-%Case 3
-    case 3 %Standardise processed trial vectors for time
+%Case 5: Standardise processed trial vectors for time
+    case 5
         
         %Setup Progress bar
         counter = 0;
@@ -231,10 +204,8 @@ switch action
         disp('--- Standardise processed trial vectors for time: Completed ---')
         disp(' ')
          
-        %End of Case 2: Standardise processed trial vectors for time
-
-%Case 4
-    case 4 %Calculate mean Trial Vector per Block
+%Case 6: Calculate mean Trial Vector per Block
+    case 6
         
         %Setup Progress bar
         counter = 0;
@@ -314,10 +285,8 @@ switch action
         disp('--- Calculate mean Trial Vectors per Block: Completed ---')
         disp(' ')
         
-       %End of Case 4: Calculate mean Trial Vectors per Block
-    
-%Case 5
-    case 5 %Calculate Spearman Correlation & Euclidean Distance for every Trial
+%Case 7: Calculate Spearman Correlation & Euclidean Distance for every Trial
+    case 7
         
         %Setup Progress bar
         counter = 0;
@@ -326,18 +295,19 @@ switch action
         
         %Setup DB_Tables
         %DB_Correlation
-        DB_Correlation = table('Size',[1 9],'VariableTypes',{'string','int8','int8','int8','double','double','double','double','double'});
-        DB_Correlation.Properties.VariableNames = {'Subject' 'Day' 'Block' 'Trial' 'Corr_ADM' 'Corr_APB' 'Corr_FDI' 'Corr_BIC' 'Corr_FCR'};
+        DB_Correlation = table('Size',[0 9],'VariableTypes',{'string','int8','int8','int8','int8','double','double','double','double','double'});
+        DB_Correlation.Properties.VariableNames = {'Subject' 'SubjN' 'Day' 'Block' 'Trial' 'Corr_ADM' 'Corr_APB' 'Corr_FDI' 'Corr_BIC' 'Corr_FCR'};
         
-        %DB_Correlation
-        DB_Euclidean = table('Size',[1 9],'VariableTypes',{'string','int8','int8','int8','double','double','double','double','double'});
-        DB_Euclidean.Properties.VariableNames = {'Subject' 'Day' 'Block' 'Trial' 'Corr_ADM' 'Corr_APB' 'Corr_FDI' 'Corr_BIC' 'Corr_FCR'};
+        %DB_Euclidean
+        DB_Euclidean = table('Size',[0 9],'VariableTypes',{'string','int8','int8','int8','int8','double','double','double','double','double'});
+        DB_Euclidean.Properties.VariableNames = {'Subject' 'SubjN' 'Day' 'Block' 'Trial' 'Euc_ADM' 'Euc_APB' 'Euc_FDI' 'Euc_BIC' 'Euc_FCR'};
 
         
         %Calculate Spearman Correlation & Euclidean Distance for every Trial
         for i = 1:length(Parameters.SessN)
     
             id = Parameters.ID(i);
+            subjn = Parameters.SubjN(i);
             day = Parameters.day(i);
             block = Parameters.BN(i);
             
@@ -375,7 +345,7 @@ switch action
                 corr_trial.BIC = corr(trial.BIC,trial_mean.BIC);
                 corr_trial.FCR = corr(trial.FCR,trial_mean.FCR);
                 
-                DB_Correlation(height(DB_Correlation)+1,:) = table(id, day, block, j, corr_trial.ADM, corr_trial.APB, corr_trial.FDI, corr_trial.BIC, corr_trial.FCR);
+                DB_Correlation(height(DB_Correlation)+1,:) = table(id, subjn, day, block, j, corr_trial.ADM, corr_trial.APB, corr_trial.FDI, corr_trial.BIC, corr_trial.FCR);
                 
                 %Euclidean Distance
                 eucdist_trial = [];
@@ -385,7 +355,7 @@ switch action
                 eucdist_trial.BIC = dist([trial.BIC,trial_mean.BIC]);
                 eucdist_trial.FCR = dist([trial.FCR,trial_mean.FCR]);
                 
-                DB_Euclidean(height(DB_Euclidean)+1,:) = table(id, day, block, j, eucdist_trial.ADM(1,2), eucdist_trial.APB(1,2), eucdist_trial.FDI(1,2), eucdist_trial.BIC(1,2), eucdist_trial.FCR(1,2));
+                DB_Euclidean(height(DB_Euclidean)+1,:) = table(id, subjn, day, block, j, eucdist_trial.ADM(1,2), eucdist_trial.APB(1,2), eucdist_trial.FDI(1,2), eucdist_trial.BIC(1,2), eucdist_trial.FCR(1,2));
     
                 %Update Progress bar
                 counter = counter+1;
@@ -397,46 +367,33 @@ switch action
         close(h)
         disp('--- Calculate Spearman Correlation & Euclidean Distance for every Trial: Completed ---')
         disp(' ')
-        
-      %End of Case 5: Calculate Spearman Correlation & Euclidean Distance for every Trial
-      
 
-%Case 8
-    case 8 %Save EMG_clean
+%Case 8: Save EMG_clean
+    case 8
         filename_suggestion = ['EMG_clean_',datestr(now,'YYYY-MM-DD_hhmmss'),'.mat'];
         [f,p] = uiputfile('','Where to save new EMG_Clean…',filename_suggestion);
         save(fullfile(p,f),'-struct','EMG_clean','-v7.3')
         disp('Saved succesfully')
         disp(' ')
-    %End of Case 8: Save EMG_clean
     
-%Case 9
-    case 9 %Save Correlation & Euclidean Distances
+%Case 9: Save Correlation & Euclidean Distances
+    case 9
         
         d = datestr(now,'YYYY-MM-DD_hhmmss');
         
-        filename = fullfile(rootDir,'fatigue_processing output',['DB_Correlation',d,'.csv']);
+        filename = fullfile(rootDir,'fatigue_processing output',['DB_Correlation',d,'.txt']);
         dsave(filename,table2struct(DB_Correlation,'ToScalar',true));
         
-        filename = fullfile(rootDir,'fatigue_processing output',['DB_Euclidean',d,'.csv']);
+        filename = fullfile(rootDir,'fatigue_processing output',['DB_Euclidean',d,'.txt']);
         dsave(filename,table2struct(DB_Euclidean,'ToScalar',true));
         
-        %writetable(DB_Correlation,fullfile(rootDir,'fatigue_processing output','DB_Correlation.csv'));
-        %writetable(DB_Euclidean,fullfile(rootDir,'fatigue_processing output','DB_Euclidean.csv'));
-        
-        disp(' ')
         disp('--- Correlation & Euclidean Distances saved to Database Folder ---')
         disp(' ')
         
-     %End of Case 9: Save Correlation & Euclidean Distances only
-        
-%Case 666      
-    case 666 %Terminate Script
+%Case 666: Terminate Script   
+    case 666
         run_script = 0;
-      %End of Case 666: Terminate Script
         
 end %End of Operation/Action Switch
-
 end %End of While Loop
-disp(' ')
 disp('SCRIPT TERMINATED')
