@@ -1,8 +1,8 @@
 % Fatigue | Approach 2 | v3 - Statistics %
 %% Setup
 run_script = 1;
-rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/Try 2/data/'; % mac root
-% rootDir = 'D:/Joshua/fatigue/data'; % windows root
+rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
+% rootDir = 'D:/Joshua/fatigue/database'; % windows root
 
 %% Code
 %Display available operations

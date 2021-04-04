@@ -4,7 +4,7 @@
 %% Setup
 run_script = 1;
 rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
-% rootDir = 'D:/Joshua/fatigue/data'; % windows root
+% rootDir = 'D:/Joshua/fatigue/database'; % windows root
 
 %% Code
 
