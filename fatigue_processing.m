@@ -3,8 +3,8 @@
 
 %% Setup
 run_script = 1;
-rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
-% rootDir = 'D:/Joshua/fatigue/database'; % windows root
+% rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
+rootDir = 'D:/Joshua/fatigue/database'; % windows root
 
 %% Code
 
@@ -30,15 +30,14 @@ disp(' 9  Save Correlations & Euclidean Distances')
 disp(' ')
 disp('terminate script with 666')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
-disp(' ')
 
 %% process EMG Data
-
 while run_script == 1
     
 %Select Operation
+disp(' ')
 action = input('What would you like me to do? ');
-
+disp(' ')
 
 switch action
 
@@ -46,6 +45,7 @@ switch action
     case 1
         [f,p] = uigetfile('*.*','Select the Fatigue Parameter File');
         Parameters = dload(fullfile(p,f));
+        disp('  -> Parameters loaded')
         
 %Case 2: Load Missing Trials
     case 2
@@ -58,18 +58,19 @@ switch action
             trial = [char(Missing_Trials.ID(i)),'.',num2str(Missing_Trials.day(i)),'.',char(Missing_Trials.BN(i)),'.',char(Missing_Trials.trial(i))];
             missing_trials = [missing_trials; string(trial)];
         end
+        disp('  -> Missing Trials loaded')
         
 %Case 3: Load EMG_clean
     case 3
         [f,p] = uigetfile('Select the EMG_Clean matlab file');
         EMG_clean = load(fullfile(p,f));
-        disp(' ')
         disp(['--- ',f,' has been loaded successfully ---'])
         disp('  You can now access it as "EMG_clean" in your code')
-        disp(' ')
         
 %Case 4: Process Raw Cut Trial EMG Data
     case 4
+        
+        [p] = uigetdir(rootDir,'Select the EMG Cut Trials folder');
         
         % Processing Parameters
         SRATE = 5000;
@@ -116,7 +117,7 @@ switch action
 
                 %Load the Trial File
                 file = strcat(id,'_EMG_d',num2str(day),'_b',num2str(block),'_t',num2str(j),'.txt');
-                D = dload(char(fullfile(rootDir,'1 Trials Cut',folder,file)));
+                D = dload(char(fullfile(p,folder,file)));
 
                 %Process each Lead
                 final.ADM = proc_std(D.ADM, SRATE, freq_h, freq_l, ORDER);
@@ -295,11 +296,11 @@ switch action
         
         %Setup DB_Tables
         %DB_Correlation
-        DB_Correlation = table('Size',[0 9],'VariableTypes',{'string','int8','int8','int8','int8','double','double','double','double','double'});
+        DB_Correlation = table('Size',[0 10],'VariableTypes',{'string','int8','int8','int8','int8','double','double','double','double','double'});
         DB_Correlation.Properties.VariableNames = {'Subject' 'SubjN' 'Day' 'Block' 'Trial' 'Corr_ADM' 'Corr_APB' 'Corr_FDI' 'Corr_BIC' 'Corr_FCR'};
         
         %DB_Euclidean
-        DB_Euclidean = table('Size',[0 9],'VariableTypes',{'string','int8','int8','int8','int8','double','double','double','double','double'});
+        DB_Euclidean = table('Size',[0 10],'VariableTypes',{'string','int8','int8','int8','int8','double','double','double','double','double'});
         DB_Euclidean.Properties.VariableNames = {'Subject' 'SubjN' 'Day' 'Block' 'Trial' 'Euc_ADM' 'Euc_APB' 'Euc_FDI' 'Euc_BIC' 'Euc_FCR'};
 
         
@@ -371,7 +372,7 @@ switch action
 %Case 8: Save EMG_clean
     case 8
         filename_suggestion = ['EMG_clean_',datestr(now,'YYYY-MM-DD_hhmmss'),'.mat'];
-        [f,p] = uiputfile('','Where to save new EMG_Clean…',filename_suggestion);
+        [f,p] = uiputfile(fullfile(rootDir,'fatigue_processing output',filename_suggestion),'Where to save new EMG_Clean…');
         save(fullfile(p,f),'-struct','EMG_clean','-v7.3')
         disp('Saved succesfully')
         disp(' ')
