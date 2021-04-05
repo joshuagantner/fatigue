@@ -43,13 +43,13 @@ switch action
 
 %Case 1: Load Parameters
     case 1
-        [f,p] = uigetfile('*.*','Select the Fatigue Parameter File');
+        [f,p] = uigetfile(rootDir,'*.*','Select the Fatigue Parameter File');
         Parameters = dload(fullfile(p,f));
         disp('  -> Parameters loaded')
         
 %Case 2: Load Missing Trials
     case 2
-        [f,p] = uigetfile('*.*','Select the Missing Trials List');
+        [f,p] = uigetfile(rootDir,'*.*','Select the Missing Trials List');
         Missing_Trials = dload(fullfile(p,f));
         
         missing_trials = [];
@@ -62,7 +62,7 @@ switch action
         
 %Case 3: Load EMG_clean
     case 3
-        [f,p] = uigetfile('Select the EMG_Clean matlab file');
+        [f,p] = uigetfile(rootDir,'Select the EMG_Clean matlab file');
         EMG_clean = load(fullfile(p,f));
         disp(['--- ',f,' has been loaded successfully ---'])
         disp('  You can now access it as "EMG_clean" in your code')
