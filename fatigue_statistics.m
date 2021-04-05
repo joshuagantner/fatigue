@@ -19,25 +19,24 @@ disp('  4  rmANOVA')
 disp(' ')
 disp('terminate script with 666')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
-disp(' ')
-
 
 %% Script
 while run_script == 1
 
-action = input('• What would you like me to do? ');
 disp(' ')
+action = input('• What would you like me to do? ');
 
 switch action
 %Case 1: Load DB_correlation or DB_euclidean
     case 1
         
-        [file, path] = uigetfile('*.*');
+        [file, path] = uigetfile(fullfile(rootDir,'*.*'));
         DB = dload(fullfile(path,file));
         
         varr_type_mandatory = 1;
         while varr_type_mandatory == 1
             
+            disp(' ')
             varr_type = input('Did you load correlation or euclidean data? (c/e) ','s');
             varr_type_mandatory = 0;
             
@@ -47,8 +46,6 @@ switch action
                 varr_type_mandatory = 1;
             end
             
-            disp(' ')
-        
         end
         
         disp('   -> DB loaded & varr_type set')
@@ -56,7 +53,7 @@ switch action
 %Case 2: Load Parameters
     case 2
         
-        [file, path] = uigetfile('*.*');
+        [file, path] = uigetfile(fullfile(rootDir,'*.*'));
         p = dload(fullfile(path,file));
 
         disp('   -> parameters loaded')
@@ -66,7 +63,7 @@ switch action
 
         
         for i = 1:length(DB.Subject)
-            DB.label(i) =   unique(p.label(p.SubjN == DB.subjn(i)));
+            DB.label(i) =   unique(p.label(p.SubjN == DB.SubjN(i)));
         end
         
         disp('   -> DB & Parameters combined')
@@ -78,21 +75,26 @@ switch action
         disp('Output options:')
         output_type = input(' • Type (mean, var): ','s');
         output_lead = input(' • Type (ADM, APB, FDI, BIC, FCR): ','s');
-        output_lead = ['Corr_', output_lead];
         
-        S = tapply(D,...
+        if varr_type == 'c'
+            output_lead = ['Corr_', output_lead];
+        elseif varr_type == 'e'
+            output_lead = ['Euc_', output_lead];
+        end
+        
+        S = tapply(DB,...
             {'label','Subject'},...
-            {output_lead, output_type, 'subset', D.Day == 1 & D.Block == 1 , 'name','d1b1'},...
-            {output_lead, output_type, 'subset', D.Day == 1 & D.Block == 2 , 'name','d1b2'},...
-            {output_lead, output_type, 'subset', D.Day == 1 & D.Block == 3 , 'name','d1b3'},...
-            {output_lead, output_type, 'subset', D.Day == 1 & D.Block == 4 , 'name','d1b4'},...
-            {output_lead, output_type, 'subset', D.Day == 2 & D.Block == 1 , 'name','d2b1'},...
-            {output_lead, output_type, 'subset', D.Day == 2 & D.Block == 2 , 'name','d2b2'},...
-            {output_lead, output_type, 'subset', D.Day == 2 & D.Block == 3 , 'name','d2b3'},...
-            {output_lead, output_type, 'subset', D.Day == 2 & D.Block == 4 , 'name','d2b4'}); % End of tapply
+            {output_lead, output_type, 'subset', DB.Day == 1 & DB.Block == 1 , 'name','d1b1'},...
+            {output_lead, output_type, 'subset', DB.Day == 1 & DB.Block == 2 , 'name','d1b2'},...
+            {output_lead, output_type, 'subset', DB.Day == 1 & DB.Block == 3 , 'name','d1b3'},...
+            {output_lead, output_type, 'subset', DB.Day == 1 & DB.Block == 4 , 'name','d1b4'},...
+            {output_lead, output_type, 'subset', DB.Day == 2 & DB.Block == 1 , 'name','d2b1'},...
+            {output_lead, output_type, 'subset', DB.Day == 2 & DB.Block == 2 , 'name','d2b2'},...
+            {output_lead, output_type, 'subset', DB.Day == 2 & DB.Block == 3 , 'name','d2b3'},...
+            {output_lead, output_type, 'subset', DB.Day == 2 & DB.Block == 4 , 'name','d2b4'}); % End of tapply
         
-        filename = [datestr(now,'yyyy-mm-dd HH.MM.SS'),' ',output_lead,' ',output_type,'.tsv'];
-        dsave(fullfile(rootDir,'Database','fatigue_statistics output',filename),S)
+        filename = [datestr(now,'yyyy-mm-dd HHMMSS'),' ',output_lead,' ',output_type,'.tsv'];
+        dsave(fullfile(rootDir,'fatigue_statistics output',filename),S)
         disp(' ')
         disp(['   -> ',filename,' saved to database'])
 

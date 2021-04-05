@@ -382,10 +382,10 @@ switch action
         
         d = datestr(now,'yyyy-mm-dd_hhMMss');
         
-        filename = fullfile(rootDir,'fatigue_processing output',['DB_Correlation',d,'.txt']);
+        filename = fullfile(rootDir,'fatigue_processing output',['DB_Correlation ',d,'.txt']);
         dsave(filename,table2struct(DB_Correlation,'ToScalar',true));
         
-        filename = fullfile(rootDir,'fatigue_processing output',['DB_Euclidean',d,'.txt']);
+        filename = fullfile(rootDir,'fatigue_processing output',['DB_Euclidean ',d,'.txt']);
         dsave(filename,table2struct(DB_Euclidean,'ToScalar',true));
         
         disp('--- Correlation & Euclidean Distances saved to Database Folder ---')
