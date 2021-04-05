@@ -43,13 +43,13 @@ switch action
 
 %Case 1: Load Parameters
     case 1
-        [f,p] = uigetfile(rootDir,'*.*','Select the Fatigue Parameter File');
+        [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Fatigue Parameter File');
         Parameters = dload(fullfile(p,f));
         disp('  -> Parameters loaded')
         
 %Case 2: Load Missing Trials
     case 2
-        [f,p] = uigetfile(rootDir,'*.*','Select the Missing Trials List');
+        [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Missing Trials List');
         Missing_Trials = dload(fullfile(p,f));
         
         missing_trials = [];
@@ -371,7 +371,7 @@ switch action
 
 %Case 8: Save EMG_clean
     case 8
-        filename_suggestion = ['EMG_clean_',datestr(now,'YYYY-MM-DD_hhmmss'),'.mat'];
+        filename_suggestion = ['EMG_clean_',datestr(now,'yyyy-mm-dd_hhMMss'),'.mat'];
         [f,p] = uiputfile(fullfile(rootDir,'fatigue_processing output',filename_suggestion),'Where to save new EMG_Clean…');
         save(fullfile(p,f),'-struct','EMG_clean','-v7.3')
         disp('Saved succesfully')
@@ -380,7 +380,7 @@ switch action
 %Case 9: Save Correlation & Euclidean Distances
     case 9
         
-        d = datestr(now,'YYYY-MM-DD_hhmmss');
+        d = datestr(now,'yyyy-mm-dd_hhMMss');
         
         filename = fullfile(rootDir,'fatigue_processing output',['DB_Correlation',d,'.txt']);
         dsave(filename,table2struct(DB_Correlation,'ToScalar',true));
