@@ -15,7 +15,8 @@ disp('  2  load Parameters')
 disp('  3  combine Data & Parameters')
 disp(' ')
 disp('OUTPUT')
-disp('  4  rmANOVA')
+disp('  4  rmANOVA in SPSS')
+disp('  5  t-test')
 disp(' ')
 disp('terminate script with 666')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
@@ -98,6 +99,35 @@ switch action
         disp(' ')
         disp(['   -> ',filename,' saved to database'])
 
+%Case 5: T-Test
+    case 5
+        disp(' ')
+        disp('T-Test Options:')
+        output_type = input(' • Type (mean, var): ','s');
+        output_lead = input(' • Type (ADM, APB, FDI, BIC, FCR): ','s');
+        
+        if varr_type == 'c'
+            output_lead = ['Corr_', output_lead];
+        elseif varr_type == 'e'
+            output_lead = ['Euc_', output_lead];
+        end
+        
+        S = tapply(DB,...
+            {'label','Subject'},...
+            {output_lead, output_type, 'subset', DB.Day == 1, 'name','d1'},...
+            {output_lead, output_type, 'subset', DB.Day == 2, 'name','d2'},...
+            {output_lead, output_type, 'subset', DB.Day == 1 & DB.Block == 1 , 'name','d1b1'},...
+            {output_lead, output_type, 'subset', DB.Day == 1 & DB.Block == 2 , 'name','d1b2'},...
+            {output_lead, output_type, 'subset', DB.Day == 1 & DB.Block == 3 , 'name','d1b3'},...
+            {output_lead, output_type, 'subset', DB.Day == 1 & DB.Block == 4 , 'name','d1b4'},...
+            {output_lead, output_type, 'subset', DB.Day == 2 & DB.Block == 1 , 'name','d2b1'},...
+            {output_lead, output_type, 'subset', DB.Day == 2 & DB.Block == 2 , 'name','d2b2'},...
+            {output_lead, output_type, 'subset', DB.Day == 2 & DB.Block == 3 , 'name','d2b3'},...
+            {output_lead, output_type, 'subset', DB.Day == 2 & DB.Block == 4 , 'name','d2b4'}); % End of tapply
+        
+        run_script = 0;
+        disp("Your Data is ready to test in Struct 'S'")
+        
 %Case 666: Terminate Script 
     case 666 %
         run_script = 0;
