@@ -2,8 +2,8 @@
 
 run_script = 1;
 
-rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
-% rootDir = 'D:/Joshua/fatigue/database'; % windows root
+% rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
+rootDir = 'D:/Joshua/fatigue/database'; % windows root
 
 array_legend = ["d1 b1" "d1 b2" "d1 b3" "d1 b4" "d2 b1" "d2 b2" "d2 b3" "d2 b4"];
 
@@ -13,16 +13,20 @@ array_legend = ["d1 b1" "d1 b2" "d1 b3" "d1 b4" "d2 b1" "d2 b2" "d2 b3" "d2 b4"]
 disp('Available operations:')
 disp(' ')
 disp('SETUP')
-disp('  2 Load fatigue_corr&eucdist')
-disp('  3 Load EMG_clean')
-disp('  6 Load parameters')
-disp('  7 Load missing trials')
+disp('  1 Load fatigue_corr&eucdist')
+disp('  2 Load EMG_clean')
+disp('  3 Load parameters')
+disp('  4 Load missing trials')
 disp(' ')
-disp('ACTIONS')
-disp('  1 Create nanMean Group Arrays for Correlation & Euclidean Distance')
-disp('  4 Plot Results')
-disp('  5 Lineplots per Block')
+disp('actions old')
+disp('  5 Create nanMean Group Arrays for Correlation & Euclidean Distance')
+disp('  6 Plot Results')
+disp('  7 Lineplots per Block')
 disp('  8 Save Group Arrays')
+disp(' ')
+disp('actions new')
+disp('   9 plot block')
+disp('  10 plot trial')
 disp(' ')
 disp('* 666 Terminate Script *')
 
@@ -35,15 +39,27 @@ disp(' ')
 
 switch action
 
-%Case 6
-    case 6 %Load Parameters
+%% SETUP
+
+    case 1 %Load fatigue_corr&eucdist
+        [file, path] = uigetfile(fullfile(rootDir,'*.*'),'What fatigue_corr&eucdist file should I load? ');
+        fatigue_corr_eucdist_only = load(fullfile(path,file));
+        
+        disp('--- Load fatigue_corr&eucdist: completed ---')
+       
+    case 2 %Load EMG_clean
+        [file, path] = uigetfile(fullfile(rootDir,'*.*'),'What EMG_clean file should I load? ');
+        EMG_clean = load(fullfile(path, file));
+        
+        disp('--- Load EMG_clean: completed ---')
+       
+    case 3 %Load Parameters
         [file, path] = uigetfile(fullfile(rootDir,'*.*'),'What parameters tsv file should I load? ');
         Parameters = dload(fullfile(path,file));
         
         disp('--- Load parameters: completed ---')
-        
-%Case 7
-    case 7 %Load Missing Trials
+       
+    case 4 %Load Missing Trials
         [file, path] = uigetfile(fullfile(rootDir,'*.*'),'What Missing_Trials file should I load? ');
         Missing_Trials = dload(fullfile(path,file));
         
@@ -56,11 +72,10 @@ switch action
 
         disp('--- Load missing trials: completed ---')
 
-%Case 1
-    case 1 %Create nanMean Group Arrays for Correlation & Euclidean Distance
+%% ACTIONS OLD
+    case 5 %Create nanMean Group Arrays for Correlation & Euclidean Distance
 
         %Add Spearman Correlation & Euclidean Distance to Blocks & Days
-
         subjects = fields(fatigue_corr_eucdist_only.stnd_len);
 
         %label = 1
@@ -205,22 +220,9 @@ switch action
 
         disp('--- Create nanMean Group Arrays for Correlation & Euclidean Distance: Completed ---')
   
-%Case 2: Load fatigue_corr&eucdist
-    case 2
-        [file, path] = uigetfile(fullfile(rootDir,'*.*'),'What fatigue_corr&eucdist file should I load? ');
-        fatigue_corr_eucdist_only = load(fullfile(path,file));
-        
-        disp('--- Load fatigue_corr&eucdist: completed ---')
-  
-%Case 3: Load EMG_clean
-    case 3
-        [file, path] = uigetfile(fullfile(rootDir,'*.*'),'What EMG_clean file should I load? ');
-        EMG_clean = load(fullfile(rootDir,file_name));
-        
-        disp('--- Load EMG_clean: completed ---')
 
 %Case 4: Plot Results
-    case 4
+    case 6
         % Get Input
         %Variable to plot
         disp('What variables would you like to plot?')
@@ -346,8 +348,7 @@ switch action
         
         disp('--- Plot Results: completed ---')
   
-%Case 5: Lineplots per Block
-    case 5
+    case 7 %Lineplots per Block
         
         %Leads to be plotted
         disp('What leads would you like me to plot? (y/n)')
@@ -453,18 +454,27 @@ switch action
         close(h)
         disp('--- Lineplots per Block: completed ---')
    
-%Case 31: Save Group Arrays
-    case 8
+    case 8 %Save Group Arrays
         file_date = datestr(datetime);
         save(fullfile(rootDir,['fatigue_group_arrays_',file_date]),'fatigue_results');
         
         disp('--- Save Group Arrays: completed ---')
+        
+%% ACTIONS NEW
+
+    case 9 %plot block
+        
+    case 10 %plot trial
+        
   
-%Case 666      
+%% END OF SCRIPT      
     case 666 %Terminate Script
         run_script = 0;
         
 end %End of Operation/Action Switch
 
 end %End of While Loop
-disp(' * SCRIPT TERMINATED *')
+disp('—————————————')
+disp('| SCRIPT TERMINATED |')
+disp('—————————————')
+disp(' ')
