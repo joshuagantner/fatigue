@@ -25,8 +25,9 @@ disp(' 6  Calculate mean Trial Vector per Block')
 disp(' 7  Calculate Spearman Correlation & Euclidean Distance for every Trial')
 disp(' ')
 disp('SAVE')
-disp(' 8  Save EMG_clean')
+disp(' 8  Save fatigue_alldat as .mat')
 disp(' 9  Save Correlations & Euclidean Distances')
+disp(' 10 Save DB_Fatigue')
 disp(' ')
 disp('terminate script with 666')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
@@ -369,9 +370,9 @@ switch action
         disp('--- Calculate Spearman Correlation & Euclidean Distance for every Trial: Completed ---')
         disp(' ')
 
-%Case 8: Save EMG_clean
+%Case 8: Save fatigue_alldat as .mat
     case 8
-        filename_suggestion = ['EMG_clean_',datestr(now,'yyyy-mm-dd_hhMMss'),'.mat'];
+        filename_suggestion = ['fatigue_alldat',datestr(now,'yyyy-mm-dd_hhMMss'),'.mat'];
         [f,p] = uiputfile(fullfile(rootDir,'fatigue_processing output',filename_suggestion),'Where to save new EMG_Clean…');
         save(fullfile(p,f),'-struct','EMG_clean','-v7.3')
         disp('Saved succesfully')
@@ -390,6 +391,9 @@ switch action
         
         disp('--- Correlation & Euclidean Distances saved to Database Folder ---')
         disp(' ')
+        
+%Case 10: save DB_Fatigue as txt
+    case 10
         
 %Case 666: Terminate Script   
     case 666
