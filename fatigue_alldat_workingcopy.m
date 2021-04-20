@@ -17,9 +17,10 @@ disp(' 3  Create fatigue_alldat')
 disp(' ')
 disp(' 4  Load fatigue_alldat')
 disp(' 5  Save fatigue_alldat')
+disp(' 6  Save fatigue_alldat w/o EMG')
 disp(' ')
-disp(' 6  Outlier analysis')
 disp(' 7  Plot EMGs')
+disp(' 8  Extend fatigue_alldat')
 disp(' ')
 disp('terminate script with 666')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
@@ -69,9 +70,11 @@ switch action
 
         %Create allDat of Procesed Cut Trial EMG Data based on Parameters File
         fatigue_alldat = [];
+        mean_trials = [];
 
         time_start = now;
 
+        %create alldat
         for i = 1:length(Parameters.SessN)
 
             id = Parameters.ID(i);
@@ -89,6 +92,14 @@ switch action
             end
 
             folder = strcat(id,'_EMGAnalysis_d',num2str(day));
+            
+            new_mean = [];
+            new_mean.adm_mean = zeros(LENGTH,1);
+            new_mean.apb_mean = zeros(LENGTH,1);
+            new_mean.fdi_mean = zeros(LENGTH,1);
+            new_mean.bic_mean = zeros(LENGTH,1);
+            new_mean.fcr_mean = zeros(LENGTH,1);
+            num_trials = 0;
 
             for j = 1:30
 
@@ -106,11 +117,27 @@ switch action
 
                 %Process each Lead
                 new_line.type = "trial";
-                new_line.EMG_ADM = proc_std(D.ADM, SRATE, freq_h, freq_l, ORDER);
-                new_line.EMG_APB = proc_std(D.APB, SRATE, freq_h, freq_l, ORDER);
-                new_line.EMG_FDI = proc_std(D.FDI, SRATE, freq_h, freq_l, ORDER);        
-                new_line.EMG_BIC = proc_std(D.BIC, SRATE, freq_h, freq_l, ORDER);
-                new_line.EMG_FCR = proc_std(D.FCR, SRATE, freq_h, freq_l, ORDER);
+                
+                new_line.adm_proc = proc_std(D.ADM, SRATE, freq_h, freq_l, ORDER);
+                new_line.adm_stnd = stnd4time(new_line.adm_proc, LENGTH);
+                new_mean.adm_mean = new_mean.adm_mean + new_line.adm_stnd;
+                
+                new_line.apb_proc = proc_std(D.APB, SRATE, freq_h, freq_l, ORDER);
+                new_line.apb_stnd = stnd4time(new_line.apb_proc, LENGTH);
+                new_mean.apb_mean = new_mean.apb_mean + new_line.apb_stnd;
+                
+                new_line.fdi_proc = proc_std(D.FDI, SRATE, freq_h, freq_l, ORDER);  
+                new_line.fdi_stnd = stnd4time(new_line.fdi_proc, LENGTH);
+                new_mean.fdi_mean = new_mean.fdi_mean + new_line.fdi_stnd;
+                
+                new_line.bic_proc = proc_std(D.BIC, SRATE, freq_h, freq_l, ORDER);
+                new_line.bic_stnd = stnd4time(new_line.bic_proc, LENGTH);
+                new_mean.bic_mean = new_mean.bic_mean + new_line.bic_stnd;
+                
+                new_line.fcr_proc = proc_std(D.FCR, SRATE, freq_h, freq_l, ORDER);
+                new_line.fcr_stnd = stnd4time(new_line.fcr_proc, LENGTH);
+                new_mean.fcr_mean = new_mean.fcr_mean + new_line.fcr_stnd;
+                
                 new_line.trial_number = j;
 
                 %Add Block Parameters
@@ -121,16 +148,109 @@ switch action
 
                 %Add Processed Trial to allDat 'EMG_clean'
                 fatigue_alldat = [fatigue_alldat new_line];
+                num_trials = num_trials + 1;
 
                 %Update Progress bar
                 counter = counter+1;
                 waitbar(counter/total,h,['Processing Cut Trial EMG Data ', num2str(round(counter/total*100)),'%']);
             end
+            
+            %Calculate trial means
+            new_mean.adm_mean = new_mean.adm_mean/num_trials;
+            new_mean.apb_mean = new_mean.apb_mean/num_trials;
+            new_mean.fdi_mean = new_mean.fdi_mean/num_trials;
+            new_mean.bic_mean = new_mean.bic_mean/num_trials;
+            new_mean.fcr_mean = new_mean.fcr_mean/num_trials;
+            
+            %Add Block Parameters to mean
+            parameter_fields = fields(Parameters);
+            for k = 1:length(parameter_fields)
+                new_mean.(char(parameter_fields(k))) = Parameters.(char(parameter_fields(k)))(i);
+            end
+
+            %Add Means to allDat
+            mean_trials = [mean_trials new_mean];
 
         end %End of Paramtere Iteration
         
         fatigue_alldat = table2struct(struct2table(fatigue_alldat),'ToScalar',true);
+        mean_trials = table2struct(struct2table(mean_trials),'ToScalar',true);
+        
+        close(h);
 
+        %% add euclidean distance & correlation
+        
+        %Setup Progress bar
+        counter = 0;
+        h = waitbar(0,['Adding Distance & Correlation ', num2str(counter*100),'%']);
+        total = length(fatigue_alldat.SubjN);
+        
+        z = zeros(LENGTH,1);
+        for i = 1:length(fatigue_alldat.SubjN)
+            subjn = fatigue_alldat.SubjN(i);
+            day = fatigue_alldat.day(i);
+            BN = fatigue_alldat.BN(i);
+            
+            %ADM
+            a = fatigue_alldat.adm_stnd(i);
+            b = mean_trials.adm_mean(mean_trials.SubjN == subjn & mean_trials.day == day & mean_trials.BN == BN);
+            c = corr([a{1,1}, b{1,1}]);
+            d = dist([a{1,1}, b{1,1}]);
+            e = dist([a{1,1}, z]);
+            fatigue_alldat.adm_corr(i,1) = c(1,2);
+            fatigue_alldat.adm_dist(i,1) = d(1,2);
+            fatigue_alldat.adm_dist2zero(i,1) = e(1,2);
+            fatigue_alldat.adm_max(i,1) = max(a{1,1});
+            
+            %APB
+            a = fatigue_alldat.apb_stnd(i);
+            b = mean_trials.apb_mean(mean_trials.SubjN == subjn & mean_trials.day == day & mean_trials.BN == BN);
+            c = corr([a{1,1}, b{1,1}]);
+            d = dist([a{1,1}, b{1,1}]);
+           	e = dist([a{1,1}, z]);
+            fatigue_alldat.apb_corr(i,1) = c(1,2);
+            fatigue_alldat.apb_dist(i,1) = d(1,2);
+            fatigue_alldat.apb_dist2zero(i,1) = e(1,2);
+            fatigue_alldat.apb_max(i,1) = max(a{1,1});
+            
+            %FDI
+            a = fatigue_alldat.fdi_stnd(i);
+            b = mean_trials.fdi_mean(mean_trials.SubjN == subjn & mean_trials.day == day & mean_trials.BN == BN);
+            c = corr([a{1,1}, b{1,1}]);
+            d = dist([a{1,1}, b{1,1}]);
+            e = dist([a{1,1}, z]);
+            fatigue_alldat.fdi_corr(i,1) = c(1,2);
+            fatigue_alldat.fdi_dist(i,1) = d(1,2);
+            fatigue_alldat.fdi_dist2zero(i,1) = e(1,2);
+            fatigue_alldat.fdi_max(i,1) = max(a{1,1});
+            
+            %BIC
+            a = fatigue_alldat.bic_stnd(i);
+            b = mean_trials.bic_mean(mean_trials.SubjN == subjn & mean_trials.day == day & mean_trials.BN == BN);
+            c = corr([a{1,1}, b{1,1}]);
+            d = dist([a{1,1}, b{1,1}]);
+            e = dist([a{1,1}, z]);
+            fatigue_alldat.bic_corr(i,1) = c(1,2);
+            fatigue_alldat.bic_dist(i,1) = d(1,2);
+            fatigue_alldat.bic_dist2zero(i,1) = e(1,2);
+            fatigue_alldat.bic_max(i,1) = max(a{1,1});
+            
+            %FCR
+            a = fatigue_alldat.fcr_stnd(i);
+            b = mean_trials.fcr_mean(mean_trials.SubjN == subjn & mean_trials.day == day & mean_trials.BN == BN);
+            c = corr([a{1,1}, b{1,1}]);
+            d = dist([a{1,1}, b{1,1}]);
+            e = dist([a{1,1}, z]);
+            fatigue_alldat.fcr_corr(i,1) = c(1,2);
+            fatigue_alldat.fcr_dist(i,1) = d(1,2);
+            fatigue_alldat.fcr_dist2zero(i,1) = e(1,2);
+            fatigue_alldat.fcr_max(i,1) = max(a{1,1});
+            
+            %Update Progress bar
+            counter = counter+1;
+            waitbar(counter/total,h,['Adding Distance & Correlation ', num2str(round(counter/total*100)),'%']);
+        end
+        
         close(h);
         disp('  -> fatigue_alldat created')
         disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
@@ -155,53 +275,23 @@ switch action
         disp('  -> fatigue_alldat saved')
         disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
         
-%Case 6: Outlier analysis
+%Case 6: Save alldat without EMG
     case 6
-        outlier_analysis = [];
-        S = [];
         
-        %Setup Progress bar
-        counter = 0;
-        h = waitbar(0,['Creating outlier analysis ', num2str(counter*100),'%']);
-        total = length(Parameters.SessN)*30;
+        export = [];
         
-        time_start = now;
+        alldat_fields = fields(fatigue_alldat);
+        fields2remove = ["adm_proc", "adm_stnd", "apb_proc", "apb_stnd", "fdi_proc", "fdi_stnd", "bic_proc", "bic_stnd", "fcr_proc", "fcr_stnd"];
         
-        for i = 1:length(fatigue_alldat.SubjN)
-            
-           outlier_analysis.ID(i,1)           = fatigue_alldat.ID(i);
-           outlier_analysis.SubjN(i,1)        = fatigue_alldat.SubjN(i);
-           outlier_analysis.label(i,1)        = fatigue_alldat.label(i);
-           outlier_analysis.day(i,1)          = fatigue_alldat.day(i);
-           outlier_analysis.BN(i,1)           = fatigue_alldat.BN(i);
-           outlier_analysis.trial_number(i,1) = fatigue_alldat.trial_number(i);
-           
-           %ADM
-           outlier_analysis.adm_auc(i,1)          = trapz(fatigue_alldat.EMG_ADM{i,1});
-           outlier_analysis.adm_max(i,1)          = max(fatigue_alldat.EMG_ADM{i,1});
-           outlier_analysis.adm_euc(i,1)          = max(fatigue_alldat.EMG_ADM{i,1});
-           %APB
-           outlier_analysis.apb_auc(i,1)          = trapz(fatigue_alldat.EMG_APB{i,1});
-           outlier_analysis.apb_max(i,1)          = max(fatigue_alldat.EMG_APB{i,1});
-           %FDI
-           outlier_analysis.fdi_auc(i,1)          = trapz(fatigue_alldat.EMG_FDI{i,1});
-           outlier_analysis.fdi_max(i,1)          = max(fatigue_alldat.EMG_FDI{i,1});
-           %BIC
-           outlier_analysis.bic_auc(i,1)          = trapz(fatigue_alldat.EMG_BIC{i,1});
-           outlier_analysis.bic_max(i,1)          = max(fatigue_alldat.EMG_BIC{i,1});
-           %FCR
-           outlier_analysis.fcr_auc(i,1)          = trapz(fatigue_alldat.EMG_FRC{i,1});
-           outlier_analysis.fcr_max(i,1)          = max(fatigue_alldat.EMG_FCR{i,1});
-
-           %Update Progress bar
-           counter = counter+1;
-           waitbar(counter/total,h,['Creating outlier analysis ', num2str(round(counter/total*100)),'%']);
-           
+        for i = 1:length(alldat_fields)
+            if ~ismember(fields2remove, alldat_fields(i))
+                export.(char(alldat_fields(i))) = fatigue_alldat.(char(alldat_fields(i)));
+            end    
         end
- 
-        close(h);
-        disp('  -> outlier_analysis created')
-        disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+        
+        [f,p] = uiputfile(fullfile(rootDir,'*.txt'),'Save outlier_analysis');
+        dsave(fullfile(p,f),export);
+        disp('  -> fatigue_alldat saved without emg')
         
 %Case 7: Plot Trials
     case 7
@@ -269,6 +359,38 @@ switch action
         end
         close()
         disp(' |- End of Plotting -|')
+        
+%Case 8: extend alldat
+    case 8
+        %Setup Progress bar
+        counter = 0;
+        h = waitbar(0,['Creating outlier analysis ', num2str(counter*100),'%']);
+        total = length(Parameters.SessN)*30;
+        
+        time_start = now;
+        
+        for i = 1:length(fatigue_alldat.SubjN)
+            
+            %Add length
+            fatigue_alldat.adm_len = length(fatigue_alldat.adm_proc(i));
+            fatigue_alldat.apb_len = length(fatigue_alldat.apb_proc(i));
+            fatigue_alldat.fdi_len = length(fatigue_alldat.fdi_proc(i));
+            fatigue_alldat.bic_len = length(fatigue_alldat.bic_proc(i));
+            fatigue_alldat.fcr_len = length(fatigue_alldat.fcr_proc(i));
+            
+            % % % % % % %
+            % your code %
+            % % % % % % %
+            
+           %Update Progress bar
+           counter = counter+1;
+           waitbar(counter/total,h,['Creating outlier analysis ', num2str(round(counter/total*100)),'%']);
+           
+        end
+ 
+        close(h);
+        disp('  -> fatigue_alldat extended')
+        disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
             
 %Case 666: Terminate Script   
     case 666
