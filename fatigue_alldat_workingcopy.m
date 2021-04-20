@@ -21,6 +21,7 @@ disp(' 6  Save fatigue_alldat w/o EMG')
 disp(' ')
 disp(' 7  Plot EMGs')
 disp(' 8  Extend fatigue_alldat')
+disp(' 9  Create Pivot Tables')
 disp(' ')
 disp('terminate script with 666')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
@@ -324,7 +325,7 @@ switch action
                             plot(data{i})
                             hold on
                         end  
-                        figure_title = strcat('F',num2str(subjn+1),'-Day',num2str(day),'-Block ',num2str(block));
+                        figure_title = strcat("F",num2str(subjn+1)," Day ",num2str(day)," Block ",num2str(block));
                         title(figure_title);
                         savefig(fullfile(p,figure_title));
                         hold off
@@ -351,7 +352,7 @@ switch action
                                                                         fatigue_alldat.trial_number == trial...
                                                                        );
                         plot(data{1})
-                        figure_title = strcat('F',num2str(subjn+1),'-Day',num2str(day),'-Block ',num2str(block),'-Trial',num2str(trial));
+                        figure_title = strcat("F",num2str(subjn+1)," Day ",num2str(day)," Block ",num2str(block)," Trial ",num2str(trial));
                         title(figure_title);
                         savefig(fullfile(p,figure_title));
                     end
@@ -364,19 +365,22 @@ switch action
     case 8
         %Setup Progress bar
         counter = 0;
-        h = waitbar(0,['Creating outlier analysis ', num2str(counter*100),'%']);
-        total = length(Parameters.SessN)*30;
-        
-        time_start = now;
-        
+        h = waitbar(0,['Extending fatigue_alldat ', num2str(counter*100),'%']);
+        total = length(fatigue_alldat.SubjN);
+
         for i = 1:length(fatigue_alldat.SubjN)
             
-            %Add length
-            fatigue_alldat.adm_len = length(fatigue_alldat.adm_proc(i));
-            fatigue_alldat.apb_len = length(fatigue_alldat.apb_proc(i));
-            fatigue_alldat.fdi_len = length(fatigue_alldat.fdi_proc(i));
-            fatigue_alldat.bic_len = length(fatigue_alldat.bic_proc(i));
-            fatigue_alldat.fcr_len = length(fatigue_alldat.fcr_proc(i));
+%% Add length
+%             a = fatigue_alldat.adm_proc(i);
+%             fatigue_alldat.adm_len(i,1) = length(a{1,1});
+%             a = fatigue_alldat.apb_proc(i);
+%             fatigue_alldat.apb_len(i,1) = length(a{1,1});
+%             a = fatigue_alldat.fdi_proc(i);
+%             fatigue_alldat.fdi_len(i,1) = length(a{1,1});
+%             a = fatigue_alldat.bic_proc(i);
+%             fatigue_alldat.bic_len(i,1) = length(a{1,1});
+%             a = fatigue_alldat.fcr_proc(i);
+%             fatigue_alldat.fcr_len(i,1) = length(a{1,1});
             
             % % % % % % %
             % your code %
@@ -384,13 +388,52 @@ switch action
             
            %Update Progress bar
            counter = counter+1;
-           waitbar(counter/total,h,['Creating outlier analysis ', num2str(round(counter/total*100)),'%']);
+           waitbar(counter/total,h,['Extending fatigue alldat ', num2str(round(counter/total*100)),'%']);
            
         end
  
         close(h);
         disp('  -> fatigue_alldat extended')
-        disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+        
+%Case 9: create all pivot tables
+    case 9
+        p = uigetdir(rootDir);
+        
+        groups  = ["CON" "FRD" "FSD"];
+        leads   = ["adm" "apb" "fdi" "bic" "fcr"];
+        vars    = ["dist" "max" "dist2zero" "corr" "len"];
+        ops     = ["max" "mean" "median" "var"];
+        
+        counter = 0;
+        h = waitbar(0,['Saving Pivot Tables ', num2str(counter*100),'%']);
+        total = length(groups)*length(leads)*length(vars)*length(ops);
+        
+        for i = 1:3
+            for j = leads
+                for k = vars
+                    for l = ops
+                        
+                        f = strcat("fatigue pivot - ", groups(i), "_", j, "_", k, "_", l,".csv");
+                        
+                        [FA,RA,CA]  =   pivottable(...
+                                            fatigue_alldat.ID,...                       rows
+                                            [fatigue_alldat.day fatigue_alldat.BN],...  columns
+                                            fatigue_alldat.(strcat(j,'_',k)),...        values
+                                            (l),...                                     operation
+                                            'subset',fatigue_alldat.label == 1,...     filter
+                                            'datafilename', fullfile(p,f) ...                    save option
+                                        ); 
+                                    
+                        %Update Progress bar
+                        counter = counter+1;
+                        waitbar(counter/total,h,['Saving Pivot Tables ', num2str(round(counter/total*100)),'%']);
+                    end
+                end
+            end
+        end
+        
+        close(h)
+        disp('  -> pivot tables saved')
             
 %Case 666: Terminate Script   
     case 666
