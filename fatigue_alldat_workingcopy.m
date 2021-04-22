@@ -297,67 +297,129 @@ switch action
 %Case 7: Plot Trials
     case 7
         disp(' ')
-        BorT = input('  Plot Block or Trial? (B/T) ','s');
         p = uigetdir(rootDir,'Where to save the plots…');
-        run = 1;
+        input_type = input('  Creat plots manualy or upload file? (m/f) ','s');
         
-        switch BorT
+        switch input_type
             
-            case 'B'
-                while run == 1
-                    disp(' ')
-                    subjn   = input("  Subject-Number or 'end': " ,'s');
-                    if subjn == "end"
-                        run = 0;
-                    else
-                        subjn   = str2double(subjn);
-                        day     = input("  Day: ");
-                        block   = input("  Block: ");
-                        lead    = input("  Lead (ADM, APB, FDI, BIC, FCR): ",'s');
-                        
-                        data    = fatigue_alldat.(strcat('EMG_',lead))(...
-                                                                        fatigue_alldat.SubjN == subjn &...
-                                                                        fatigue_alldat.day == day & ...
-                                                                        fatigue_alldat.BN == block...
-                                                                       );
-                        
-                        for i = 1:length(test_data)
-                            plot(data{i})
-                            hold on
-                        end  
-                        figure_title = strcat("F",num2str(subjn+1)," Day ",num2str(day)," Block ",num2str(block));
-                        title(figure_title);
-                        savefig(fullfile(p,figure_title));
-                        hold off
-                    end
+        %manual plotting
+            case "m"
+                
+                BorT = input('  Plot Block or Trial? (B/T) ','s');
+                run = 1;
+                
+                switch BorT
+                    case 'B'
+                        while run == 1
+                            disp(' ')
+                            subjn   = input("  Subject-Number or 'end': " ,'s');
+                            if subjn == "end"
+                                run = 0;
+                            else
+                                subjn   = str2double(subjn);
+                                day     = input("  Day: ");
+                                block   = input("  Block: ");
+                                lead    = input("  Lead (adm, apb, fdi, bic, fcr): ",'s');
+
+                                data    = fatigue_alldat.(strcat(lead,"_stnd"))(...
+                                                                                fatigue_alldat.SubjN == subjn &...
+                                                                                fatigue_alldat.day == day & ...
+                                                                                fatigue_alldat.BN == block...
+                                                                               );
+                                leg = {};
+                                f = figure;
+                                f.Position(1:4) = [500 500 800 500];
+                                hold on
+                                for i = 1:length(data)
+                                    plot(data{i})
+                                    leg{end+1} = strcat('t',num2str(i));
+                                end  
+                                figure_title = strcat(char(unique(fatigue_alldat.ID(fatigue_alldat.SubjN == subjn)))," Day ",num2str(day)," Block ",num2str(block)," ",lead);
+                                title(figure_title);
+                                legend(leg);
+                                savefig(fullfile(p,figure_title));
+                                hold off
+                                close(f);
+                            end
+                        end
+
+                    case 'T'
+                        while run == 1
+                            disp(' ')
+                            subjn   = input("  Subject-Number or 'end': " ,'s');
+                            if subjn == "end"
+                                run = 0;
+                            else
+                                subjn   = str2double(subjn);
+                                day     = input("  Day: ");
+                                block   = input("  Block: ");
+                                trial   = input("  Trial: ");
+                                lead    = input("  Lead (adm, apb, fdi, bic, fcr): ",'s');
+
+                                data    = fatigue_alldat.(strcat(lead,"_stnd"))(...
+                                                                                fatigue_alldat.SubjN == subjn &...
+                                                                                fatigue_alldat.day == day & ...
+                                                                                fatigue_alldat.BN == block & ...
+                                                                                fatigue_alldat.trial_number == trial...
+                                                                               );
+                                plot(data{1})
+                                figure_title = strcat(char(unique(fatigue_alldat.ID(fatigue_alldat.SubjN == subjn)))," Day ",num2str(day)," Block ",num2str(block)," Trial ",num2str(trial," ",lead));
+                                title(figure_title);
+                                savefig(fullfile(p,figure_title));
+                            end
+                        end
                 end
                 
-            case 'T'
-                while run == 1
-                    disp(' ')
-                    subjn   = input("  Subject-Number or 'end': " ,'s');
-                    if subjn == "end"
-                        run = 0;
-                    else
-                        subjn   = str2double(subjn);
-                        day     = input("  Day: ");
-                        block   = input("  Block: ");
-                        trial   = input("  Trial: ");
-                        lead    = input("  Lead (ADM, APB, FDI, BIC, FCR): ",'s');
+        %serial plotting based on file | file structure '.csv' [plot_type(B,T), ID(string), day(int), BN(int), trial(int,'all'), lead(string)]
+            case "f"
+                [f,p] = uigetfile(fullfile(rootDir,'*.csv'),'file of plot requests','plot_requests.csv');
+                request = table2struct(readtable(fullfile(p,f)),'ToScalar',true);
+                
+                %Setup Progress bar
+                counter = 0;
+                h = waitbar(0,['Adding Distance & Correlation ', num2str(counter*100),'%']);
+                total = length(request.plot_type);
+
+                for i = 1:length(request.plot_type)
+                    if request.plot_type(i) == "B"
                         
-                        data    = fatigue_alldat.(strcat('EMG_',lead))(...
-                                                                        fatigue_alldat.SubjN == subjn &...
-                                                                        fatigue_alldat.day == day & ...
-                                                                        fatigue_alldat.BN == block & ...
-                                                                        fatigue_alldat.trial_number == trial...
-                                                                       );
-                        plot(data{1})
-                        figure_title = strcat("F",num2str(subjn+1)," Day ",num2str(day)," Block ",num2str(block)," Trial ",num2str(trial));
+                        subjn   = request.subjn(i);
+                        day     = request.day(i);
+                        block   = request.BN(i);
+                        lead    = request.lead(i);
+                        
+                        data    = fatigue_alldat.(strcat(lead,"_stnd"))(...
+                                                                                fatigue_alldat.SubjN == subjn &...
+                                                                                fatigue_alldat.day == day & ...
+                                                                                fatigue_alldat.BN == block...
+                                                                               );
+                        leg = {};
+                        f = figure;
+                        f.Position(1:4) = [500 500 800 500];
+                        hold on
+                        for i = 1:length(data)
+                            plot(data{i})
+                            leg{end+1} = strcat('t',num2str(i));
+                        end  
+                        figure_title = strcat(char(unique(fatigue_alldat.ID(fatigue_alldat.SubjN == subjn)))," Day ",num2str(day)," Block ",num2str(block)," ",lead);
                         title(figure_title);
+                        legend(leg);
                         savefig(fullfile(p,figure_title));
+                        hold off
+                        close(f);
+                        
+                    elseif request.plot_type(i) == "T"
+                        disp("plot trials from file has not been implemented yet")
+                    else
+                        disp(strcat("Unknown Plot_Type on line ",num2str(i)))
                     end
+                    
+                    %Update Progress bar
+                    counter = counter+1;
+                    waitbar(counter/total,h,['Adding Distance & Correlation ', num2str(counter),'/',num2str(total)]);
                 end
         end
+        
         close()
         disp(' |- End of Plotting -|')
         
@@ -420,7 +482,7 @@ switch action
                                             [fatigue_alldat.day fatigue_alldat.BN],...  columns
                                             fatigue_alldat.(strcat(j,'_',k)),...        values
                                             (l),...                                     operation
-                                            'subset',fatigue_alldat.label == 1,...     filter
+                                            'subset',fatigue_alldat.label == i,...     filter
                                             'datafilename', fullfile(p,f) ...                    save option
                                         ); 
                                     
