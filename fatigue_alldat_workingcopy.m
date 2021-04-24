@@ -3,7 +3,7 @@
 %% Setup
 run_script = 1;
 % rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
-rootDir = 'D:/Joshua/fatigue/database'; % windows root
+rootDir = '\\JOSHUAS-MACBOOK\smb fatigue\database'; % windows root
 
 %% Code
 
@@ -11,17 +11,23 @@ rootDir = 'D:/Joshua/fatigue/database'; % windows root
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
 disp('Available operations:')
 disp(' ')
+disp(' SETUP')
 disp(' 1  Load Parameters')
 disp(' 2  Load Mising Trial')
 disp(' 3  Create fatigue_alldat')
 disp(' ')
-disp(' 4  Load fatigue_alldat')
-disp(' 5  Save fatigue_alldat')
-disp(' 6  Save fatigue_alldat w/o EMG')
+disp(' PROCESSING')
+disp(' 4  update status')
+disp(' 5  process raw data')
+disp(' 6  stnd4time')
+disp(' 7  calculate mean trial per block')
+disp(' 8  calculate variables')
 disp(' ')
-disp(' 7  Plot EMGs')
-disp(' 8  Extend fatigue_alldat')
-disp(' 9  Create Pivot Tables')
+disp(' CLEANING')
+disp(' ')
+disp(' ')
+disp(' SPSS STATISTICS')
+disp(' ')
 disp(' ')
 disp('terminate script with 666')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
@@ -55,6 +61,261 @@ switch action
         
 %Case 3: Create fatigue_alldat
     case 3
+        [p] = uigetdir(rootDir,'Select the EMG Cut Trials folder');
+
+        %Setup Progress bar
+        counter = 0;
+        h = waitbar(0,'Processing Cut Trial EMG Data 0%');
+        total = length(Parameters.SessN)*30;
+
+        %Create allDat of Procesed Cut Trial EMG Data based on Parameters File
+        fatigue_alldat = [];
+
+        time_start = now;
+        %create alldat
+        for i = 1:length(Parameters.SessN)
+
+            id = Parameters.ID(i);
+            day = Parameters.day(i);
+            block = Parameters.BN(i);
+
+            %Check for missing day or block and skip if true
+            test_str1 = char(strcat(id,'.',num2str(day),'.all.all'));
+            test_str2 = char(strcat(id,'.',num2str(day),'.',num2str(block),'.all'));
+            if sum(contains(missing_trials,test_str1))>0
+                continue
+            end
+            if sum(contains(missing_trials,test_str2))>0
+                continue
+            end
+
+            folder = strcat(id,'_EMGAnalysis_d',num2str(day));
+
+            for j = 1:30
+
+                % check for missing trial and skip if true
+                test_str3 = char(strcat(id,'.',num2str(day),'.',num2str(block),'.',num2str(j)));
+                if sum(contains(missing_trials,test_str3))>0
+                    continue
+                end
+
+                new_line = [];
+
+                %Load the Trial File
+                file = strcat(id,'_EMG_d',num2str(day),'_b',num2str(block),'_t',num2str(j),'.txt');
+                D = dload(char(fullfile(p,folder,file)));
+
+                %Process each Lead
+                new_line.adm_raw = D.ADM;
+                new_line.apb_raw = D.APB;
+                new_line.fdi_raw = D.FDI;
+                new_line.bic_raw = D.BIC;
+                new_line.fcr_raw = D.FCR;
+
+                %Add Parameters
+                new_line.type = "trial";
+                new_line.exclude = {{}};
+                new_line.trial_number = j;
+                
+                parameter_fields = fields(Parameters);
+                for k = 1:length(parameter_fields)
+                    new_line.(char(parameter_fields(k))) = Parameters.(char(parameter_fields(k)))(i);
+                end
+
+                %Add Processed Trial to allDat 'EMG_clean'
+                fatigue_alldat = [fatigue_alldat new_line];
+
+                %Update Progress bar
+                counter = counter+1;
+                waitbar(counter/total,h,['Processing Cut Trial EMG Data ', num2str(round(counter/total*100)),'%']);
+            end
+
+        end %End of Paramtere Iteration
+        
+        fatigue_alldat = table2struct(struct2table(fatigue_alldat),'ToScalar',true);
+        
+        close(h);
+        disp('  -> fatigue_alldat created')
+        disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+        
+%Case 4: Update Status | bool value, default true
+    case 4
+        [f,p] = uigetfile(fullfile(rootDir,"*.csv"),"Select the status update file","status_update.csv");
+        status_update = table2struct(readtable(fullfile(p,f)),'ToScalar',true);
+        
+        for i = 1:length(fatigue_alldat.SubjN)
+            fatigue_alldat.exclude(i) = {unique(status_update.lead(...
+                                                status_update.subjn == fatigue_alldat.SubjN(i)&...
+                                                status_update.day   == fatigue_alldat.day(i)&...
+                                                status_update.BN    == fatigue_alldat.BN(i)&...
+                                                status_update.trial_number == fatigue_alldat.trial_number(i)...
+                                                ))};
+        end
+        
+%Case 5: Process Raw Data
+    case 5
+        SRATE = 5000;
+        freq_h = 10;
+        freq_l = 6;
+        ORDER = 4;
+        
+        %Setup Progress bar
+        counter = 0;
+        h = waitbar(0,['Processing Raw Data ', num2str(counter*100),'%']);
+        total = length(fatigue_alldat.SubjN);
+
+        start_time = now;
+        for i = 1:length(fatigue_alldat.SubjN)
+            
+            leads = {'adm' 'apb' 'fdi' 'bic' 'fcr'};
+            a = fatigue_alldat.exclude(i);
+            a = a{1,1};
+            if ~isempty(a)
+                for j = 1:length(a)
+                    leads(strcmpi(leads, a{j,1})) = [];
+                end
+            end
+            
+            for j = leads
+                a = fatigue_alldat.(strcat(j,"_raw"))(i);
+                fatigue_alldat.(strcat(j,"_proc"))(i,1) = {proc_std(a{1,1}, SRATE, freq_h, freq_l, ORDER)};
+            end
+            
+            %Update Progress bar
+            counter = counter+1;
+            waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
+        end
+        disp(strcat("  -> completed | runtime: ",datestr(now-start_time,"MM:SS")))
+        close(h)
+        
+%Cas 6: stnd4time
+    case 6
+        LENGTH = 100000;
+        
+        %Setup Progress bar
+        counter = 0;
+        h = waitbar(0,['Standardising for Time ', num2str(counter*100),'%']);
+        total = length(fatigue_alldat.SubjN);
+
+        start_time = now;
+        for i = 1:length(fatigue_alldat.SubjN)
+            
+            leads = {'adm' 'apb' 'fdi' 'bic' 'fcr'};
+            a = fatigue_alldat.exclude(i);
+            a = a{1,1};
+            if ~isempty(a)
+                for j = 1:length(a)
+                    leads(strcmpi(leads, a{j,1})) = [];
+                end
+            end
+            
+            for j = leads
+                a = fatigue_alldat.(strcat(j,"_proc"))(i);
+                fatigue_alldat.(strcat(j,"_stnd"))(i,1) = {stnd4time(a{1,1}, LENGTH)};
+            end
+            
+            %Update Progress bar
+            counter = counter+1;
+            waitbar(counter/total,h,['Standardising for Time ', num2str(round(counter/total*100)),'%']);
+        end
+        disp(strcat("  -> completed | runtime: ",datestr(now-start_time,"MM:SS")))
+        close(h)
+        
+%Case 7: Calculate meanTrial per Block
+    case 7
+        
+        blocks = unique([fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN],'rows');
+        mean_trials = [];
+        
+        %Create empty stuct
+        
+            %% MY CODE %%
+            
+        %Fill struct with means
+        
+            %% MY CODE %%
+        
+%%
+%         %Setup Progress bar
+%         counter = 0;
+%         h = waitbar(0,['Calculating mean Trial per Block ', num2str(counter*100),'%']);
+%         total = length(blocks);
+% 
+%         start_time = now;
+%         for i = 1:length(blocks)
+%             
+%             leads = {'adm' 'apb' 'fdi' 'bic' 'fcr'};
+%             a = fatigue_alldat.exclude(i);
+%             a = a{1,1};
+%             if ~isempty(a)
+%                 for j = 1:length(a)
+%                     leads(strcmpi(leads, a{j,1})) = [];
+%                 end
+%             end
+%             
+%             new_line = [];
+%             new_line.subjn  = blocks(i,1);
+%             new_line.day    = blocks(i,2);
+%             new_line.BN     = blocks(i,3);
+%             
+%             for j = leads
+% 
+%                 a = fatigue_alldat.(strcat(j,"_stnd"))(fatigue_alldat.SubjN  == blocks(i,1) &...
+%                                                        fatigue_alldat.day    == blocks(i,2) &...
+%                                                        fatigue_alldat.BN     == blocks(i,3));
+%                 a = a(~cellfun(@isempty,a));
+%                 b = length(a);
+%                 a = cellfun(@transpose,a,'UniformOutput',false);
+%                 a = cell2mat(a);
+%                 a = sum(a);
+%                 a = a/b;
+%                                                                               
+%                 new_line.(strcat(j,"_mean")) = a;
+%             end
+%             
+%             mean_trials = [mean_trials new_line];
+%             
+%             %Update Progress bar
+%             counter = counter+1;
+%             waitbar(counter/total,h,['Calculating mean Trial per Block ', num2str(round(counter/total*100)),'%']);
+%         end
+%         disp(strcat("  -> completed | runtime: ",datestr(now-start_time,"MM:SS")))
+%         close(h)
+        
+%% -----------------------------------------------------------------------------------------------------------------------------------------        
+% %Setup Progress bar
+%         counter = 0;
+%         h = waitbar(0,['___________ ', num2str(counter*100),'%']);
+%         total = length(fatigue_alldat.SubjN);
+% 
+%         start_time = now;
+%         for i = 1:length(fatigue_alldat.SubjN)
+%             
+%             leads = {'adm' 'apb' 'fdi' 'bic' 'fcr'};
+%             a = fatigue_alldat.exclude(i);
+%             a = a{1,1};
+%             if ~isempty(a)
+%                 for j = 1:length(a)
+%                     leads(strcmpi(leads, a{j,1})) = [];
+%                 end
+%             end
+%             
+%             for j = leads
+%
+%                 %% MY CODE %%
+%
+%             end
+%             
+%             %Update Progress bar
+%             counter = counter+1;
+%             waitbar(counter/total,h,['___________ ', num2str(round(counter/total*100)),'%']);
+%         end
+%         disp(strcat("  -> completed | runtime: ",datestr(now-start_time,"MM:SS")))
+%         close(h)
+%% -----------------------------------------------------------------------------------------------------------------------------------------
+
+%Case 3: Create fatigue_alldat
+    case 33
         [p] = uigetdir(rootDir,'Select the EMG Cut Trials folder');
 
         % Processing Parameters
@@ -257,7 +518,7 @@ switch action
         disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
         
 %Case 4: Load fatigue_alldat        
-    case 4
+    case 44
         [f,p] = uigetfile(fullfile(rootDir,'*.mat*'),'Select the fatigue_alldat');
         
         time_start = now;
@@ -267,7 +528,7 @@ switch action
         disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
         
 %Case 5: Save fatigue_alldat        
-    case 5
+    case 55
         [file, path] = uiputfile(fullfile(rootDir,'*.mat'));
         
         time_start = now;
@@ -277,12 +538,18 @@ switch action
         disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
         
 %Case 6: Save alldat without EMG
-    case 6
+    case 66
         
         export = [];
         
         alldat_fields = fields(fatigue_alldat);
-        fields2remove = ["adm_proc", "adm_stnd", "apb_proc", "apb_stnd", "fdi_proc", "fdi_stnd", "bic_proc", "bic_stnd", "fcr_proc", "fcr_stnd"];
+        fields2remove = [...
+            "adm_raw", "adm_proc", "adm_stnd",...
+            "apb_raw", "apb_proc", "apb_stnd",...
+            "fdi_raw", "fdi_proc", "fdi_stnd",...
+            "bic_raw", "bic_proc", "bic_stnd",...
+            "fcr_raw", "fcr_proc", "fcr_stnd"...
+            ];
         
         for i = 1:length(alldat_fields)
             if ~ismember(fields2remove, alldat_fields(i))
@@ -295,7 +562,7 @@ switch action
         disp('  -> fatigue_alldat saved without emg')
         
 %Case 7: Plot Trials
-    case 7
+    case 77
         disp(' ')
         p = uigetdir(rootDir,'Where to save the plots…');
         input_type = input('  Creat plots manualy or upload file? (m/f) ','s');
@@ -424,7 +691,7 @@ switch action
         disp(' |- End of Plotting -|')
         
 %Case 8: extend alldat
-    case 8
+    case 88
         %Setup Progress bar
         counter = 0;
         h = waitbar(0,['Extending fatigue_alldat ', num2str(counter*100),'%']);
@@ -458,7 +725,7 @@ switch action
         disp('  -> fatigue_alldat extended')
         
 %Case 9: create all pivot tables
-    case 9
+    case 99
         p = uigetdir(rootDir);
         
         groups  = ["CON" "FRD" "FSD"];
