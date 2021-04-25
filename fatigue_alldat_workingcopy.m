@@ -233,18 +233,18 @@ switch action
         mean_trials = [];
         
         blocks = unique([fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.lead],'rows');
-        blocks = table2struct(cell2table([num2cell(arrayfun(@str2num,blocks(:,1:3))) num2cell(blocks(:,4))]),'ToScalar',true);
+        blocks = table2struct(cell2table([num2cell(arrayfun(@str2num,blocks(:,1:3))) num2cell(blocks(:,4))],'VariableNames',["subjn" "day" "BN" "lead"]),'ToScalar',true);
         
         %Create empty stuct
-        for i = 1:height(blocks)
+        for i = 1:length(blocks.subjn)
 
             leads = {'adm' 'apb' 'fdi' 'bic' 'fcr'};
             
             new_line = [];
-            new_line.subjn  = blocks(i,1);
-            new_line.day    = blocks(i,2);
-            new_line.BN     = blocks(i,3);
-            new_line.lead   = blocks(i,4);
+            new_line.subjn  = blocks.subjn(i);
+            new_line.day    = blocks.day(i);
+            new_line.BN     = blocks.BN(i);
+            new_line.lead   = blocks.lead(i);
             
             mean_trials = [mean_trials new_line];
 
@@ -253,16 +253,16 @@ switch action
             
         %Fill struct with means
         counter = 0;
-        h = waitbar(0,['Calculating mean Trial per Block ', num2str(counter*100),'%']);
-        total = length(blocks);
+        h = waitbar(0,'Calculating mean Trial per Block 0%');
+        total = length(blocks.subjn);
 
         start_time = now;
-        for i = 1:length(blocks)
+        for i = 1:length(blocks.subjn)
             
-            a = fatigue_alldat.stnd(fatigue_alldat.SubjN  == blocks.Var1(i) &...
-                                    fatigue_alldat.day    == blocks.Var2(i) &...
-                                    fatigue_alldat.BN     == blocks.Var3(i) &...
-                                    fatigue_alldat.lead   == blocks.Var4(i) &...
+            a = fatigue_alldat.stnd(fatigue_alldat.SubjN  == blocks.subjn(i) &...
+                                    fatigue_alldat.day    == blocks.day(i) &...
+                                    fatigue_alldat.BN     == blocks.BN(i) &...
+                                    fatigue_alldat.lead   == blocks.lead(i) &...
                                     fatigue_alldat.exclude ~= "TRUE" ...
                                     );
                                 
@@ -273,7 +273,7 @@ switch action
             a = sum(a);
             a = {transpose(a/b)};
 
-            mean_trials.(strcat(j,"_mean"))(i) = a;
+            mean_trials.mean(i,1) = a;
             
             %Update Progress bar
             counter = counter+1;
