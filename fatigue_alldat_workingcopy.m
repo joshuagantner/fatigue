@@ -25,15 +25,14 @@ disp(' 6  stnd4time')
 disp(' 7  calculate mean trial per block')
 disp(' 8  calculate variables')
 disp(' ')
-disp(' CLEANING')
+disp(' OUTPUT')
 disp(' 10 save without emg')
 disp(' 11 create pivot tables')
 disp(' 12 plot trials')
-disp(' ')
-disp(' SPSS STATISTICS')
-disp(' 20 rmANOVA')
+disp(' 23 rmANOVA @ SPSS')
 disp(' ')
 disp('terminate script with 666')
+disp('clear workspace with 911')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
 
 %% process EMG Data
@@ -180,7 +179,7 @@ switch action
                         status_update.subjn == fatigue_alldat.SubjN(i)&...
                         status_update.day   == fatigue_alldat.day(i)&...
                         status_update.BN    == fatigue_alldat.BN(i)&...
-                        status_update.trial_number == fatigue_alldat.trial_number(i)&...
+                        (status_update.trial_number == fatigue_alldat.trial_number(i) | isnan(status_update.trial_number))  &...
                         status_update.lead  == fatigue_alldat.lead(i)...
                         ));
             if isempty(a)
@@ -190,7 +189,9 @@ switch action
             end
         end
         disp("  -> Status updated")
-        disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+        disp(" ")
+        disp(strcat("     Total Trials excluded: ",num2str(sum(fatigue_alldat.exclude == "TRUE"))))
+        disp("     compare total to excel to double check correct update ")
         
 %Case 5: Process Raw Data
     case 5
@@ -324,16 +325,16 @@ switch action
                 
             if fatigue_alldat.exclude(i) == "TRUE"
                 %dist
-                fatigue_alldat.dist(i) = [];
+                fatigue_alldat.dist(i) = nan;
 
                 %max
-                fatigue_alldat.max(i) = [];
+                fatigue_alldat.max(i) = nan;
 
                 %dist2zero
-                fatigue_alldat.dist2zero(i) = [];
+                fatigue_alldat.dist2zero(i) = nan;
 
                 %correlation
-                fatigue_alldat.corr(i) = [];
+                fatigue_alldat.corr(i) = nan;
             else
                 %get trial_mean
                 trial_mean = mean_trials.mean(mean_trials.subjn  == fatigue_alldat.SubjN(i) &...
@@ -383,8 +384,8 @@ switch action
                 export.(char(alldat_fields(i))) = fatigue_alldat.(char(alldat_fields(i)));
             end    
         end
-        
-        [f,p] = uiputfile(fullfile(rootDir,'*.txt'),'Save outlier_analysis');
+        disp('    export created, startin dsave')
+        [f,p] = uiputfile(fullfile(rootDir,'*.tsv'),'Save alldat without emg');
         dsave(fullfile(p,f),export);
         disp('  -> fatigue_alldat saved without emg')
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
@@ -564,13 +565,35 @@ switch action
         close()
         disp(' |- End of Plotting -|')
         
-%Case 20: rmANOVA
-    case 20
+%Case 13: rmANOVA in SPSS
+    case 13
+        disp(' ')
+        disp('Output options:')
+        lead = input(' • Type (adm, apb, fdi, bic, fcr): ','s');
+        operation = input(' • Operation (var, mean, median): ','s');
         
+        S = tapply(fatigue_alldat,{'label','SubjN'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==1 & fatigue_alldat.BN==1 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd1b1'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==1 & fatigue_alldat.BN==2 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd1b2'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==1 & fatigue_alldat.BN==3 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd1b3'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==1 & fatigue_alldat.BN==4 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd1b4'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==2 & fatigue_alldat.BN==1 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd2b1'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==2 & fatigue_alldat.BN==2 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd2b2'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==2 & fatigue_alldat.BN==3 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd2b3'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==2 & fatigue_alldat.BN==4 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd2b4'}...
+            ); % End of tapply
+        
+        [f,p] = uiputfile(fullfile(rootDir,'*.tsv'),'Where to save Data for rmANOVA...');
+        dsave(fullfile(p,f),S)
+        disp(['   -> ',f,' saved to ',p])
                    
 %Case 666: Terminate Script   
     case 666
         run_script = 0;
+        
+%Case 911: Clear Workspace
+    case 911
+        clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update
         
 end %End of Operation/Action Switch
 end %End of While Loop
