@@ -2,8 +2,8 @@
 
 %% Setup
 run_script = 1;
-% rootDir    = '/Users/joshuagantner/Library/Mobile Documents/com~apple~CloudDocs/Files/Studium/2 Klinik/Masterarbeit/fatigue/database/'; % mac root
-rootDir = '\\JOSHUAS-MACBOOK\smb fatigue\database'; % windows root
+rootDir    = '/Volumes/smb fatigue'; % mac root
+%rootDir = '\\JOSHUAS-MACBOOK\smb fatigue\database'; % windows root
 
 %% Code
 
@@ -47,7 +47,7 @@ action = input('What would you like me to do? ');
 switch action
 %Case 0: Load fatigue_alldat
     case 0
-        [f,p] = uigetfile(fullfile(rootDir,'*.mat*'),'Select the fatigue_alldat');
+        [f,p] = uigetfile(fullfile(rootDir,'*.mat'),'Select the fatigue_alldat');
         
         time_start = now;
         fatigue_alldat = load(fullfile(p,f));
@@ -665,24 +665,63 @@ switch action
                 
         %serial plotting based on file | file structure '.csv' [...]
             case "f"
-                disp(' serial ttesting from request file has not been implemented yet')
-%                 [f,p] = uigetfile(fullfile(rootDir,'*.csv'),'file of test requests','test_requests.csv');
-%                 request = table2struct(readtable(fullfile(p,f)),'ToScalar',true);
-%                 
-%                 %Setup Progress bar
-%                 counter = 0;
-%                 h = waitbar(0,'TTest 0%');
-%                 total = length(request.plot_type);
-% 
-%                 for i = 1:1 %length(request)
-%                     
-%                     %% MY CODE %%
-%                     
-%                     %Update Progress bar
-%                     counter = counter+1;
-%                     waitbar(counter/total,h,['Plotting trials ', num2str(counter),'/',num2str(total)]);
-%                 end
-%                 close(h)
+                [f,p] = uigetfile(fullfile(rootDir,'*.csv'),'file of ttest requests','test_requests.csv');
+                request = table2struct(readtable(fullfile(p,f)),'ToScalar',true);
+                request.a_lead = string(request.a_lead);
+                request.b_lead = string(request.b_lead);
+                
+                results = [];
+                
+                %Setup Progress bar
+                counter = 0;
+                total = length(request.a_group);
+                h = waitbar(0,strcat("TTest 0/",num2str(total)));
+
+                for i = 1:length(request.a_group)
+                    
+                    a_group   = request.a_group(i);
+                    a_day     = request.a_day(i);
+                    a_block   = request.a_block(i);
+                    a_lead    = request.a_lead(i);
+
+                    b_group   = request.b_group(i);
+                    b_day     = request.b_day(i);
+                    b_block   = request.b_block(i);
+                    b_lead    = request.b_lead(i);
+                    
+                    a    = fatigue_alldat.dist(...
+                                                    fatigue_alldat.label == a_group &...
+                                                    fatigue_alldat.day   == a_day & ...
+                                                    fatigue_alldat.BN    == a_block &...
+                                                    fatigue_alldat.lead  == a_lead & ...
+                                                    fatigue_alldat.exclude ~= "TRUE");
+                    b    = fatigue_alldat.dist(...
+                                                    fatigue_alldat.label == b_group &...
+                                                    fatigue_alldat.day   == b_day & ...
+                                                    fatigue_alldat.BN    == b_block &...
+                                                    fatigue_alldat.lead  == b_lead & ...
+                                                    fatigue_alldat.exclude ~= "TRUE");
+
+                    [t,p] = ttest(a,b,2,'independent');
+                    results.a_data(i,1)   = strcat("G",num2str(a_group),"-d",num2str(a_day),"b",num2str(a_block),"-",a_lead);
+                    results.b_data(i,1)   = strcat("G",num2str(b_group),"-d",num2str(b_day),"b",num2str(b_block),"-",b_lead);
+                    results.a_mean(i,1)   = mean(a);
+                    results.a_std(i,1)    = std(a);
+                    results.b_mean(i,1)   = mean(b);
+                    results.b_std(i,1)    = std(b);
+                    results.t(i,1)        = t;
+                    results.p(i,1)        = p;
+                    
+                    %Update Progress bar
+                    counter = counter+1;
+                    waitbar(counter/total,h,['TTest ', num2str(counter),'/',num2str(total)]);
+                end
+                close(h)
+                [f,p] = uiputfile(fullfile(rootDir,'*.tsv'),"save ttest results","ttest_results_vx.tsv");
+                results.a_data = cellstr(results.a_data);
+                results.b_data = cellstr(results.b_data);
+                dsave(fullfile(p,f),results);
+                disp(strcat("  ",f," saved at ",p));
         end
                    
 %Case 666: Terminate Script   
