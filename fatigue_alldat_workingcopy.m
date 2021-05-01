@@ -29,7 +29,9 @@ disp(' OUTPUT')
 disp(' 10 save without emg')
 disp(' 11 create pivot tables')
 disp(' 12 plot trials')
-disp(' 23 rmANOVA @ SPSS')
+disp(' 13 rmANOVA in SPSS by Subject')
+disp(' 14 rmANOVA in SPSS by Trial')
+disp(' 15 ttest')
 disp(' ')
 disp('terminate script with 666')
 disp('clear workspace with 911')
@@ -565,7 +567,7 @@ switch action
         close()
         disp(' |- End of Plotting -|')
         
-%Case 13: rmANOVA in SPSS
+%Case 13: rmANOVA in SPSS by Subject
     case 13
         disp(' ')
         disp('Output options:')
@@ -586,6 +588,102 @@ switch action
         [f,p] = uiputfile(fullfile(rootDir,'*.tsv'),'Where to save Data for rmANOVA...');
         dsave(fullfile(p,f),S)
         disp(['   -> ',f,' saved to ',p])
+        
+%Case 14: rmANOVA in SPSS by Trial
+    case 14
+        disp(' ')
+        disp('Output options:')
+        lead = input(' • Type (adm, apb, fdi, bic, fcr): ','s');
+        operation = 'mean';
+        
+        S = tapply(fatigue_alldat,{'label','SubjN','trial_number'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==1 & fatigue_alldat.BN==1 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd1b1'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==1 & fatigue_alldat.BN==2 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd1b2'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==1 & fatigue_alldat.BN==3 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd1b3'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==1 & fatigue_alldat.BN==4 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd1b4'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==2 & fatigue_alldat.BN==1 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd2b1'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==2 & fatigue_alldat.BN==2 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd2b2'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==2 & fatigue_alldat.BN==3 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd2b3'},...
+             {'dist', operation, 'subset', fatigue_alldat.day==2 & fatigue_alldat.BN==4 & fatigue_alldat.lead==lead & fatigue_alldat.exclude ~= "TRUE", 'name', 'd2b4'}...
+            ); % End of tapply
+        
+        [f,p] = uiputfile(fullfile(rootDir,'*.tsv'),'Where to save Data for rmANOVA...');
+        dsave(fullfile(p,f),S)
+        disp(['   -> ',f,' saved to ',p])
+        
+%Case 15: ttest
+    case 15
+        disp(' ')
+        input_type = input('  ttest manualy or upload request file? (m/f) ','s');
+        
+        switch input_type
+            
+        %manual plotting
+            case "m"
+                run = 1;
+                n = 'n';
+
+                while run == 1
+                    
+                    disp(' ')
+                    disp(' Block A')
+                    a_group   = input("  Group label: " );
+                    a_day     = input("  Day: ");
+                    a_block   = input("  Block: ");
+                    a_lead    = input("  Lead (adm, apb, fdi, bic, fcr): ",'s');
+
+                    disp(' Block B')
+                    b_group   = input("  Group label: ");
+                    b_day     = input("  Day: ");
+                    b_block   = input("  Block: ");
+                    b_lead    = input("  Lead (adm, apb, fdi, bic, fcr): ",'s');
+
+                    a    = fatigue_alldat.dist(...
+                                                    fatigue_alldat.label == a_group &...
+                                                    fatigue_alldat.day   == a_day & ...
+                                                    fatigue_alldat.BN    == a_block &...
+                                                    fatigue_alldat.lead  == a_lead & ...
+                                                    fatigue_alldat.exclude ~= "TRUE");
+                    b    = fatigue_alldat.dist(...
+                                                    fatigue_alldat.label == b_group &...
+                                                    fatigue_alldat.day   == b_day & ...
+                                                    fatigue_alldat.BN    == b_block &...
+                                                    fatigue_alldat.lead  == b_lead & ...
+                                                    fatigue_alldat.exclude ~= "TRUE");
+
+                    disp(' ')
+                    disp(strcat("TTest | G",num2str(a_group),"-d",num2str(a_day),"b",num2str(a_block),"-",a_lead," x G",num2str(b_group),"-d",num2str(b_day),"b",num2str(b_block),"-",b_lead))
+                    ttest(a,b,2,'independent')
+                    
+                    disp(' ')
+                    n = input(" next test or end? (n/e) ",'s');
+                    if n == "e"
+                        run = 0;
+                    end
+                    
+                end
+                
+        %serial plotting based on file | file structure '.csv' [...]
+            case "f"
+                disp(' serial ttesting from request file has not been implemented yet')
+%                 [f,p] = uigetfile(fullfile(rootDir,'*.csv'),'file of test requests','test_requests.csv');
+%                 request = table2struct(readtable(fullfile(p,f)),'ToScalar',true);
+%                 
+%                 %Setup Progress bar
+%                 counter = 0;
+%                 h = waitbar(0,'TTest 0%');
+%                 total = length(request.plot_type);
+% 
+%                 for i = 1:1 %length(request)
+%                     
+%                     %% MY CODE %%
+%                     
+%                     %Update Progress bar
+%                     counter = counter+1;
+%                     waitbar(counter/total,h,['Plotting trials ', num2str(counter),'/',num2str(total)]);
+%                 end
+%                 close(h)
+        end
                    
 %Case 666: Terminate Script   
     case 666
