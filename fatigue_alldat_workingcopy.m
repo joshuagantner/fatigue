@@ -1,9 +1,12 @@
-% Fatigue | Approach 2 | v3 - Process EMG Data %
+% Fatigue | Approach 2 | v6 %
 
 %% Setup
 run_script = 1;
-rootDir    = '/Volumes/smb fatigue'; % mac root
-%rootDir = '\\JOSHUAS-MACBOOK\smb fatigue\database'; % windows root
+%rootDir    = '/Volumes/smb fatigue'; % mac root
+%rootDir = '\\JOSHUAS-MACBOOK\smb fatigue\database'; % windows root network
+%rootDir = 'F:\database'; %windows root hd over usb
+%rootDir = '\\jmg\home\Drive\fatigue\database'; %windows root nas
+rootDir = 'D:\Joshua\fatigue\database'; %windows root internal hd
 
 %% Code
 
@@ -16,8 +19,7 @@ disp(' 0  Load fatigue_alldat')
 disp(' 1  Load Parameters')
 disp(' 2  Load Mising Trial')
 disp(' 3  Create fatigue_alldat')
-disp(' 9  Save fatigue_alldat')
-disp(' ')
+disp(' 9  Save fatigue_alldat') 
 disp(' PROCESSING')
 disp(' 4  update status')
 disp(' 5  process raw data')
@@ -32,6 +34,7 @@ disp(' 12 plot trials')
 disp(' 13 rmANOVA in SPSS by Subject')
 disp(' 14 rmANOVA in SPSS by Trial')
 disp(' 15 ttest')
+disp(' 16 boxplot')
 disp(' ')
 disp('terminate script with 666')
 disp('clear workspace with 911')
@@ -51,6 +54,7 @@ switch action
         
         time_start = now;
         fatigue_alldat = load(fullfile(p,f));
+        fatigue_alldat = fatigue_alldat.fatigue_alldat;
         
         disp('  -> fatigue_alldat loaded')
         disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
@@ -168,7 +172,7 @@ switch action
         save(fullfile(path,file),'-struct','fatigue_alldat','-v7.3');
         
         disp('  -> fatigue_alldat saved')
-        disp(strcat("     runtime ", datestr(now - time_start,'HH:MM')))
+        disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
         
 %Case 4: Update Status 
     case 4
@@ -615,6 +619,119 @@ switch action
     case 15
         disp(' ')
         input_type = input('  ttest manualy or upload request file? (m/f) ','s');
+        
+        switch input_type
+            
+        %manual plotting
+            case "m"
+                run = 1;
+                n = 'n';
+
+                while run == 1
+                    
+                    disp(' ')
+                    disp(' Block A')
+                    a_group   = input("  Group label: " );
+                    a_day     = input("  Day: ");
+                    a_block   = input("  Block: ");
+                    a_lead    = input("  Lead (adm, apb, fdi, bic, fcr): ",'s');
+
+                    disp(' Block B')
+                    b_group   = input("  Group label: ");
+                    b_day     = input("  Day: ");
+                    b_block   = input("  Block: ");
+                    b_lead    = input("  Lead (adm, apb, fdi, bic, fcr): ",'s');
+
+                    a    = fatigue_alldat.dist(...
+                                                    fatigue_alldat.label == a_group &...
+                                                    fatigue_alldat.day   == a_day & ...
+                                                    fatigue_alldat.BN    == a_block &...
+                                                    fatigue_alldat.lead  == a_lead & ...
+                                                    fatigue_alldat.exclude ~= "TRUE");
+                    b    = fatigue_alldat.dist(...
+                                                    fatigue_alldat.label == b_group &...
+                                                    fatigue_alldat.day   == b_day & ...
+                                                    fatigue_alldat.BN    == b_block &...
+                                                    fatigue_alldat.lead  == b_lead & ...
+                                                    fatigue_alldat.exclude ~= "TRUE");
+
+                    disp(' ')
+                    disp(strcat("TTest | G",num2str(a_group),"-d",num2str(a_day),"b",num2str(a_block),"-",a_lead," x G",num2str(b_group),"-d",num2str(b_day),"b",num2str(b_block),"-",b_lead))
+                    ttest(a,b,2,'independent')
+                    
+                    disp(' ')
+                    n = input(" next test or end? (n/e) ",'s');
+                    if n == "e"
+                        run = 0;
+                    end
+                    
+                end
+                
+        %serial plotting based on file | file structure '.csv' [...]
+            case "f"
+                [f,p] = uigetfile(fullfile(rootDir,'*.csv'),'file of ttest requests','test_requests.csv');
+                request = table2struct(readtable(fullfile(p,f)),'ToScalar',true);
+                request.a_lead = string(request.a_lead);
+                request.b_lead = string(request.b_lead);
+                
+                results = [];
+                
+                %Setup Progress bar
+                counter = 0;
+                total = length(request.a_group);
+                h = waitbar(0,strcat("TTest 0/",num2str(total)));
+
+                for i = 1:length(request.a_group)
+                    
+                    a_group   = request.a_group(i);
+                    a_day     = request.a_day(i);
+                    a_block   = request.a_block(i);
+                    a_lead    = request.a_lead(i);
+
+                    b_group   = request.b_group(i);
+                    b_day     = request.b_day(i);
+                    b_block   = request.b_block(i);
+                    b_lead    = request.b_lead(i);
+                    
+                    a    = fatigue_alldat.dist(...
+                                                    fatigue_alldat.label == a_group &...
+                                                    fatigue_alldat.day   == a_day & ...
+                                                    fatigue_alldat.BN    == a_block &...
+                                                    fatigue_alldat.lead  == a_lead & ...
+                                                    fatigue_alldat.exclude ~= "TRUE");
+                    b    = fatigue_alldat.dist(...
+                                                    fatigue_alldat.label == b_group &...
+                                                    fatigue_alldat.day   == b_day & ...
+                                                    fatigue_alldat.BN    == b_block &...
+                                                    fatigue_alldat.lead  == b_lead & ...
+                                                    fatigue_alldat.exclude ~= "TRUE");
+
+                    [t,p] = ttest(a,b,2,'independent');
+                    results.a_data(i,1)   = strcat("G",num2str(a_group),"-d",num2str(a_day),"b",num2str(a_block),"-",a_lead);
+                    results.b_data(i,1)   = strcat("G",num2str(b_group),"-d",num2str(b_day),"b",num2str(b_block),"-",b_lead);
+                    results.a_mean(i,1)   = mean(a);
+                    results.a_std(i,1)    = std(a);
+                    results.b_mean(i,1)   = mean(b);
+                    results.b_std(i,1)    = std(b);
+                    results.t(i,1)        = t;
+                    results.p(i,1)        = p;
+                    
+                    %Update Progress bar
+                    counter = counter+1;
+                    waitbar(counter/total,h,['TTest ', num2str(counter),'/',num2str(total)]);
+                end
+                close(h)
+                [f,p] = uiputfile(fullfile(rootDir,'*.tsv'),"save ttest results","ttest_results_vx.tsv");
+                results.a_data = cellstr(results.a_data);
+                results.b_data = cellstr(results.b_data);
+                dsave(fullfile(p,f),results);
+                disp(strcat("  ",f," saved at ",p));
+        end
+        
+%Case 16: boxplot
+    case 16
+        disp(' ')
+        input_type = input('  boxplot manualy or upload request file? (m/f) ','s');
         
         switch input_type
             
