@@ -1269,31 +1269,27 @@ case 23
     case 28
 
         %%
-        %disp(' ')
-        %disp('slope of lsline')
-        %subject_to_plot     = input("  Group Label: ");
-        %day_to_plot     = input("  Day: ");
-        %disp(' ')
+        disp(' ')
+        disp('slope of lsline')
+        subject_to_plot     = input("  Subject: ");
+        day_to_plot     = input("  Day: ");
+        disp(' ')
+
+        regression_input = [(...
+            y_clean(y_clean.label==subject_to_plot & y_clean.day==day_to_plot,:).BN-1)*30+y_clean(y_clean.label==subject_to_plot & y_clean.day==day_to_plot,:).trial_number,...
+            y_clean(y_clean.label==subject_to_plot & y_clean.day==day_to_plot,:).dist...
+            ];
+        scatter(regression_input(:,1), regression_input(:,2))
+        hl = lsline;
+        B = [ones(size(hl.XData(:))), hl.XData(:)]\hl.YData(:);
+        Slope = B(2);
+        Intercept = B(1);
 
         disp(' ')
-        disp("Regression | Group - Day")
-        for i= 1:3
-            for j=1:2
-                group_to_plot  = i;
-                day_to_plot      = j;
-                regression_input = [(...
-                    y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).BN-1)*30+y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).trial_number,...
-                    y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).dist...
-                    ];
-                scatter(regression_input(:,1), regression_input(:,2))
-                hl = lsline;
-                B = [ones(size(hl.XData(:))), hl.XData(:)]\hl.YData(:);
-                Slope = B(2);
-                Intercept = B(1);
-                regression_operator = regression_input(:,1)\regression_input(:,2);
-                disp(string(i)+'-'+string(j)+': Slope '+string(B(2))+'  Intercept '+string(B(1))+' | operator '+string(regression_operator))
-            end
-        end
+        disp("Regression | subject "+string(subject_to_plot)+" day "+string(day_to_plot))
+        disp(' ')
+        disp('Slope '+string(B(2))+'  Intercept '+string(B(1)))
+        disp(' ')
         %%
 
 %%Case 666: Terminate Script   
