@@ -15,6 +15,7 @@ disp('––––––––––––––––––––––––�
 disp('Available operations:')
 disp(' ')
 disp(' SETUP')
+disp(' 00 set root directory')
 disp(' 0  Load fatigue_alldat')
 disp(' 1  Load Parameters')
 disp(' 2  Load Mising Trial')
@@ -25,8 +26,11 @@ disp(' ')
 disp(' ')
 disp(' T TEST & CORRELATIONS')
 disp(' ')
+disp(' 29 alldat with dist percentile cutoff')
 disp(' 18 normality testing')
+disp(' 28 fit robust linear regression model')
 disp(' 19 save var_table for spss')
+disp(' 32 compare slopes of regression')
 disp(' ')
 disp(' 20 ttest clean dist')
 disp(' 22 intra day t-test group')
@@ -39,7 +43,8 @@ disp(' ')
 disp(' PLOT')
 disp(' 21 plot mean variability and skill by group')
 disp(' 25 plot mean for all groups')
-disp(' 28 slope of lsline')
+disp(' 30 variability mean & regression on top')
+disp(' 31 variability mean an regression side by side')
 disp(' ')
 disp(' ')
 disp(' PROCESSING')
@@ -70,6 +75,13 @@ disp('––––––––––––––––––––––––�
 action = input('What would you like me to do? ');
 
 switch action
+%Case 00: Set root directory
+    case 00
+        disp(' ')
+        rootDir = input('root directory: ','s');
+        disp(' ')
+        disp("  root directory set to '"+rootDir+"'")
+
 %Case 0: Load fatigue_alldat
     case 0
         [f,p] = uigetfile(fullfile(rootDir,'*.mat'),'Select the fatigue_alldat');
@@ -873,36 +885,6 @@ switch action
 
 %Case 18: Normality Test
     case 18
-        %exclude top 5 percentile
-        percentile_cutoff = input('percentile cutoff: ');
-
-        y = struct2table(fatigue_alldat);
-        y_clean = y(y.dist<prctile(y.dist,percentile_cutoff),:);
-
-        g1_meanvariability = [];
-        g2_meanvariability = [];
-        g3_meanvariability = [];
-        g1_meanskill = [];
-        g2_meanskill = [];
-        g3_meanskill = [];
-        g1_variance = [];
-        g2_variance = [];
-        g3_variance = [];
-
-        for i=1:2
-            for j=1:4
-                g1_meanvariability(end+1) = mean(y_clean(y_clean.label==1 & y_clean.day==i & y_clean.BN==j,:).dist);
-                g2_meanvariability(end+1) = mean(y_clean(y_clean.label==2 & y_clean.day==i & y_clean.BN==j,:).dist);
-                g3_meanvariability(end+1) = mean(y_clean(y_clean.label==3 & y_clean.day==i & y_clean.BN==j,:).dist);
-                g1_meanskill(end+1) = mean(p1(p1.day==i & p1.BN==j,:).skillp,'omitnan');
-                g2_meanskill(end+1) = mean(p2(p2.day==i & p2.BN==j,:).skillp,'omitnan');
-                g3_meanskill(end+1) = mean(p3(p3.day==i & p3.BN==j,:).skillp,'omitnan');
-                g1_variance(end+1) = var(y_clean(y_clean.label==1 & y_clean.day==i & y_clean.BN==j,:).dist);
-                g2_variance(end+1) = var(y_clean(y_clean.label==2 & y_clean.day==i & y_clean.BN==j,:).dist);
-                g3_variance(end+1) = var(y_clean(y_clean.label==3 & y_clean.day==i & y_clean.BN==j,:).dist);
-            end
-        end
-
         %create variance table
         var_table = tapply(y_clean,{'label','SubjN'},...
             {'dist', 'var', 'subset', y_clean.day==1 & y_clean.BN==1, 'name', 'd1b1'},...
@@ -1160,7 +1142,7 @@ case 23
 %Case 25: plot mean for all groups
     case 25
         %%
-        mean_to_plot = input('what group to plot (var, skill): ','s');
+        mean_to_plot = input('what measure to plot (var, skill): ','s');
 
         switch mean_to_plot
             case 'var'
@@ -1265,35 +1247,311 @@ case 23
         disp(' ')
         %%
 
-%Case 28: slope of lsline
+%Case 28: fit robust linear regression model
     case 28
 
         %%
-        %disp(' ')
-        %disp('slope of lsline')
-        %subject_to_plot     = input("  Group Label: ");
-        %day_to_plot     = input("  Day: ");
-        %disp(' ')
+        slopes      = zeros([3 2]);
+        intercepts  = zeros([3 2]);
+        stderrors   = zeros([3 2]);
 
         disp(' ')
-        disp("Regression | Group - Day")
+        output = input('output models? (y/n) ','s');
+
+        if output=='y'
+            output = true;
+        else
+            output = false;
+        end
+
+        disp(' ')
+        disp('Regression by Group - Day')
+        disp('- - - - - - - - - - - - -')
+
         for i= 1:3
             for j=1:2
                 group_to_plot  = i;
                 day_to_plot      = j;
-                regression_input = [(...
-                    y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).BN-1)*30+y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).trial_number,...
-                    y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).dist...
-                    ];
-                scatter(regression_input(:,1), regression_input(:,2))
-                hl = lsline;
-                B = [ones(size(hl.XData(:))), hl.XData(:)]\hl.YData(:);
-                Slope = B(2);
-                Intercept = B(1);
-                regression_operator = regression_input(:,1)\regression_input(:,2);
-                disp(string(i)+'-'+string(j)+': Slope '+string(B(2))+'  Intercept '+string(B(1))+' | operator '+string(regression_operator))
+
+                regression_input_trialnumbering = (y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).BN-1)*30+y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).trial_number;
+                regression_input_dist = y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).dist;
+
+                mdl = fitlm(regression_input_trialnumbering,regression_input_dist,'RobustOpts','on');
+
+                slopes(i,j)     = mdl.Coefficients{2,1};
+                intercepts(i,j) = mdl.Coefficients{1,1};
+                stderrors(i,j)  = mdl.Coefficients{2,2};
+
+                if output
+                    disp(string(i)+'-'+string(j)+': ')
+                    disp(mdl)
+                    disp(' ')
+                end
             end
         end
+
+        disp('slopes:')
+        disp(slopes)
+        disp(' ')
+        disp('intercepts:')
+        disp(intercepts)
+        disp(' ')
+        disp('stderrors:')
+        disp(stderrors)
+        disp(' ')
+        %%
+
+%Case 29: create alldat with outlier cutoff
+    case 29
+        %exclude top N percentile
+        percentile_cutoff = input('percentile cutoff: ');
+
+        y = struct2table(fatigue_alldat);
+        y_clean = y(y.dist<prctile(y.dist,percentile_cutoff),:);
+        p = struct2table(Parameters);
+        p1 = p(p.label==1,:);
+        p2 = p(p.label==2,:);
+        p3 = p(p.label==3,:);
+
+        g1_meanvariability = [];
+        g2_meanvariability = [];
+        g3_meanvariability = [];
+        g1_meanskill = [];
+        g2_meanskill = [];
+        g3_meanskill = [];
+        g1_variance = [];
+        g2_variance = [];
+        g3_variance = [];
+
+        for i=1:2
+            for j=1:4
+                g1_meanvariability(end+1) = mean(y_clean(y_clean.label==1 & y_clean.day==i & y_clean.BN==j,:).dist);
+                g2_meanvariability(end+1) = mean(y_clean(y_clean.label==2 & y_clean.day==i & y_clean.BN==j,:).dist);
+                g3_meanvariability(end+1) = mean(y_clean(y_clean.label==3 & y_clean.day==i & y_clean.BN==j,:).dist);
+                g1_meanskill(end+1) = mean(p1(p1.day==i & p1.BN==j,:).skillp,'omitnan');
+                g2_meanskill(end+1) = mean(p2(p2.day==i & p2.BN==j,:).skillp,'omitnan');
+                g3_meanskill(end+1) = mean(p3(p3.day==i & p3.BN==j,:).skillp,'omitnan');
+                g1_variance(end+1) = var(y_clean(y_clean.label==1 & y_clean.day==i & y_clean.BN==j,:).dist);
+                g2_variance(end+1) = var(y_clean(y_clean.label==2 & y_clean.day==i & y_clean.BN==j,:).dist);
+                g3_variance(end+1) = var(y_clean(y_clean.label==3 & y_clean.day==i & y_clean.BN==j,:).dist);
+            end
+        end
+
+        disp('√')
+        %%
+
+%Case 30: plot of mean an regression on top
+    case 30
+        %%
+
+        mean_to_plot = "variability";
+        vector_con = g1_meanvariability;
+        vector_fsd = g2_meanvariability;
+        vector_frd = g3_meanvariability;
+
+        y_min = min([vector_con, vector_fsd, vector_frd]);
+        y_max = max([vector_con, vector_fsd, vector_frd]);
+
+        line_width = 3;
+
+        figure('Position', [185 311 1054*2/3 420])
+        plot(...
+            1:4,vector_con(1:4),"--b",5:8,vector_con(5:8),"--b",...
+            1:4,vector_fsd(1:4),"--g",5:8,vector_fsd(5:8),"--g",...
+            1:4,vector_frd(1:4),"--r",5:8,vector_frd(5:8),"--r",...
+            'LineWidth',line_width/2)
+
+        hold on;
+        style_list = ['b','g','r'];
+
+        for i= 1:3
+            for j=1:2
+                group_to_plot  = i;
+                day_to_plot      = j;
+
+                %preparing regression input
+                regression_input_trialnumbering = (y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).BN-1)*30+y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).trial_number;
+                regression_input_dist = y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).dist;
+
+                %fitting robust regression model
+                mdl = fitlm(regression_input_trialnumbering,regression_input_dist,'RobustOpts','on');
+                slope = mdl.Coefficients{2,1};
+                intercept = mdl.Coefficients{1,1};
+
+                %add regression line to plot
+                if j==1
+                    x= 1:4;
+                    y= 30*slope*(x-1)+intercept;
+                else
+                    x= 5:8;
+                    y= 30*slope*(x-4)+intercept;
+                end
+
+                plot(x,y,style_list(i),'Linewidth',line_width)
+                drawnow()
+                
+            end
+        end
+        hold off
+
+        title("mean "+mean_to_plot)
+        legend("CON mean","CON mean","FSD mean","FSD mean","FRD mean","FRD mean",...
+            "CON regression","CON regression","FSD regression","FSD regression","FRD regression","FRD regression",...
+            "Location","bestoutside")
+        ylabel(mean_to_plot)
+        xlabel("session")
+        xticks(1:8)
+        xticklabels(["T1", "T2", "T3", "T4", "S1", "S2", "S3", "S4"])
+        set(findall(gcf,'-property','FontSize'),'FontSize',20)
+        drawnow()
+        %%
+
+%Case 31: plot of mean an regression side by side
+    case 31
+        %%
+
+        mean_to_plot = "variability";
+        vector_con = g1_meanvariability;
+        vector_fsd = g2_meanvariability;
+        vector_frd = g3_meanvariability;
+
+        line_width = 3;
+
+        figure('Position', [185 311 1054 420])
+
+        %plot variability
+        subplot(1,2,1)
+        y_min = min([vector_con, vector_fsd, vector_frd]);
+        y_max = max([vector_con, vector_fsd, vector_frd]);
+
+        plot(...
+            1:4,vector_con(1:4),"b",5:8,vector_con(5:8),"b",...
+            1:4,vector_fsd(1:4),"g",5:8,vector_fsd(5:8),"g",...
+            1:4,vector_frd(1:4),"r",5:8,vector_frd(5:8),"r",...
+            'LineWidth',line_width)
+        title("mean of "+mean_to_plot)
+        %legend("CON mean","CON mean","FSD mean","FSD mean","FRD mean","FRD mean","Location","bestoutside")
+        ylabel(mean_to_plot)
+        xlabel("session")
+        xticks(1:8)
+        xticklabels(["T1", "T2", "T3", "T4", "S1", "S2", "S3", "S4"])
+        set(findall(gcf,'-property','FontSize'),'FontSize',20)
+
+        subplot(1,2,2)
+        hold on;
+        style_list = ['b','g','r'];
+
+        for i= 1:3
+            for j=1:2
+                group_to_plot  = i;
+                day_to_plot      = j;
+
+                %preparing regression input
+                regression_input_trialnumbering = (y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).BN-1)*30+y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).trial_number;
+                regression_input_dist = y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).dist;
+
+                %fitting robust regression model
+                mdl = fitlm(regression_input_trialnumbering,regression_input_dist,'RobustOpts','on');
+                slope = mdl.Coefficients{2,1};
+                intercept = mdl.Coefficients{1,1};
+
+                %add regression line to plot
+                if j==1
+                    x= 1:4;
+                    y= 30*slope*(x-1)+intercept;
+                else
+                    x= 5:8;
+                    y= 30*slope*(x-4)+intercept;
+                end
+
+                plot(x,y,style_list(i),'Linewidth',line_width)
+                drawnow()
+                
+            end
+        end
+
+        legend1 = plot(NaN,NaN,'b','Linewidth',line_width);
+        legend2 = plot(NaN,NaN,'g','Linewidth',line_width);
+        legend3 = plot(NaN,NaN,'r','Linewidth',line_width);
+
+        hold off
+
+        title("robust linear regression of "+mean_to_plot)
+        %legend("CON regression","CON regression","FSD regression","FSD regression","FRD regression","FRD regression","Location","bestoutside")
+        %ylabel(mean_to_plot)
+        xlabel("session")
+        xticks(1:8)
+        xticklabels(["T1", "T2", "T3", "T4", "S1", "S2", "S3", "S4"])
+        legend([legend1, legend2, legend3],'CON', 'FSD', 'FRD','Location','northeast')
+        
+        set(findall(gcf,'-property','FontSize'),'FontSize',20)
+        drawnow()
+        %%
+
+%Case 32: compare slopes of regression
+    case 32
+
+        %%
+        disp(' ')
+        disp('ttest of slopes')
+        disp(' ')
+        group_a = input('group a: ','s');
+        day_a   = input('day a: ');
+        group_b = input('group b: ','s');
+        day_b   = input('day b: ');
+        disp(' ')
+
+        output = group_a+" d"+string(day_a)+" x "+group_b+" d"+string(day_b)+": t ";
+
+        switch group_a
+            case 'con'
+                group_a = 1;
+            case 'fsd'
+                group_a = 2;
+            case 'frd'
+                group_a = 3;
+        end
+
+        switch group_b
+            case 'con'
+                group_b = 1;
+            case 'fsd'
+                group_b = 2;
+            case 'frd'
+                group_b = 3;
+        end
+
+        slope_a = slopes(group_a,day_a);
+        stderror_a = stderrors(group_a,day_a);
+        slope_b = slopes(group_b,day_b);
+        stderror_b = stderrors(group_b,day_b);
+
+        t = (slope_a-slope_b)/sqrt(stderror_a^2+stderror_b^2);
+
+        disp(output+string(t))
+
+%         for i= 1:3
+%             for j=1:2
+%                 group_to_plot  = i;
+%                 day_to_plot      = j;
+% 
+%                 regression_input_trialnumbering = (y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).BN-1)*30+y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).trial_number;
+%                 regression_input_dist = y_clean(y_clean.label==group_to_plot & y_clean.day==day_to_plot,:).dist;
+% 
+%                 mdl = fitlm(regression_input_trialnumbering,regression_input_dist,'RobustOpts','on');
+% 
+%                 slopes(i,j)     = mdl.Coefficients{2,1};
+%                 intercepts(i,j) = mdl.Coefficients{1,1};
+%                 stderrors(i,j)  = mdl.Coefficients{2,2};
+% 
+%                 if output
+%                     disp(string(i)+'-'+string(j)+': ')
+%                     disp(mdl)
+%                     disp(' ')
+%                 end
+%             end
+%         end
+
         %%
 
 %%Case 666: Terminate Script   
