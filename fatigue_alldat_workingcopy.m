@@ -71,12 +71,12 @@ switch action
                 disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
 
             case 2 %load parameters
-                [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Fatigue Parameter File');
+                [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Fatigue Parameter File (.tsv)');
                 Parameters = dload(fullfile(p,f));
                 disp('  -> Parameters loaded')
 
             case 3
-                [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Missing Trials List');
+                [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Missing Trials List (.tsv)');
                 Missing_Trials = dload(fullfile(p,f));
 
                 missing_trials = [];
