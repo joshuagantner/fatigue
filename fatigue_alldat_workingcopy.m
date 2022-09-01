@@ -25,7 +25,7 @@ operations_list = ...
     "22  process inlcuded raw data\n"+...
     "23  standardize length/time\n"+...
     "24  leads as columns\n"+...
-    "25  calculate mean trial per block\n"+...
+    "25  create mean trial table\n"+...
     "26  calculate variables\n"+...
     "\n"+...
     "output\n"+...
@@ -176,9 +176,7 @@ switch action
 
         end %End of Paramtere Iteration
         
-        raw = table2struct(struct2table(fatigue_alldat),'ToScalar',true);
-        fatigue_alldat = [];
-        fatigue_alldat.raw = raw;
+        fatigue_alldat = table2struct(struct2table(fatigue_alldat),'ToScalar',true);
         
         close(h);
         disp("  -> fatigue_alldat created")
@@ -212,73 +210,129 @@ switch action
         %% end case 21 update inclusion status
 
     case 22 % process included raw data
-        %%
-        start_time = now;
         SRATE = 5000;
         freq_h = 10;
         freq_l = 6;
         ORDER = 4;
         
-        % create raw table from struct
-        raw_emg_table = struct2table(fatigue_alldat.raw);       
+        %Setup Progress bar
+        counter = 0;
+        h = waitbar(0,['Processing Raw Data ', num2str(counter*100),'%']);
+        total = length(fatigue_alldat.SubjN);
 
-        % factor out excluded rows
-        stencil = raw_emg_table.exclude ~= "TRUE";
-        raw_emg_table = raw_emg_table(stencil,:);
+        start_time = now;
+        for i = 1:length(fatigue_alldat.SubjN)
 
-        % create empty processed emg table
-        processed_emg_table = array2table(zeros(height(raw_emg_table),7));
-        processed_emg_table.Properties.VariableNames = {'group', 'subject', 'day', 'session', 'trial', 'lead', 'processed'};
-        
-    
-        % create processed_emg_table
-        disp('started processing')
-        processed_emg_table.group   = raw_emg_table.label;
-        processed_emg_table.subject = raw_emg_table.SubjN;
-        processed_emg_table.day     = raw_emg_table.day;
-        processed_emg_table.session = raw_emg_table.BN;
-        processed_emg_table.trial   = raw_emg_table.trial_number;
-        processed_emg_table.lead    = raw_emg_table.lead;
-        processed_emg_table.emg     = proc_std(raw_emg_table.raw, SRATE, freq_h, freq_l, ORDER);
-
-        fatigue_alldat.processed = processed_emg_table;
-
-        close(h)
+            if fatigue_alldat.exclude(i) == "TRUE"
+                fatigue_alldat.proc(i,1) = {{}};
+            else
+                a = fatigue_alldat.raw(i);
+                fatigue_alldat.proc(i,1) = {proc_std(a{1,1}, SRATE, freq_h, freq_l, ORDER)};
+            end
+            
+            %Update Progress bar
+            counter = counter+1;
+            waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
+        end
         disp("  -> Raw Data processed")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+        close(h)
         %% end case 22 process raw data
         
     case 23 % standardize length/time
         %%
-        start_time = now;
         LENGTH = 100000;
-
-        processed_emg_table = fatigue_alldat.processed;
-        processed_emg_table.emg = stnd4time(processed_emg_table.emg, LENGTH);
-        fatigue_alldat.processed = processed_emg_table;
         
+        %Setup Progress bar
+        counter = 0;
+        h = waitbar(0,['Standardising for Time ', num2str(counter*100),'%']);
+        total = length(fatigue_alldat.SubjN);
+
+        start_time = now;
+        for i = 1:length(fatigue_alldat.SubjN)
+
+            if fatigue_alldat.exclude(i) == "TRUE"
+                fatigue_alldat.stnd(i,1) = {{}};
+            else
+                a = fatigue_alldat.proc(i);
+                fatigue_alldat.stnd(i,1) = {stnd4time(a{1,1}, LENGTH)};
+            end
+            
+            %Update Progress bar
+            counter = counter+1;
+            waitbar(counter/total,h,['Standardising for Time ', num2str(round(counter/total*100)),'%']);
+        end
         disp("  -> Trials standardized for Time")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+        close(h)
         %% end case 23 standardize length/time
 
-    case 24 % leads as columns
+    case 24 % create standardized emg table
         %%
+
+        stnd_emg_table = array2table(zeros(length(fatigue_alldat.label),7));
+        stnd_emg_table.Properties.VariableNames = {'group' 'subject' 'day' 'session' 'trial' 'lead' 'processed'};
+
+        stnd_emg_table.group   = fatigue_alldat.label;
+        stnd_emg_table.subject = fatigue_alldat.SubjN;
+        stnd_emg_table.day     = fatigue_alldat.day;
+        stnd_emg_table.session = fatigue_alldat.BN;
+        stnd_emg_table.trial   = fatigue_alldat.trial_number;
+        stnd_emg_table.lead    = fatigue_alldat.lead;
+        stnd_emg_table.emg     = fatigue_alldat.stnd;
+
+        fatigue_alldat.processed = stnd_emg_table;
         fatigue_alldat.processed = unstack(fatigue_alldat.processed,'processed', 'lead');
         %% end case 24 leads as columns
 
-    case 25 % calculate mean trial per block
+    case 25 % create mean trial table
         %%
         start_time = now;
-        processed_emg_table = fatigue_alldat.processed;
+        stnd_emg_table = fatigue_alldat.processed;
 
-        mean_trials = unstack(processed_emg_table,'processed','lead','GroupingVariables',["group" "subject" "day" "session"],'AggregationFunction',@mean);
+        mean_trials = unstack(stnd_emg_table,'processed','lead','GroupingVariables',["group" "subject" "day" "session"],'AggregationFunction',@mean);
+        %fatigue_alldat.mean_trials = mean_trials;
 
         disp("  -> MeanTrials calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
-        %% end case 25 calculate mean trial per block
+        %% end case 25 create mean trial table
         
     case 26 % calculate distances
         %%
+        start_time = now;
+        stnd_emg_table = fatigue_alldat.processed;
+        mean_trials = fatigue_alldat.mean_trials;
+
+        % create table with header columns
+        calc_variables = stnd_emg_table(:,1:5);
+        
+        % distances to calculate
+        distances_to_calc = [...
+            "adm";...
+            "fdi";...
+            "apb";...
+            "fcr";...
+            "bic";...
+            ["fdi" "apb"];...
+            ["fdi" "apb" "adm"];...
+            ["fcr" "bic"];...
+            ["fdi" "apb" "adm" "fcr" "bic"]...
+            ];
+
+        % calculate
+        for i=1:length(distances_to_calc)
+            request = distances_to_calc(i);
+
+            %for every row…
+            %   • get mean trial matrix
+            %   • get trial matrix
+            for j=i:length(request)
+                
+            end
+
+            %   • Lpqnorm(1,2,trial - mean)
+        end
+
         %Add empty var columns
         vars    = {'dist' 'max' 'dist2zero' 'corr'};
         l       = length(fatigue_alldat.SubjN);
@@ -286,12 +340,9 @@ switch action
             fatigue_alldat.(i{1,1}) = zeros(l,1);
         end
         
-        %Calculate & fill var columns
-        counter = 0;
-        h = waitbar(0,['Calculating Variables ', num2str(counter*100),'%']);
-        total = length(fatigue_alldat.SubjN);
+        
 
-        start_time = now;
+        
         for i = 1:length(fatigue_alldat.SubjN)
                 
             if fatigue_alldat.exclude(i) == "TRUE"
@@ -338,7 +389,7 @@ switch action
             counter = counter+1;
             waitbar(counter/total,h,['Calculating Variables ', num2str(round(counter/total*100)),'%']);
         end
-        close(h)
+        
         disp("  -> Variables calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 25 calculate distances
