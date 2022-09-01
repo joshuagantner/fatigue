@@ -385,6 +385,10 @@ switch action
         %% end case 25 calculate distances
 
 
+    case 666 %%Case 666: Terminate Script   
+        run_script = 0;
+        
+    case 911 %Case 911: Clear Workspace        
 
 end % end of master switch
 end % end of master while loop
