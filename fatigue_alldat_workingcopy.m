@@ -170,7 +170,7 @@ switch action
 
         end %End of Paramtere Iteration
         
-        fatigue_alldat = table2struct(struct2table(fatigue_alldat),'ToScalar',true);
+        fatigue_alldat.raw = table2struct(struct2table(fatigue_alldat),'ToScalar',true);
         
         close(h);
         disp("  -> fatigue_alldat created")
