@@ -215,17 +215,18 @@ switch action
         freq_h = 10;
         freq_l = 6;
         ORDER = 4;
-
-        processed_emg_table = array2table(zeros(0,7));
-        processed_emg_table.Properties.VariableNames = {'group', 'subject', 'day', 'session', 'trial', 'lead', 'processed'};
-        
         
         % create raw table from struct
         raw_emg_table = struct2table(fatigue_alldat.raw);       
 
         % factor out excluded rows
-        stencil = raw_emg_table.excluded ~= "TRUE";
-        raw_emg_table = raw_emg_table(stencil);
+        stencil = raw_emg_table.exclude ~= "TRUE";
+        raw_emg_table = raw_emg_table(stencil,:);
+
+        % create empty processed emg table
+        processed_emg_table = array2table(zeros(height(raw_emg_table),7));
+        processed_emg_table.Properties.VariableNames = {'group', 'subject', 'day', 'session', 'trial', 'lead', 'processed'};
+        
     
         % create processed_emg_table
         disp('started processing')
@@ -233,7 +234,7 @@ switch action
         processed_emg_table.subject = raw_emg_table.SubjN;
         processed_emg_table.day     = raw_emg_table.day;
         processed_emg_table.session = raw_emg_table.BN;
-        processed_emg_table.trial   = raw_emg_table.trial;
+        processed_emg_table.trial   = raw_emg_table.trial_number;
         processed_emg_table.lead    = raw_emg_table.lead;
         processed_emg_table.emg     = proc_std(raw_emg_table.raw, SRATE, freq_h, freq_l, ORDER);
 
