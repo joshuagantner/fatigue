@@ -24,8 +24,9 @@ operations_list = ...
     "21  mark outliers\n"+...
     "22  process inlcuded raw data\n"+...
     "23  standardize length/time\n"+...
-    "24  calculate mean trial per block\n"+...
-    "25  calculate variables\n"+...
+    "24  leads as columns\n"+...
+    "25  calculate mean trial per block\n"+...
+    "26  calculate variables\n"+...
     "\n"+...
     "\n"+...
     "clear cml & display operations with 0\n"+...
@@ -213,7 +214,7 @@ switch action
         freq_l = 6;
         ORDER = 4;
 
-        processed_emg_table = array2table(zeros(0,6));
+        processed_emg_table = array2table(zeros(0,7));
         processed_emg_table.Properties.VariableNames = {'group', 'subject', 'day', 'session', 'trial', 'lead', 'processed'};
         
         
@@ -254,7 +255,12 @@ switch action
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 23 standardize length/time
 
-    case 24 % calculate mean trial per block
+    case 24 % leads as columns
+        %%
+        
+        %% end case 24 leads as columns
+
+    case 25 % calculate mean trial per block
         %%
         mean_trials = [];
         
@@ -310,7 +316,7 @@ switch action
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 24 calculate mean trial per block
         
-    case 25 % calculate distances
+    case 26 % calculate distances
         %%
         %Add empty var columns
         vars    = {'dist' 'max' 'dist2zero' 'corr'};
