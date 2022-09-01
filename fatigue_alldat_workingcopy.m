@@ -28,6 +28,9 @@ operations_list = ...
     "25  calculate mean trial per block\n"+...
     "26  calculate variables\n"+...
     "\n"+...
+    "output\n"+...
+    "51  save alldat\n"+...
+    "\n"+...
     "\n"+...
     "clear cml & display operations with 0\n"+...
     "terminate script with 666\n"+...
@@ -259,64 +262,19 @@ switch action
 
     case 24 % leads as columns
         %%
-        
+        fatigue_alldat.processed = unstack(fatigue_alldat.processed,'processed', 'lead');
         %% end case 24 leads as columns
 
     case 25 % calculate mean trial per block
         %%
-        mean_trials = [];
-        
-        blocks = unique([fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.lead],'rows');
-        blocks = table2struct(cell2table([num2cell(arrayfun(@str2num,blocks(:,1:3))) num2cell(blocks(:,4))],'VariableNames',["subjn" "day" "BN" "lead"]),'ToScalar',true);
-        
-        %Create empty stuct
-        for i = 1:length(blocks.subjn)
-
-            leads = {'adm' 'apb' 'fdi' 'bic' 'fcr'};
-            
-            new_line = [];
-            new_line.subjn  = blocks.subjn(i);
-            new_line.day    = blocks.day(i);
-            new_line.BN     = blocks.BN(i);
-            new_line.lead   = blocks.lead(i);
-            
-            mean_trials = [mean_trials new_line];
-
-        end
-        mean_trials = table2struct(struct2table(mean_trials),'ToScalar',true);
-            
-        %Fill struct with means
-        counter = 0;
-        h = waitbar(0,'Calculating mean Trial per Block 0%');
-        total = length(blocks.subjn);
-
         start_time = now;
-        for i = 1:length(blocks.subjn)
-            
-            a = fatigue_alldat.stnd(fatigue_alldat.SubjN  == blocks.subjn(i) &...
-                                    fatigue_alldat.day    == blocks.day(i) &...
-                                    fatigue_alldat.BN     == blocks.BN(i) &...
-                                    fatigue_alldat.lead   == blocks.lead(i) &...
-                                    fatigue_alldat.exclude ~= "TRUE" ...
-                                    );
-                                
-            a = a(~cellfun(@isempty,a));
-            b = length(a);
-            a = cellfun(@transpose,a,'UniformOutput',false);
-            a = cell2mat(a);
-            a = sum(a);
-            a = {transpose(a/b)};
+        processed_emg_table = fatigue_alldat.processed;
 
-            mean_trials.mean(i,1) = a;
-            
-            %Update Progress bar
-            counter = counter+1;
-            waitbar(counter/total,h,['Calculating mean Trial per Block ', num2str(round(counter/total*100)),'%']);
-        end
-        close(h)
+        mean_trials = unstack(processed_emg_table,'processed','lead','GroupingVariables',["group" "subject" "day" "session"],'AggregationFunction',@mean);
+
         disp("  -> MeanTrials calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
-        %% end case 24 calculate mean trial per block
+        %% end case 25 calculate mean trial per block
         
     case 26 % calculate distances
         %%
@@ -384,6 +342,16 @@ switch action
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 25 calculate distances
 
+    case 51 % save alldat
+        %%
+        [file, path] = uiputfile(fullfile(rootDir,'*.mat'));
+
+        time_start = now;
+        save(fullfile(path,file),'-struct','fatigue_alldat','-v7.3');
+
+        disp('  -> fatigue_alldat saved')
+        disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+        %% end case 51 save alldat
     case 0 % reset cml view
         %%
         clc
