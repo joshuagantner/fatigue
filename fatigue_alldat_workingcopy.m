@@ -24,8 +24,8 @@ operations_list = ...
     "21  mark outliers\n"+...
     "22  process inlcuded raw data\n"+...
     "23  standardize length/time\n"+...
-    "24  create standardized emg table\n"+...
-    "25  create mean trial table\n"+...
+    %"24  leads as columns\n"+...
+    "25  calculate mean trial\n"+...
     "26  calculate variables\n"+...
     "\n"+...
     "output\n"+...
@@ -271,7 +271,7 @@ switch action
         %%
 
         stnd_emg_table = array2table(zeros(length(fatigue_alldat.label),7));
-        stnd_emg_table.Properties.VariableNames = {'group' 'subject' 'day' 'session' 'trial' 'lead' 'emg'};
+        stnd_emg_table.Properties.VariableNames = {'group' 'subject' 'day' 'session' 'trial' 'lead' 'processed'};
 
         stnd_emg_table.group   = fatigue_alldat.label;
         stnd_emg_table.subject = fatigue_alldat.SubjN;
@@ -279,22 +279,67 @@ switch action
         stnd_emg_table.session = fatigue_alldat.BN;
         stnd_emg_table.trial   = fatigue_alldat.trial_number;
         stnd_emg_table.lead    = fatigue_alldat.lead;
-        stnd_emg_table.emg     = cellfun(@transpose, fatigue_alldat.stnd, 'UniformOutput', false);
+        stnd_emg_table.emg     = fatigue_alldat.stnd;
 
-        %fatigue_alldat.processed = stnd_emg_table;
-        %fatigue_alldat.processed = unstack(fatigue_alldat.processed,'processed', 'lead');
-        disp('stnd_emg_table created successfully')
+        fatigue_alldat.processed = stnd_emg_table;
+        fatigue_alldat.processed = unstack(fatigue_alldat.processed,'processed', 'lead');
         %% end case 24 leads as columns
 
-    case 25 % create mean trial table
+    case 25 % calculate mean trial
         %%
+        mean_trials = [];
+        
+        blocks = unique([fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.lead],'rows');
+        blocks = table2struct(cell2table([num2cell(arrayfun(@str2num,blocks(:,1:3))) num2cell(blocks(:,4))],'VariableNames',["subjn" "day" "BN" "lead"]),'ToScalar',true);
+        
+        %Create empty stuct
+        for i = 1:length(blocks.subjn)
+
+            leads = {'adm' 'apb' 'fdi' 'bic' 'fcr'};
+            
+            new_line = [];
+            new_line.subjn  = blocks.subjn(i);
+            new_line.day    = blocks.day(i);
+            new_line.BN     = blocks.BN(i);
+            new_line.lead   = blocks.lead(i);
+            
+            mean_trials = [mean_trials new_line];
+
+        end
+        mean_trials = table2struct(struct2table(mean_trials),'ToScalar',true);
+            
+        %Fill struct with means
+        counter = 0;
+        h = waitbar(0,'Calculating mean Trial per Block 0%');
+        total = length(blocks.subjn);
+
         start_time = now;
+        for i = 1:length(blocks.subjn)
+            
+            a = fatigue_alldat.stnd(fatigue_alldat.SubjN  == blocks.subjn(i) &...
+                                    fatigue_alldat.day    == blocks.day(i) &...
+                                    fatigue_alldat.BN     == blocks.BN(i) &...
+                                    fatigue_alldat.lead   == blocks.lead(i) &...
+                                    fatigue_alldat.exclude ~= "TRUE" ...
+                                    );
+                                
+            a = a(~cellfun(@isempty,a));
+            b = length(a);
+            a = cellfun(@transpose,a,'UniformOutput',false);
+            a = cell2mat(a);
+            a = sum(a);
+            a = {transpose(a/b)};
 
-        mean_trials = unstack(stnd_emg_table,'emg','lead','GroupingVariables',["group" "subject" "day" "session"],'AggregationFunction',@mean);
-        %fatigue_alldat.mean_trials = mean_trials;
-
+            mean_trials.mean(i,1) = a;
+            
+            %Update Progress bar
+            counter = counter+1;
+            waitbar(counter/total,h,['Calculating mean Trial per Block ', num2str(round(counter/total*100)),'%']);
+        end
         disp("  -> MeanTrials calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+        close(h)
+        
         %% end case 25 create mean trial table
         
     case 26 % calculate distances
