@@ -11,7 +11,7 @@ rootDir = 'D:\Joshua\fatigue\database'; %windows root internal hd
 %% print legend to cml
 
 %display available operations
-fprintf(...
+operations_list = ...
     "––––––––––––––––––––––––––––––––––––––––––––––––––––\n"+...
     "Available operations:\n"+...
     "\n"+...
@@ -22,15 +22,17 @@ fprintf(...
     "\n"+...
     "processing\n"+...
     "21  mark outliers\n"+...
-    "22  process raw data\n"+...
+    "22  process inlcuded raw data\n"+...
     "23  standardize length/time\n"+...
     "24  calculate mean trial per block\n"+...
     "25  calculate variables\n"+...
     "\n"+...
     "\n"+...
+    "clear cml & display operations with 0\n"+...
     "terminate script with 666\n"+...
-    "clear workspace with 911\n"...
-    )
+    "clear workspace with 911\n";
+
+fprintf(operations_list);
 
 %% master while loop
 while run_script == 1
@@ -205,32 +207,37 @@ switch action
         disp("     compare total to excel to double check correct update ")
         %% end case 21 update inclusion status
 
-    case 22 % process raw data
+    case 22 % process included raw data
         %%
+        start_time = now;
         SRATE = 5000;
         freq_h = 10;
         freq_l = 6;
         ORDER = 4;
+
+        processed_emg_table = array2table(zeros(0,6));
+        processed_emg_table.Properties.VariableNames = {'group', 'subject', 'day', 'session', 'trial', 'lead', 'processed'};
         
-        %Setup Progress bar
-        counter = 0;
-        h = waitbar(0,['Processing Raw Data ', num2str(counter*100),'%']);
-        total = length(fatigue_alldat.SubjN);
+        
+        % create raw table from struct
+        raw_emg_table = struct2table(fatigue_alldat.raw);       
 
-        start_time = now;
-        for i = 1:length(fatigue_alldat.SubjN)
+        % factor out excluded rows
+        stencil = raw_emg_table.excluded ~= "TRUE";
+        raw_emg_table = raw_emg_table(stencil);
+    
+        % create processed_emg_table
+        disp('started processing')
+        processed_emg_table.group   = raw_emg_table.label;
+        processed_emg_table.subject = raw_emg_table.SubjN;
+        processed_emg_table.day     = raw_emg_table.day;
+        processed_emg_table.session = raw_emg_table.BN;
+        processed_emg_table.trial   = raw_emg_table.trial;
+        processed_emg_table.lead    = raw_emg_table.lead;
+        processed_emg_table.emg     = proc_std(raw_emg_table.raw, SRATE, freq_h, freq_l, ORDER);
 
-            if fatigue_alldat.exclude(i) == "TRUE"
-                fatigue_alldat.proc(i,1) = {{}};
-            else
-                a = fatigue_alldat.raw(i);
-                fatigue_alldat.proc(i,1) = {proc_std(a{1,1}, SRATE, freq_h, freq_l, ORDER)};
-            end
-            
-            %Update Progress bar
-            counter = counter+1;
-            waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
-        end
+        fatigue_alldat.processed = processed_emg_table;
+
         close(h)
         disp("  -> Raw Data processed")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
@@ -238,28 +245,13 @@ switch action
         
     case 23 % standardize length/time
         %%
-        LENGTH = 100000;
-        
-        %Setup Progress bar
-        counter = 0;
-        h = waitbar(0,['Standardising for Time ', num2str(counter*100),'%']);
-        total = length(fatigue_alldat.SubjN);
-
         start_time = now;
-        for i = 1:length(fatigue_alldat.SubjN)
+        LENGTH = 100000;
 
-            if fatigue_alldat.exclude(i) == "TRUE"
-                fatigue_alldat.stnd(i,1) = {{}};
-            else
-                a = fatigue_alldat.proc(i);
-                fatigue_alldat.stnd(i,1) = {stnd4time(a{1,1}, LENGTH)};
-            end
-            
-            %Update Progress bar
-            counter = counter+1;
-            waitbar(counter/total,h,['Standardising for Time ', num2str(round(counter/total*100)),'%']);
-        end
-        close(h)
+        processed_emg_table = fatigue_alldat.processed;
+        processed_emg_table.emg = stnd4time(processed_emg_table.emg, LENGTH);
+        fatigue_alldat.processed = processed_emg_table;
+        
         disp("  -> Trials standardized for Time")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 23 standardize length/time
@@ -386,7 +378,12 @@ switch action
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 25 calculate distances
 
-
+    case 0 % reset cml view
+        %%
+        clc
+        fprintf(operations_list);
+        %% end of case 0
+    
     case 666 %%Case 666: Terminate Script   
         run_script = 0;
         
