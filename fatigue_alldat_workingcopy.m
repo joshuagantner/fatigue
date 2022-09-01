@@ -24,7 +24,7 @@ operations_list = ...
     "21  mark outliers\n"+...
     "22  process inlcuded raw data\n"+...
     "23  standardize length/time\n"+...
-    "24  leads as columns\n"+...
+    "24  create standardized emg table\n"+...
     "25  create mean trial table\n"+...
     "26  calculate variables\n"+...
     "\n"+...
@@ -271,7 +271,7 @@ switch action
         %%
 
         stnd_emg_table = array2table(zeros(length(fatigue_alldat.label),7));
-        stnd_emg_table.Properties.VariableNames = {'group' 'subject' 'day' 'session' 'trial' 'lead' 'processed'};
+        stnd_emg_table.Properties.VariableNames = {'group' 'subject' 'day' 'session' 'trial' 'lead' 'emg'};
 
         stnd_emg_table.group   = fatigue_alldat.label;
         stnd_emg_table.subject = fatigue_alldat.SubjN;
@@ -279,18 +279,18 @@ switch action
         stnd_emg_table.session = fatigue_alldat.BN;
         stnd_emg_table.trial   = fatigue_alldat.trial_number;
         stnd_emg_table.lead    = fatigue_alldat.lead;
-        stnd_emg_table.emg     = fatigue_alldat.stnd;
+        stnd_emg_table.emg     = cellfun(@transpose, fatigue_alldat.stnd, 'UniformOutput', false);
 
-        fatigue_alldat.processed = stnd_emg_table;
-        fatigue_alldat.processed = unstack(fatigue_alldat.processed,'processed', 'lead');
+        %fatigue_alldat.processed = stnd_emg_table;
+        %fatigue_alldat.processed = unstack(fatigue_alldat.processed,'processed', 'lead');
+        disp('stnd_emg_table created successfully')
         %% end case 24 leads as columns
 
     case 25 % create mean trial table
         %%
         start_time = now;
-        stnd_emg_table = fatigue_alldat.processed;
 
-        mean_trials = unstack(stnd_emg_table,'processed','lead','GroupingVariables',["group" "subject" "day" "session"],'AggregationFunction',@mean);
+        mean_trials = unstack(stnd_emg_table,'emg','lead','GroupingVariables',["group" "subject" "day" "session"],'AggregationFunction',@mean);
         %fatigue_alldat.mean_trials = mean_trials;
 
         disp("  -> MeanTrials calculated")
