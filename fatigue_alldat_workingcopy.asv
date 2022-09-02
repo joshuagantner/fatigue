@@ -351,7 +351,7 @@ switch action
         %calc_variables = stnd_emg_table(:,1:5);
         
         % distances to calculate
-        distances_to_calc = {...
+        distances_to_calc = [...
             "adm";...
             "fdi";...
             "apb";...
@@ -361,7 +361,7 @@ switch action
             ["fdi" "apb" "adm"];...
             ["fcr" "bic"];...
             ["fdi" "apb" "adm" "fcr" "bic"]...
-            };
+            ];
 
         % setup table
         calc_variables = unique([fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.trial_number],'rows');
@@ -397,11 +397,9 @@ switch action
 
             %   • iterate distances to calculate
             for j=i:length(request)
-                request = distances_to_calc{i};
-                request_mean = [mean_matrix{:,request}{:}];
-                request_trial = [trial_matrix{:,request}{:}];
+                request = distances_to_calc(i);
+                
                 %   • Lpqnorm(1,2,trial - mean)
-                Lpq_norm(1,2,request_trial-request_mean);
 
             end
         end
