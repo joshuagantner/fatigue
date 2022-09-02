@@ -26,7 +26,7 @@ operations_list = ...
     "23  calculate variables\n"+...
     "\n"+...
     "output\n"+...
-    "51  save alldat\n"+...
+    "51  save…\n"+...
     "\n"+...
     "\n"+...
     "clear cml & display operations with 0\n"+...
@@ -49,7 +49,7 @@ switch action
     %% 
     case 11 % set root directory
         %%
-        rootDir = input('root directory: ','s');
+        rootDir = uigetdir('','fatigue root directory');
         disp(' ')
         disp("  root directory set to '"+rootDir+"'")
         %% end Case 11: Set root directory
@@ -445,14 +445,44 @@ switch action
 
     case 51 % save alldat
         %%
-        [file, path] = uiputfile(fullfile(rootDir,'*.mat'));
+        disp('1 alldat as struct')
+        disp('2 alldat as table')
+        disp('3 calc_variables table')
+        disp(' ')
+        what_to_save = input('save: ');
 
-        time_start = now;
-        save(fullfile(path,file),'-struct','fatigue_alldat','-v7.3');
+        switch what_to_save
+            case 1
+                if istable(fatigue_alldat)
+                    fatigue_alldat = table2struct(fatigue_alldat,"ToScalar",true);
+                end
 
-        disp('  -> fatigue_alldat saved')
-        disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+                [file, path] = uiputfile(fullfile(rootDir,'*.mat'));
+
+                time_start = now;
+                save(fullfile(path,file),'-struct','fatigue_alldat','-v7.3');
+
+                disp('  -> fatigue_alldat saved')
+                disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+
+            case 2
+                if isstruct(fatigue_alldat)
+                    fatigue_alldat = struct2table(fatigue_alldat,"ToScalar",true);
+                end
+
+                [f,p] = uiputfile(fullfile(rootDir,'*.csv'),'save alldat table');
+                time_start = now;
+                writetable(calc_variables,[p,f]);
+                disp(['   -> ',f,' saved to ',p]);
+                disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+
+            case 3
+                [f,p] = uiputfile(fullfile(rootDir,'*.csv'),'save calc_variables table');
+                writetable(calc_variables,[p,f]);
+                disp(['   -> ',f,' saved to ',p]);
+        end
         %% end case 51 save alldat
+
     case 0 % reset cml view
         %%
         clc
@@ -462,7 +492,8 @@ switch action
     case 666 %%Case 666: Terminate Script   
         run_script = 0;
         
-    case 911 %Case 911: Clear Workspace        
+    case 911 %Case 911: Clear Workspace
+        clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update calc_variables
 
 end % end of master switch
 end % end of master while loop
