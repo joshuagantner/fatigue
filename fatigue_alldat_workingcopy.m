@@ -21,11 +21,9 @@ operations_list = ...
     "13  create fatigue_alldat\n"+...
     "\n"+...
     "processing\n"+...
-    "21  mark outliers\n"+...
-    "22  process inlcuded raw data\n"+...
-    "23  standardize length/time\n"+...
-    "25  calculate mean trial\n"+...
-    "26  calculate variables\n"+...
+    "21  process raw alldat\n"+...
+    "22  calculate mean trial\n"+...
+    "23  calculate variables\n"+...
     "\n"+...
     "output\n"+...
     "51  save alldat\n"+...
@@ -182,91 +180,103 @@ switch action
         disp(strcat("     runtime: ", datestr(now - time_start,'HH:MM:SS')))
         %% end case 13 create alldat
 
-    case 21 % update inclusion status
+    case 21 % process raw alldat
         %%
-        [f,p] = uigetfile(fullfile(rootDir,"*.csv"),"Select the status update file","status_update.csv");
-        status_update = table2struct(readtable(fullfile(p,f)),'ToScalar',true);
-        
-        start_time = now;
-        for i = 1:length(fatigue_alldat.SubjN)
-            a = string(status_update.status(...
+        disp('1 mark outliers')
+        disp('2 filter & rectify raw emg')
+        disp('3 standardize length/time')
+        disp(' ')
+        what_to_process = input('what to porcess: ');
+
+        switch what_to_process
+            case 1 % update inclusion status
+                %%
+                [f,p] = uigetfile(fullfile(rootDir,"*.csv"),"Select the status update file","status_update.csv");
+                status_update = table2struct(readtable(fullfile(p,f)),'ToScalar',true);
+
+                start_time = now;
+                for i = 1:length(fatigue_alldat.SubjN)
+                    a = string(status_update.status(...
                         status_update.subjn == fatigue_alldat.SubjN(i)&...
                         status_update.day   == fatigue_alldat.day(i)&...
                         status_update.BN    == fatigue_alldat.BN(i)&...
                         (status_update.trial_number == fatigue_alldat.trial_number(i) | isnan(status_update.trial_number))  &...
                         status_update.lead  == fatigue_alldat.lead(i)...
                         ));
-            if isempty(a)
-                fatigue_alldat.exclude(i) = "FALSE";
-            else
-                fatigue_alldat.exclude(i) = a;
-            end
-        end
-        disp("  -> Status updated")
-        disp(" ")
-        disp(strcat("     Total Trials excluded: ",num2str(sum(fatigue_alldat.exclude == "TRUE"))))
-        disp("     compare total to excel to double check correct update ")
-        %% end case 21 update inclusion status
+                    if isempty(a)
+                        fatigue_alldat.exclude(i) = "FALSE";
+                    else
+                        fatigue_alldat.exclude(i) = a;
+                    end
+                end
+                disp("  -> Status updated")
+                disp(" ")
+                disp(strcat("     Total Trials excluded: ",num2str(sum(fatigue_alldat.exclude == "TRUE"))))
+                disp("     compare total to excel to double check correct update ")
+                %% end subcase 1 update inclusion status
 
-    case 22 % process included raw data
-        SRATE = 5000;
-        freq_h = 10;
-        freq_l = 6;
-        ORDER = 4;
-        
-        %Setup Progress bar
-        counter = 0;
-        h = waitbar(0,['Processing Raw Data ', num2str(counter*100),'%']);
-        total = length(fatigue_alldat.SubjN);
+            case 2 % process included raw data
+                %%
+                SRATE = 5000;
+                freq_h = 10;
+                freq_l = 6;
+                ORDER = 4;
 
-        start_time = now;
-        for i = 1:length(fatigue_alldat.SubjN)
+                %Setup Progress bar
+                counter = 0;
+                h = waitbar(0,['Processing Raw Data ', num2str(counter*100),'%']);
+                total = length(fatigue_alldat.SubjN);
 
-            if fatigue_alldat.exclude(i) == "TRUE"
-                fatigue_alldat.proc(i,1) = {{}};
-            else
-                a = fatigue_alldat.raw(i);
-                fatigue_alldat.proc(i,1) = {proc_std(a{1,1}, SRATE, freq_h, freq_l, ORDER)};
-            end
-            
-            %Update Progress bar
-            counter = counter+1;
-            waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
-        end
-        disp("  -> Raw Data processed")
-        disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
-        close(h)
-        %% end case 22 process raw data
-        
-    case 23 % standardize length/time
-        %%
-        LENGTH = 100000;
-        
-        %Setup Progress bar
-        counter = 0;
-        h = waitbar(0,['Standardising for Time ', num2str(counter*100),'%']);
-        total = length(fatigue_alldat.SubjN);
+                start_time = now;
+                for i = 1:length(fatigue_alldat.SubjN)
 
-        start_time = now;
-        for i = 1:length(fatigue_alldat.SubjN)
+                    if fatigue_alldat.exclude(i) == "TRUE"
+                        fatigue_alldat.proc(i,1) = {{}};
+                    else
+                        a = fatigue_alldat.raw(i);
+                        fatigue_alldat.proc(i,1) = {proc_std(a{1,1}, SRATE, freq_h, freq_l, ORDER)};
+                    end
 
-            if fatigue_alldat.exclude(i) == "TRUE"
-                fatigue_alldat.stnd(i,1) = {{}};
-            else
-                a = fatigue_alldat.proc(i);
-                fatigue_alldat.stnd(i,1) = {stnd4time(a{1,1}, LENGTH)};
-            end
-            
-            %Update Progress bar
-            counter = counter+1;
-            waitbar(counter/total,h,['Standardising for Time ', num2str(round(counter/total*100)),'%']);
-        end
-        disp("  -> Trials standardized for Time")
-        disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
-        close(h)
-        %% end case 23 standardize length/time
+                    %Update Progress bar
+                    counter = counter+1;
+                    waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
+                end
+                disp("  -> Raw Data processed")
+                disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+                close(h)
+                %% end subcase 2 process raw data
 
-    case 24 % create standardized emg table
+            case 3 % standardize length/time
+                %%
+                LENGTH = 100000;
+
+                %Setup Progress bar
+                counter = 0;
+                h = waitbar(0,['Standardising for Time ', num2str(counter*100),'%']);
+                total = length(fatigue_alldat.SubjN);
+
+                start_time = now;
+                for i = 1:length(fatigue_alldat.SubjN)
+
+                    if fatigue_alldat.exclude(i) == "TRUE"
+                        fatigue_alldat.stnd(i,1) = {{}};
+                    else
+                        a = fatigue_alldat.proc(i);
+                        fatigue_alldat.stnd(i,1) = {stnd4time(a{1,1}, LENGTH)};
+                    end
+
+                    %Update Progress bar
+                    counter = counter+1;
+                    waitbar(counter/total,h,['Standardising for Time ', num2str(round(counter/total*100)),'%']);
+                end
+                disp("  -> Trials standardized for Time")
+                disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+                close(h)
+                %% end subcase 3 standardize length/time
+        end % end
+        %% case 21 process raw alldat
+
+    case 99 % create standardized emg table
         %%
 
         stnd_emg_table = array2table(zeros(length(fatigue_alldat.label),7));
@@ -284,7 +294,7 @@ switch action
         fatigue_alldat.processed = unstack(fatigue_alldat.processed,'processed', 'lead');
         %% end case 24 leads as columns
 
-    case 25 % calculate mean trial
+    case 22 % calculate mean trial
         %%
         mean_trials = [];
         
@@ -341,7 +351,7 @@ switch action
         
         %% end case 25 create mean trial table
         
-    case 26 % calculate distances
+    case 23 % calculate variables
         %%
         start_time = now;
         %stnd_emg_table = fatigue_alldat.processed;
@@ -462,7 +472,7 @@ switch action
 %         
         disp("  -> Variables calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
-        %% end case 25 calculate distances
+        %% end case 25 calculate variables
 
     case 51 % save alldat
         %%
