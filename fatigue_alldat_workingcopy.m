@@ -369,8 +369,8 @@ switch action
             };
 
         % setup table
-        calc_variables = unique([fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.trial_number],'rows');
-        calc_variables = array2table (calc_variables,'VariableNames',["subject" "day" "session" "trial"]);
+        calc_variables = unique([fatigue_alldat.label fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.trial_number],'rows');
+        calc_variables = array2table (calc_variables,'VariableNames',["group" "subject" "day" "session" "trial"]);
         calc_variablles_addon = array2table(zeros([height(calc_variables) length(distances_to_calc)]),"VariableNames",cellfun(@strjoin, distances_to_calc));
         calc_variables = [calc_variables calc_variablles_addon];
 
