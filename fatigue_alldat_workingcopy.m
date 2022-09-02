@@ -354,11 +354,6 @@ switch action
     case 23 % calculate variables
         %%
         start_time = now;
-        %stnd_emg_table = fatigue_alldat.processed;
-        %mean_trials = fatigue_alldat.mean_trials;
-
-        % create table with header columns
-        %calc_variables = stnd_emg_table(:,1:5);
         
         % distances to calculate
         distances_to_calc = {...
@@ -379,7 +374,6 @@ switch action
         calc_variablles_addon = array2table(zeros([height(calc_variables) length(distances_to_calc)]),"VariableNames",cellfun(@strjoin, distances_to_calc));
         calc_variables = [calc_variables calc_variablles_addon];
 
-
         % convert mean trials to table
         if ~istable(mean_trials)
             mean_trials = struct2table(mean_trials);
@@ -389,9 +383,14 @@ switch action
         if ~istable(fatigue_alldat)
         fatigue_alldat = struct2table(fatigue_alldat); 
         end
+
+        % set up progress bar
+        counter = 0;
+        h = waitbar(0,'Calculating Variables 0%');
+        total = height(calc_variables);
         
-        %for every row…
-        for i=1:30 %height(calc_variables)
+        % for every row…
+        for i=1:height(calc_variables)
 
             %   • get mean trial matrix
             mean_matrix = mean_trials(mean_trials.subjn  == calc_variables.subject(i) &...
@@ -413,70 +412,33 @@ switch action
 
             %   • iterate distances to calculate
             for j=1:length(distances_to_calc)
-                request = distances_to_calc{j}
+                
+                request = distances_to_calc{j};
+
+                check = sum(cellfun(@sum, cellfun(@isnan, mean_matrix{:,request}, 'UniformOutput', false)));
+                if check > 0
+                    calc_variables(i,strjoin(request)) = {nan};
+                    continue
+                end
+
                 request_mean = [mean_matrix{:,request}{:}];
                 request_trial = [trial_matrix{:,request}{:}];
+                
+                if width(request_mean) ~= width(request_trial)
+                    calc_variables(i,strjoin(request)) = {nan};
+                    continue
+                end
 
                 result = Lpq_norm(2,1,request_trial-request_mean);
 
                 calc_variables(i,strjoin(request)) = {result};
             end
+
+            %Update Progress bar
+            counter = counter+1;
+            waitbar(counter/total,h,['Calculating Variables ', num2str(round(counter/total*100)),'%']);
         end
 
-        %Add empty var columns
-%         vars    = {'dist' 'max' 'dist2zero' 'corr'};
-%         l       = length(fatigue_alldat.SubjN);
-%         for i = vars
-%             fatigue_alldat.(i{1,1}) = zeros(l,1);
-%         end
-%                
-%         for i = 1:length(fatigue_alldat.SubjN)
-%                 
-%             if fatigue_alldat.exclude(i) == "TRUE"
-%                 %dist
-%                 fatigue_alldat.dist(i) = nan;
-% 
-%                 %max
-%                 fatigue_alldat.max(i) = nan;
-% 
-%                 %dist2zero
-%                 fatigue_alldat.dist2zero(i) = nan;
-% 
-%                 %correlation
-%                 fatigue_alldat.corr(i) = nan;
-%             else
-%                 %get trial_mean
-%                 trial_mean = mean_trials.mean(mean_trials.subjn  == fatigue_alldat.SubjN(i) &...
-%                                               mean_trials.day    == fatigue_alldat.day(i) &...
-%                                               mean_trials.BN     == fatigue_alldat.BN(i) &...
-%                                               mean_trials.lead   == fatigue_alldat.lead(i)...
-%                                               );
-%                 trial_mean = trial_mean{1};
-% 
-%                 trial = fatigue_alldat.stnd(i);
-%                 trial = trial{1,1};
-% 
-%                 %dist
-%                 a = dist([trial, trial_mean]);
-%                 fatigue_alldat.dist(i) = a(1,2);
-% 
-%                 %max
-%                 fatigue_alldat.max(i) = max(trial);
-% 
-%                 %dist2zero
-%                 a = dist([trial, zeros(100000,1)]);
-%                 fatigue_alldat.dist2zero(i) = a(1,2);
-% 
-%                 %correlation
-%                 a = corr([trial, trial_mean]);
-%                 fatigue_alldat.corr(i) = a(1,2);
-%             end
-%             
-%             %Update Progress bar
-%             counter = counter+1;
-%             waitbar(counter/total,h,['Calculating Variables ', num2str(round(counter/total*100)),'%']);
-%         end
-%         
         disp("  -> Variables calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 25 calculate variables
