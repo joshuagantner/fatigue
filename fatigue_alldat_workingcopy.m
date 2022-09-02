@@ -376,16 +376,22 @@ switch action
         % setup table
         calc_variables = unique([fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.trial_number],'rows');
         calc_variables = array2table (calc_variables,'VariableNames',["subject" "day" "session" "trial"]);
+        calc_variablles_addon = array2table(zeros([height(calc_variables) length(distances_to_calc)]),"VariableNames",cellfun(@strjoin, distances_to_calc));
+        calc_variables = [calc_variables calc_variablles_addon];
 
 
         % convert mean trials to table
-        mean_trials = struct2table(mean_trials);
+        if ~istable(mean_trials)
+            mean_trials = struct2table(mean_trials);
+        end
 
         % convert alldat to table
+        if ~istable(fatigue_alldat)
         fatigue_alldat = struct2table(fatigue_alldat); 
-
+        end
+        
         %for every row…
-        for i=1:height(calc_variables)
+        for i=1:30 %height(calc_variables)
 
             %   • get mean trial matrix
             mean_matrix = mean_trials(mean_trials.subjn  == calc_variables.subject(i) &...
@@ -406,13 +412,14 @@ switch action
             trial_matrix    = unstack(trial_matrix,"stnd","lead");
 
             %   • iterate distances to calculate
-            for j=i:length(request)
-                request = distances_to_calc{i};
+            for j=1:length(distances_to_calc)
+                request = distances_to_calc{j}
                 request_mean = [mean_matrix{:,request}{:}];
                 request_trial = [trial_matrix{:,request}{:}];
-                %   • Lpqnorm(1,2,trial - mean)
-                Lpq_norm(1,2,request_trial-request_mean);
 
+                result = Lpq_norm(2,1,request_trial-request_mean);
+
+                calc_variables(i,strjoin(request)) = {result};
             end
         end
 
@@ -422,7 +429,7 @@ switch action
 %         for i = vars
 %             fatigue_alldat.(i{1,1}) = zeros(l,1);
 %         end
-                
+%                
 %         for i = 1:length(fatigue_alldat.SubjN)
 %                 
 %             if fatigue_alldat.exclude(i) == "TRUE"
