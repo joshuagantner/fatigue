@@ -94,7 +94,7 @@ switch action
             case 4
                 [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select calc_variables (.csv)');
                 calc_variables = readtable(fullfile(p,f));
-                calc_variables.Properties.VariableNames = ["group" "subject" "day" "session" "trial" transpose(cellfun(@strjoin, distances_to_calc))];
+                T.Properties.VariableNames = 
 
         end
         %% end Case 12: load data
