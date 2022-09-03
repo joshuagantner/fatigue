@@ -472,7 +472,7 @@ switch action
 
                 [f,p] = uiputfile(fullfile(rootDir,'*.csv'),'save alldat table');
                 time_start = now;
-                writetable(calc_variables,[p,f]);
+                writetable(fatigue_alldat,[p,f]);
                 disp(['   -> ',f,' saved to ',p]);
                 disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
 
