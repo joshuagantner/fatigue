@@ -2,11 +2,26 @@
 
 %% setup
 run_script = 1;
+
+% set root directory
 %rootDir    = '/Volumes/smb fatigue'; % mac root
 %rootDir = '\\JOSHUAS-MACBOOK\smb fatigue\database'; % windows root network
 %rootDir = 'F:\database'; %windows root hd over usb
 %rootDir = '\\jmg\home\Drive\fatigue\database'; %windows root nas
 rootDir = 'D:\Joshua\fatigue\database'; %windows root internal hd
+
+% distances to calculate
+distances_to_calc = {...
+    "adm";...
+    "fdi";...
+    "apb";...
+    "fcr";...
+    "bic";...
+    ["fdi" "apb"];...
+    ["fdi" "apb" "adm"];...
+    ["fcr" "bic"];...
+    ["fdi" "apb" "adm" "fcr" "bic"]...
+    };
 
 %% print legend to cml
 
@@ -24,6 +39,11 @@ operations_list = ...
     "21  process raw alldat\n"+...
     "22  calculate mean trial\n"+...
     "23  calculate variables\n"+...
+    "\n"+...
+    "24  fit robust models overall\n"+...
+    "25  fit robust models by day\n"+...
+    "26  add comparison variables\n"+...
+    "27  compare models"+...
     "\n"+...
     "output\n"+...
     "51  save…\n"+...
@@ -283,24 +303,6 @@ switch action
         end % end
         %% case 21 process raw alldat
 
-    case 99 % create standardized emg table
-        %%
-
-        stnd_emg_table = array2table(zeros(length(fatigue_alldat.label),7));
-        stnd_emg_table.Properties.VariableNames = {'group' 'subject' 'day' 'session' 'trial' 'lead' 'processed'};
-
-        stnd_emg_table.group   = fatigue_alldat.label;
-        stnd_emg_table.subject = fatigue_alldat.SubjN;
-        stnd_emg_table.day     = fatigue_alldat.day;
-        stnd_emg_table.session = fatigue_alldat.BN;
-        stnd_emg_table.trial   = fatigue_alldat.trial_number;
-        stnd_emg_table.lead    = fatigue_alldat.lead;
-        stnd_emg_table.emg     = fatigue_alldat.stnd;
-
-        fatigue_alldat.processed = stnd_emg_table;
-        fatigue_alldat.processed = unstack(fatigue_alldat.processed,'processed', 'lead');
-        %% end case 24 leads as columns
-
     case 22 % calculate mean trial
         %%
         mean_trials = [];
@@ -361,42 +363,35 @@ switch action
     case 23 % calculate variables
         %%
         start_time = now;
-        
-        % distances to calculate
-        distances_to_calc = {...
-            "adm";...
-            "fdi";...
-            "apb";...
-            "fcr";...
-            "bic";...
-            ["fdi" "apb"];...
-            ["fdi" "apb" "adm"];...
-            ["fcr" "bic"];...
-            ["fdi" "apb" "adm" "fcr" "bic"]...
-            };
 
-        % setup table
+      % setup table
+        % get subtable from parameters
         calc_variables = unique([fatigue_alldat.label fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.trial_number],'rows');
         calc_variables = array2table (calc_variables,'VariableNames',["group" "subject" "day" "session" "trial"]);
+        % create unified time column
+        calc_variables_time = calc_variables.trial+(calc_variables.session-1)*30+(calc_variables.day-1)*120;
+        calc_variables_time = array2table(calc_variables_time,'VariableNames',"time");
+        % create columns for calculated variables
         calc_variables_addon = array2table(zeros([height(calc_variables) length(distances_to_calc)]),"VariableNames",cellfun(@strjoin, distances_to_calc));
-        calc_variables = [calc_variables calc_variables_addon];
+        % combine tables
+        calc_variables = [calc_variables calc_variables_time calc_variables_addon];
 
-        % convert mean trials to table
+      % convert mean trials to table
         if ~istable(mean_trials)
             mean_trials = struct2table(mean_trials);
         end
 
-        % convert alldat to table
+      % convert alldat to table
         if ~istable(fatigue_alldat)
         fatigue_alldat = struct2table(fatigue_alldat); 
         end
 
-        % set up progress bar
+      % set up progress bar
         counter = 0;
         h = waitbar(0,'Calculating Variables 0%');
         total = height(calc_variables);
         
-        % for every row…
+      % for every row…
         for i=1:height(calc_variables)
 
             %   • get mean trial matrix
@@ -449,6 +444,136 @@ switch action
         disp("  -> Variables calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 25 calculate variables
+
+    case 24 % create robust models across days
+        %%
+        regression_models = array2table([]);
+
+        for i=1:length(distances_to_calc)
+            emg_space = strjoin(distances_to_calc{i});
+            for j=1:3
+                group = j;
+
+                % get observed values from calc_variables
+                dependant = calc_variables(calc_variables.group == group, emg_space);
+                dependant = table2array(dependant);
+
+                % get explanatory values from calc_variables
+                regressor = calc_variables(calc_variables.group == group, ["day" "session" "trial"]);
+                regressor = table2array(regressor);
+
+                % add 1s for intercept
+                %regressor = [regressor ones([height(regressor) 1])];
+
+                % fit a robust linear regression model
+                mdlr = fitlm(regressor,dependant,'RobustOpts','on');
+
+                % save model to table
+                regression_models(j,emg_space) = {mdlr};
+            end
+        end
+        regression_models.Properties.RowNames = ["group 1" "group 2" "group 3"];
+        disp(regression_models)
+        %%
+
+    case 25 % create robust models within days
+        %%
+        regression_models_day = array2table([]);
+
+        for i=1:length(distances_to_calc)
+            emg_space = strjoin(distances_to_calc{i});
+
+            for j=1:3
+                group = j;
+                subtable = array2table([]);
+                for k = 1:2
+                    column_names = ["day_1" "day_2"];
+                    % get observed values from calc_variables
+                    dependant = calc_variables(calc_variables.group == group & calc_variables.day == k, emg_space);
+                    dependant = table2array(dependant);
+
+                    % get explanatory values from calc_variables
+                    regressor = calc_variables(calc_variables.group == group & calc_variables.day == k, ["session" "trial"]);
+                    regressor = table2array(regressor);
+
+                    % add 1s for intercept
+                    %regressor = [regressor ones([height(regressor) 1])];
+
+                    % fit a robust linear regression model
+                    mdlr = fitlm(regressor,dependant,'RobustOpts','on');
+
+                    % save model to table
+                    subtable(1,column_names(k)) = {mdlr};
+                end
+                %save day models to overall table
+                regression_models_day(j,emg_space) = {subtable};
+            end
+        end
+        regression_models_day.Properties.RowNames = ["group 1" "group 2" "group 3"];
+        disp(regression_models_day)
+        %%
+
+    case 26 % add comparison variables
+        %%
+        % normalize distances for dimensions
+        for i = 1:length(distances_to_calc)
+            if length(distances_to_calc{i})>1
+                calc_variables.(strjoin(distances_to_calc{i})+" normalized") = calc_variables{:,strjoin(distances_to_calc{i})}/length(distances_to_calc{i});
+            end
+        end
+
+        % add dummy variables
+        calc_variables.g2_binary = calc_variables.group == 2;
+        calc_variables.g3_binary = calc_variables.group == 3;
+
+        % dummy * regressor
+        % group 2
+        calc_variables.day_g2       = calc_variables.day     .*double(calc_variables.g2_binary);
+        calc_variables.session_g2   = calc_variables.session .*double(calc_variables.g2_binary);
+        calc_variables.trial_g2     = calc_variables.trial   .*double(calc_variables.g2_binary);
+        
+        % group 3
+        calc_variables.day_g3       = calc_variables.day     .*double(calc_variables.g3_binary);
+        calc_variables.session_g3   = calc_variables.session .*double(calc_variables.g3_binary);
+        calc_variables.trial_g3     = calc_variables.trial   .*double(calc_variables.g3_binary);
+
+        disp(' success')
+        %%
+    
+    case 27 % compare regression model
+        %%
+        % regression_models{"group 1", "fdi"}{:,:}
+        % regression_models_day{"group 1","adm"}{:,"day_1"}{:,:}
+
+        % We can use the same approach even when there are more than two 
+        % samples. For example, with three samples S0, S1 and S2, we use 
+        % two dummy variables d1 = 1 if the data comes from sample S1 and 
+        % d1 = 0 otherwise and d2 = 1 if the data comes from sample S2 and 
+        % d2 = 0 otherwise.
+        % 
+        % The regression model takes the form: 
+        % 
+        %               y = b0 + b1x + b2d1 + b3d2 + b4d1x+ b5d2x
+        %         
+
+        i=1;
+        j=1;
+
+        emg_space = strjoin(distances_to_calc{i});
+        group = j;
+
+        % get observed values from calc_variables
+        dependant = calc_variables(:, emg_space);
+        dependant = table2array(dependant);
+        
+        % get explanatory values from calc_variables
+        regressor = calc_variables(:, ["day" "session" "trial" "g2_binary" "g3_binary" "day_g2" "session_g2" "trial_g2" "day_g3" "session_g3" "trial_g3"]); 
+        regressor = table2array(regressor);
+        
+        % fit a robust linear regression model
+        mdlr = fitlm(regressor,dependant,'RobustOpts','on')
+
+        %%
 
     case 51 % save alldat
         %%
