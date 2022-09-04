@@ -439,11 +439,12 @@ switch action
             waitbar(counter/total,h,['Calculating Variables ', num2str(round(counter/total*100)),'%']);
         end
 
+        close(h)
         disp("  -> Variables calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 25 calculate variables
 
-    case 51 % save alldat
+    case 51 % save 
         %%
         disp('1 alldat as struct')
         disp('2 alldat as table')
@@ -481,7 +482,7 @@ switch action
                 writetable(calc_variables,[p,f]);
                 disp(['   -> ',f,' saved to ',p]);
         end
-        %% end case 51 save alldat
+        %% end case 51 save 
 
     case 0 % reset cml view
         %%
@@ -493,7 +494,8 @@ switch action
         run_script = 0;
         
     case 911 %Case 911: Clear Workspace
+        %%
         clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update calc_variables
-
+        %%
 end % end of master switch
 end % end of master while loop
