@@ -441,6 +441,7 @@ switch action
             waitbar(counter/total,h,['Calculating Variables ', num2str(round(counter/total*100)),'%']);
         end
 
+        close(h)
         disp("  -> Variables calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 25 calculate variables
