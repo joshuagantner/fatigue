@@ -26,6 +26,9 @@ distances_to_calc = {...
 % struct for regression models
 lin_reg_models = [];
 
+% supress warnings
+warning('off','MATLAB:table:RowsAddedNewVars')
+
 %% print legend to cml
 
 %display available operations
@@ -49,6 +52,7 @@ operations_list = ...
     "\n"+...
     "27  add comparison variables\n"+...
     "28  compare models\n"+...
+    "29  compare 2 overall multiple linear regression model\n"+...
     "\n"+...
     "output\n"+...
     "51  save…\n"+...
@@ -599,6 +603,7 @@ switch action
         end
 
         % add dummy variables
+        calc_variables.g1_binary = calc_variables.group == 1;
         calc_variables.g2_binary = calc_variables.group == 2;
         calc_variables.g3_binary = calc_variables.group == 3;
 
@@ -643,12 +648,100 @@ switch action
         dependant = table2array(dependant);
         
         % get explanatory values from calc_variables
-        regressor = calc_variables(:, ["day" "session" "trial" "g2_binary" "g3_binary" "day_g2" "session_g2" "trial_g2" "day_g3" "session_g3" "trial_g3"]); 
+        regressor = calc_variables(:, ["day" "session" "trial" "g2_binary" "g3_binary" "day_g2" "day_g3" "session_g2" "session_g3" "trial_g2" "trial_g3"]); 
+        regressor_names = regressor.Properties.VariableNames;
         regressor = table2array(regressor);
         
         % fit a robust linear regression model
         mdlr = fitlm(regressor,dependant,'RobustOpts','on')
+        disp("regressors:")
+        disp(regressor_names)
 
+        %%
+
+    case 29 % compare 2 overall multiple linear regression model
+        %
+        % Model
+        %
+        %     y =	int +	x1*day +	x2*session +	x3*trial +	x4*gX_binary +	x5*gX_binary*day +	x6*gX_binary*session +	x7*gX_binary*trial
+        %
+        %
+        % Interpretation of Coefficients
+        %
+        % 	             group A  |  group X vs group A
+        %   ––––––––––––––––––––––––––––––––––––––––––––
+        %   intercept |	intercept |	    x4
+        %   day	      |    x1	  |     x5
+        %   session	  |    x2	  |     x6
+        %   trial	  |    x3	  |     x7
+        %
+
+        %%
+        coefficient_interpretation = table(["intercept"; "x1"; "x2"; "x3"], ["x4"; "x5"; "x6"; "x7"],'RowNames',["intercept" "day" "session" "trial"]);
+
+        % todo: implement emgs pace selector
+
+        i=1;
+        emg_space = strjoin(distances_to_calc{i});
+
+        base_group = input('base group: ');
+        test_group = input('test group: ');
+
+        % deduce excluded_group
+        if base_group + test_group == 3
+            excluded_group = 3;
+        elseif base_group + test_group == 4
+            excluded_group = 2;
+        else 
+            excluded_group = 1;
+        end
+
+        % set binary regressor name string
+        switch test_group
+            case 1
+                test_group_binary = "g1_binary";
+            case 2
+                test_group_binary = "g2_binary";
+            case 3
+                test_group_binary = "g3_binary";
+        end
+
+        % get observed values from calc_variables
+        dependant = calc_variables(calc_variables.group ~= excluded_group, emg_space);
+        dependant = table2array(dependant);
+
+        % get regressors & dummy from calc_variables
+        regressors = calc_variables(calc_variables.group ~= excluded_group, ["day" "session" "trial" test_group_binary]);
+
+        % create dummy*regressor
+        intercep_terms =    table(...
+                                    regressors{:,test_group_binary}.*regressors{:,"day"},...
+                                    regressors{:,test_group_binary}.*regressors{:,"session"},...
+                                    regressors{:,test_group_binary}.*regressors{:,"trial"},...
+                                    'VariableNames', [test_group_binary+"*day" test_group_binary+"*session" test_group_binary+"*trial"]...
+                                  ); % end of dummy*regressor creator
+
+        % add dummy*regressor to regressors
+        regressors = [regressors intercep_terms];
+
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+
+        % fit a robust linear regression model
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %output
+        coefficient_interpretation.Properties.VariableNames = ["Group "+base_group "Group "+test_group+" vs "+base_group];
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>RMLR - Group "+string(test_group)+" vs "+string(base_group)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
         %%
 
     case 51 % save alldat
@@ -701,7 +794,7 @@ switch action
         run_script = 0;
         
     case 911 %Case 911: Clear Workspace
-        clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update calc_variables lin_reg_models regression_models regression_models_day
+        clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update calc_variables lin_reg_models distances_to_calc
 
 end % end of master switch
 end % end of master while loop
