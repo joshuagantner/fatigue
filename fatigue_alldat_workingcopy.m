@@ -52,7 +52,8 @@ operations_list = ...
     "\n"+...
     "27  add comparison variables\n"+...
     "28  compare models\n"+...
-    "29  compare 2 overall multiple linear regression model\n"+...
+    "\n"+...
+    "31  compare 2 overall multiple linear regression models\n"+...
     "\n"+...
     "output\n"+...
     "51  save…\n"+...
@@ -450,6 +451,13 @@ switch action
             waitbar(counter/total,h,['Calculating Variables ', num2str(round(counter/total*100)),'%']);
         end
 
+        % normalize distances for dimensions
+        for i = 1:length(distances_to_calc)
+            if length(distances_to_calc{i})>1
+                calc_variables.(strjoin(distances_to_calc{i})+" normalized") = calc_variables{:,strjoin(distances_to_calc{i})}/length(distances_to_calc{i});
+            end
+        end
+
         close(h)
         disp("  -> Variables calculated")
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
@@ -659,7 +667,7 @@ switch action
 
         %%
 
-    case 29 % compare 2 overall multiple linear regression model
+    case 31 % compare 2 overall multiple linear regression model
         %
         % Model
         %
@@ -679,11 +687,17 @@ switch action
         %%
         coefficient_interpretation = table(["intercept"; "x1"; "x2"; "x3"], ["x4"; "x5"; "x6"; "x7"],'RowNames',["intercept" "day" "session" "trial"]);
 
-        % todo: implement emgs pace selector
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("available emg spaces")
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            disp("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars))
+        end
 
-        i=1;
-        emg_space = strjoin(distances_to_calc{i});
-
+        disp(' ')
+        emg_space = input('emg space:   ')+6;
+        emg_space = emg_spaces{emg_space};
         base_group = input('base group: ');
         test_group = input('test group: ');
 
@@ -696,32 +710,26 @@ switch action
             excluded_group = 1;
         end
 
-        % set binary regressor name string
-        switch test_group
-            case 1
-                test_group_binary = "g1_binary";
-            case 2
-                test_group_binary = "g2_binary";
-            case 3
-                test_group_binary = "g3_binary";
-        end
-
         % get observed values from calc_variables
         dependant = calc_variables(calc_variables.group ~= excluded_group, emg_space);
         dependant = table2array(dependant);
 
-        % get regressors & dummy from calc_variables
-        regressors = calc_variables(calc_variables.group ~= excluded_group, ["day" "session" "trial" test_group_binary]);
+        % get regressors
+        regressors = calc_variables(calc_variables.group ~= excluded_group, ["day" "session" "trial"]);
 
-        % create dummy*regressor
+        % add binary dummy regressor
+        binary = array2table(calc_variables{calc_variables.group ~= excluded_group, "group"} == test_group, 'VariableNames', "binary");
+        regressors = [regressors binary];
+        
+        % create intercept terms: dummy*regressor
         intercep_terms =    table(...
-                                    regressors{:,test_group_binary}.*regressors{:,"day"},...
-                                    regressors{:,test_group_binary}.*regressors{:,"session"},...
-                                    regressors{:,test_group_binary}.*regressors{:,"trial"},...
-                                    'VariableNames', [test_group_binary+"*day" test_group_binary+"*session" test_group_binary+"*trial"]...
+                                    regressors{:,"binary"}.*regressors{:,"day"},...
+                                    regressors{:,"binary"}.*regressors{:,"session"},...
+                                    regressors{:,"binary"}.*regressors{:,"trial"},...
+                                    'VariableNames', ["binary*day" "binary*session" "binary*trial"]...
                                   ); % end of dummy*regressor creator
 
-        % add dummy*regressor to regressors
+        % add intercept terms to regressors
         regressors = [regressors intercep_terms];
 
         regressors_names = regressors.Properties.VariableNames;
@@ -744,7 +752,7 @@ switch action
         disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
         %%
 
-    case 51 % save alldat
+    case 51 % save
         %%
         disp('1 alldat as struct')
         disp('2 alldat as table')
@@ -782,7 +790,7 @@ switch action
                 writetable(calc_variables,[p,f]);
                 disp(['   -> ',f,' saved to ',p]);
         end
-        %% end case 51 save alldat
+        %% end case 51 save
 
     case 0 % reset cml view
         %%
