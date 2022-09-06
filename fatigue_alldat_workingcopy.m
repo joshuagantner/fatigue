@@ -739,7 +739,8 @@ switch action
         y_dimensions = [];
 
         %% scaffold
-        tiledlayout(1,n_days);
+        t = tiledlayout(1,n_days,'TileSpacing','Compact');
+        title(t,'Robust Multiple Linear Regression of Variability')
 
         % Tile 1 - training sessions
         if day == 1 || n_days == 2
