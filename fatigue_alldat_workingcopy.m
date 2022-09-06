@@ -53,7 +53,8 @@ operations_list = ...
     "27  add comparison variables\n"+...
     "28  compare models\n"+...
     "\n"+...
-    "31  compare 2 overall multiple linear regression models\n"+...
+    "31  compare 1-day models\n"+...
+    "32  compare 2-day models\n"+...
     "\n"+...
     "output\n"+...
     "51  save…\n"+...
@@ -75,7 +76,6 @@ action = input('What would you like me to do? ');
 disp(' ')
 
 switch action
-
     %% 
     case 11 % set root directory
         %%
@@ -223,7 +223,7 @@ switch action
         disp('2 filter & rectify raw emg')
         disp('3 standardize length/time')
         disp(' ')
-        what_to_process = input('what to porcess: ');
+        what_to_process = input('what to process: ');
 
         switch what_to_process
             case 1 % update inclusion status
@@ -601,73 +601,252 @@ switch action
         disp(simple_models_day)
         lin_reg_models.simple_day = simple_models_day;
         %%
-    case 27 % add comparison variables
-        %%
-        % normalize distances for dimensions
-        for i = 1:length(distances_to_calc)
-            if length(distances_to_calc{i})>1
-                calc_variables.(strjoin(distances_to_calc{i})+" normalized") = calc_variables{:,strjoin(distances_to_calc{i})}/length(distances_to_calc{i});
-            end
-        end
-
-        % add dummy variables
-        calc_variables.g1_binary = calc_variables.group == 1;
-        calc_variables.g2_binary = calc_variables.group == 2;
-        calc_variables.g3_binary = calc_variables.group == 3;
-
-        % dummy * regressor
-        % group 2
-        calc_variables.day_g2       = calc_variables.day     .*double(calc_variables.g2_binary);
-        calc_variables.session_g2   = calc_variables.session .*double(calc_variables.g2_binary);
-        calc_variables.trial_g2     = calc_variables.trial   .*double(calc_variables.g2_binary);
-        
-        % group 3
-        calc_variables.day_g3       = calc_variables.day     .*double(calc_variables.g3_binary);
-        calc_variables.session_g3   = calc_variables.session .*double(calc_variables.g3_binary);
-        calc_variables.trial_g3     = calc_variables.trial   .*double(calc_variables.g3_binary);
-
-        disp(' success')
+%% depricated        
+%     case 27 % add comparison variables
+%         %%
+%         % normalize distances for dimensions
+%         for i = 1:length(distances_to_calc)
+%             if length(distances_to_calc{i})>1
+%                 calc_variables.(strjoin(distances_to_calc{i})+" normalized") = calc_variables{:,strjoin(distances_to_calc{i})}/length(distances_to_calc{i});
+%             end
+%         end
+% 
+%         % add dummy variables
+%         calc_variables.g1_binary = calc_variables.group == 1;
+%         calc_variables.g2_binary = calc_variables.group == 2;
+%         calc_variables.g3_binary = calc_variables.group == 3;
+% 
+%         % dummy * regressor
+%         % group 2
+%         calc_variables.day_g2       = calc_variables.day     .*double(calc_variables.g2_binary);
+%         calc_variables.session_g2   = calc_variables.session .*double(calc_variables.g2_binary);
+%         calc_variables.trial_g2     = calc_variables.trial   .*double(calc_variables.g2_binary);
+%         
+%         % group 3
+%         calc_variables.day_g3       = calc_variables.day     .*double(calc_variables.g3_binary);
+%         calc_variables.session_g3   = calc_variables.session .*double(calc_variables.g3_binary);
+%         calc_variables.trial_g3     = calc_variables.trial   .*double(calc_variables.g3_binary);
+% 
+%         disp(' success')
+%         %%
+%     
+%     case 28 % compare regression model
+%         %%
+%         % regression_models{"group 1", "fdi"}{:,:}
+%         % regression_models_day{"group 1","adm"}{:,"day_1"}{:,:}
+% 
+%         % We can use the same approach even when there are more than two 
+%         % samples. For example, with three samples S0, S1 and S2, we use 
+%         % two dummy variables d1 = 1 if the data comes from sample S1 and 
+%         % d1 = 0 otherwise and d2 = 1 if the data comes from sample S2 and 
+%         % d2 = 0 otherwise.
+%         % 
+%         % The regression model takes the form: 
+%         % 
+%         %               y = b0 + b1x + b2d1 + b3d2 + b4d1x+ b5d2x
+%         %         
+% 
+%         i=1;
+%         j=1;
+% 
+%         emg_space = strjoin(distances_to_calc{i});
+%         group = j;
+% 
+%         % get observed values from calc_variables
+%         dependant = calc_variables(:, emg_space);
+%         dependant = table2array(dependant);
+%         
+%         % get explanatory values from calc_variables
+%         regressor = calc_variables(:, ["day" "session" "trial" "g2_binary" "g3_binary" "day_g2" "day_g3" "session_g2" "session_g3" "trial_g2" "trial_g3"]); 
+%         regressor_names = regressor.Properties.VariableNames;
+%         regressor = table2array(regressor);
+%         
+%         % fit a robust linear regression model
+%         mdlr = fitlm(regressor,dependant,'RobustOpts','on')
+%         disp("regressors:")
+%         disp(regressor_names)
+%
         %%
     
-    case 28 % compare regression model
+    case 30 % view model
         %%
-        % regression_models{"group 1", "fdi"}{:,:}
-        % regression_models_day{"group 1","adm"}{:,"day_1"}{:,:}
-
-        % We can use the same approach even when there are more than two 
-        % samples. For example, with three samples S0, S1 and S2, we use 
-        % two dummy variables d1 = 1 if the data comes from sample S1 and 
-        % d1 = 0 otherwise and d2 = 1 if the data comes from sample S2 and 
-        % d2 = 0 otherwise.
+        %% input
+        %  √ emg space
+        %  √ group
+        %  √ multiple or simple
+        %  √ 1- or 2- day
+        %   √ • which day
         % 
-        % The regression model takes the form: 
-        % 
-        %               y = b0 + b1x + b2d1 + b3d2 + b4d1x+ b5d2x
-        %         
 
-        i=1;
-        j=1;
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("available emg spaces")
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            disp("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars))
+        end
 
-        emg_space = strjoin(distances_to_calc{i});
-        group = j;
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
 
-        % get observed values from calc_variables
-        dependant = calc_variables(:, emg_space);
+        % other input
+        group       = input('group:    ');
+        multiple_yn = input('multiple: ','s');
+        n_days      = input('days:     ');
+
+        if n_days == 1
+            day     = input('day:      ');
+        else
+            clear day
+        end
+
+        % get subset of calc_variables to be tested
+        if n_days == 1
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+        else
+            stencil = (calc_variables.group == group);
+        end
+
+        calc_variables_subset = calc_variables(stencil,:);
+
+        % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
         dependant = table2array(dependant);
+
+        % get regressors
+        if multiple_yn == "n"
+            regressors_names = "time";
+        elseif n_days == 2
+            regressors_names = ["day" "session" "trial"];
+        else
+            regressors_names = ["session" "trial"];
+        end
+
+        regressors = calc_variables_subset(:, regressors_names);
         
-        % get explanatory values from calc_variables
-        regressor = calc_variables(:, ["day" "session" "trial" "g2_binary" "g3_binary" "day_g2" "day_g3" "session_g2" "session_g3" "trial_g2" "trial_g3"]); 
-        regressor_names = regressor.Properties.VariableNames;
-        regressor = table2array(regressor);
-        
-        % fit a robust linear regression model
-        mdlr = fitlm(regressor,dependant,'RobustOpts','on')
-        disp("regressors:")
-        disp(regressor_names)
+%       NOT RELEVANT UNLESS COMPARING GROUPS
+%         add binary dummy regressor
+%         binary = array2table(calc_variables_subset.group == test_group & calc_variables_subset.day == test_day, 'VariableNames', "binary");
+%         regressors = [regressors binary];
+% 
+%         % create intercept terms: dummy*regressor
+%         intercep_terms =    table(...
+%                                     regressors{:,"binary"}.*regressors{:,"session"},...
+%                                     regressors{:,"binary"}.*regressors{:,"trial"},...
+%                                     'VariableNames', ["binary*session" "binary*trial"]...
+%                                   ); % end of dummy*regressor creator
+% 
+%         % add intercept terms to regressors
+%         regressors = [regressors intercep_terms];
+
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
 
         %%
+        %output
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        %disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
 
-    case 31 % compare 2 overall multiple linear regression model
+    case 31 % compare 1-day models
+        %
+        % Model
+        %
+        %     y =	int +	x1*session +	x2*trial +	x3*gX_binary +	x4*gX_binary*session +	x5*gX_binary*trial
+        %
+        %
+        % Interpretation of Coefficients
+        %
+        % 	             group A  |  group X vs group A
+        %   ––––––––––––––––––––––––––––––––––––––––––––
+        %   intercept |	intercept |	    x3
+        %   session	  |    x1	  |     x4
+        %   trial	  |    x2	  |     x5
+        %
+
+        %%
+        coefficient_interpretation = table(["intercept"; "x1"; "x2"], ["x3"; "x4"; "x5"], ["intercept + x3"; "x1 + x4"; "x2 + x5"],'RowNames',["intercept" "session" "trial"]);
+
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("available emg spaces")
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            disp("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars))
+        end
+
+        disp(' ')
+        emg_space = input('emg space:   ')+6;
+        emg_space = emg_spaces{emg_space};
+
+        % other input
+        disp('base')
+        base_group = input(' • group: ');
+        base_day   = input(' • day:   ');
+        disp('test')
+        test_group = input(' • group: ');
+        test_day   = input(' • day:   ');
+
+        % get subset of calc_variables to be tested
+        calc_variables_subset = calc_variables( ...
+                                    ... get rows according to input
+                                    (calc_variables.group == base_group & calc_variables.day == base_day)| ...for base group
+                                    (calc_variables.group == test_group & calc_variables.day == test_day), ...for test group
+                                    ... get all columns
+                                    :);
+
+        % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+        % get regressors
+        regressors = calc_variables_subset(:, ["session" "trial"]);
+
+        % add binary dummy regressor
+        binary = array2table(calc_variables_subset.group == test_group & calc_variables_subset.day == test_day, 'VariableNames', "binary");
+        regressors = [regressors binary];
+
+        % create intercept terms: dummy*regressor
+        intercep_terms =    table(...
+                                    regressors{:,"binary"}.*regressors{:,"session"},...
+                                    regressors{:,"binary"}.*regressors{:,"trial"},...
+                                    'VariableNames', ["binary*session" "binary*trial"]...
+                                  ); % end of dummy*regressor creator
+
+        % add intercept terms to regressors
+        regressors = [regressors intercep_terms];
+        regressors_names = regressors.Properties.VariableNames;
+
+        regressors = table2array(regressors);
+
+        % fit a robust linear regression model
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %output
+        coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
+    
+    case 32 % compare 2-day models
         %
         % Model
         %
