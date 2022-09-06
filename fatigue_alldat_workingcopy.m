@@ -32,37 +32,32 @@ warning('off','MATLAB:table:RowsAddedNewVars')
 %% print legend to cml
 
 %display available operations
-operations_list = ...
-    "––––––––––––––––––––––––––––––––––––––––––––––––––––\n"+...
-    "Available operations:\n"+...
-    "\n"+...
-    "setup\n"+...
-    "11  set root directory\n"+...
-    "12  load data\n"+...
-    "13  create fatigue_alldat\n"+...
-    "\n"+...
-    "processing\n"+...
-    "21  process raw alldat\n"+...
-    "22  calculate mean trial\n"+...
-    "23  calculate variables\n"+...
-    "\n"+...
-    "24  multiple models overall\n"+...
-    "25  multiple models by day\n"+...
-    "26  simple models\n"+...
-    "\n"+...
-    "27  add comparison variables\n"+...
-    "28  compare models\n"+...
-    "\n"+...
-    "31  compare 1-day models\n"+...
-    "32  compare 2-day models\n"+...
-    "\n"+...
-    "output\n"+...
-    "51  save…\n"+...
-    "\n"+...
-    "\n"+...
-    "clear cml & display operations with 0\n"+...
-    "terminate script with 666\n"+...
-    "clear workspace with 911\n";
+operations_list = ... "––––––––––––––––––––––––––––––––––––––––––––––––––––\n"+...
+"<strong>Available operations:</strong>\n"+...
+"\n"+...
+"setup\n"+...
+"11  set root directory\n"+...
+"12  load data\n"+...
+"13  create fatigue_alldat\n"+...
+"\n"+...
+"processing\n"+...
+"21  process raw alldat\n"+...
+"22  calculate mean trial\n"+...
+"23  calculate variables\n"+...
+"\n"+...
+"regression analysis\n"+...
+"30  view model\n"+...
+"31  compare 1-day models\n"+...
+"32  compare 2-day models\n"+...
+"34  plot regression models\"+...
+"\n"+...
+"output\n"+...
+"51  save…\n"+...
+"\n"+...
+"\n"+...
+"clear cml & display operations with 0\n"+...
+"terminate script with 666\n"+...
+"clear workspace with 911\n";
 
 fprintf(operations_list);
 
@@ -463,211 +458,6 @@ switch action
         disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
         %% end case 25 calculate variables
 
-    case 24 % multiple models across days
-        %%
-        regression_models = array2table([]);
-
-        for i=1:length(distances_to_calc)
-            emg_space = strjoin(distances_to_calc{i});
-            for j=1:3
-                group = j;
-
-                % get observed values from calc_variables
-                dependant = calc_variables(calc_variables.group == group, emg_space);
-                dependant = table2array(dependant);
-
-                % get explanatory values from calc_variables
-                regressor = calc_variables(calc_variables.group == group, ["day" "session" "trial"]);
-                regressor = table2array(regressor);
-
-                % add 1s for intercept
-                %regressor = [regressor ones([height(regressor) 1])];
-
-                % fit a robust linear regression model
-                mdlr = fitlm(regressor,dependant,'RobustOpts','on');
-
-                % save model to table
-                regression_models(j,emg_space) = {mdlr};
-            end
-        end
-        regression_models.Properties.RowNames = ["group 1" "group 2" "group 3"];
-        disp(regression_models)
-        lin_reg_models.multiple_overall = regression_models;
-        %%
-
-    case 25 % multiple models within days
-        %%
-        regression_models_day = array2table([]);
-
-        for i=1:length(distances_to_calc)
-            emg_space = strjoin(distances_to_calc{i});
-
-            for j=1:3
-                group = j;
-                subtable = array2table([]);
-                for k = 1:2
-                    column_names = ["day_1" "day_2"];
-                    % get observed values from calc_variables
-                    dependant = calc_variables(calc_variables.group == group & calc_variables.day == k, emg_space);
-                    dependant = table2array(dependant);
-
-                    % get explanatory values from calc_variables
-                    regressor = calc_variables(calc_variables.group == group & calc_variables.day == k, ["session" "trial"]);
-                    regressor = table2array(regressor);
-
-                    % add 1s for intercept
-                    %regressor = [regressor ones([height(regressor) 1])];
-
-                    % fit a robust linear regression model
-                    mdlr = fitlm(regressor,dependant,'RobustOpts','on');
-
-                    % save model to table
-                    subtable(1,column_names(k)) = {mdlr};
-                end
-                %save day models to overall table
-                regression_models_day(j,emg_space) = {subtable};
-            end
-        end
-        regression_models_day.Properties.RowNames = ["group 1" "group 2" "group 3"];
-        disp(regression_models_day)
-        lin_reg_models.multiple_day = regression_models_day;
-        %%
-
-    case 26 % simple models
-        %% simple models across days
-        simple_models_overall = array2table([]);
-
-        for i=1:length(distances_to_calc)
-            emg_space = strjoin(distances_to_calc{i});
-            for j=1:3
-                group = j;
-
-                % get observed values from calc_variables
-                dependant = calc_variables(calc_variables.group == group, emg_space);
-                dependant = table2array(dependant);
-
-                % get explanatory values from calc_variables
-                regressor = calc_variables(calc_variables.group == group, "time");
-                regressor = table2array(regressor);
-
-                % add 1s for intercept
-                %regressor = [regressor ones([height(regressor) 1])];
-
-                % fit a robust linear regression model
-                mdlr = fitlm(regressor,dependant,'RobustOpts','on');
-
-                % save model to table
-                simple_models_overall(j,emg_space) = {mdlr};
-            end
-        end
-        simple_models_overall.Properties.RowNames = ["group 1" "group 2" "group 3"];
-        disp(simple_models_overall)
-        lin_reg_models.simple_overall = simple_models_overall;
-        %%
-
-        %%
-        simple_models_day = array2table([]);
-
-        for i=1:length(distances_to_calc)
-            emg_space = strjoin(distances_to_calc{i});
-
-            for j=1:3
-                group = j;
-                subtable = array2table([]);
-                for k = 1:2
-                    column_names = ["day_1" "day_2"];
-                    % get observed values from calc_variables
-                    dependant = calc_variables(calc_variables.group == group & calc_variables.day == k, emg_space);
-                    dependant = table2array(dependant);
-
-                    % get explanatory values from calc_variables
-                    regressor = calc_variables(calc_variables.group == group & calc_variables.day == k, "time");
-                    regressor = table2array(regressor);
-
-                    % add 1s for intercept
-                    %regressor = [regressor ones([height(regressor) 1])];
-
-                    % fit a robust linear regression model
-                    mdlr = fitlm(regressor,dependant,'RobustOpts','on');
-
-                    % save model to table
-                    subtable(1,column_names(k)) = {mdlr};
-                end
-                %save day models to overall table
-                simple_models_day(j,emg_space) = {subtable};
-            end
-        end
-        simple_models_day.Properties.RowNames = ["group 1" "group 2" "group 3"];
-        disp(simple_models_day)
-        lin_reg_models.simple_day = simple_models_day;
-        %%
-%% depricated        
-%     case 27 % add comparison variables
-%         %%
-%         % normalize distances for dimensions
-%         for i = 1:length(distances_to_calc)
-%             if length(distances_to_calc{i})>1
-%                 calc_variables.(strjoin(distances_to_calc{i})+" normalized") = calc_variables{:,strjoin(distances_to_calc{i})}/length(distances_to_calc{i});
-%             end
-%         end
-% 
-%         % add dummy variables
-%         calc_variables.g1_binary = calc_variables.group == 1;
-%         calc_variables.g2_binary = calc_variables.group == 2;
-%         calc_variables.g3_binary = calc_variables.group == 3;
-% 
-%         % dummy * regressor
-%         % group 2
-%         calc_variables.day_g2       = calc_variables.day     .*double(calc_variables.g2_binary);
-%         calc_variables.session_g2   = calc_variables.session .*double(calc_variables.g2_binary);
-%         calc_variables.trial_g2     = calc_variables.trial   .*double(calc_variables.g2_binary);
-%         
-%         % group 3
-%         calc_variables.day_g3       = calc_variables.day     .*double(calc_variables.g3_binary);
-%         calc_variables.session_g3   = calc_variables.session .*double(calc_variables.g3_binary);
-%         calc_variables.trial_g3     = calc_variables.trial   .*double(calc_variables.g3_binary);
-% 
-%         disp(' success')
-%         %%
-%     
-%     case 28 % compare regression model
-%         %%
-%         % regression_models{"group 1", "fdi"}{:,:}
-%         % regression_models_day{"group 1","adm"}{:,"day_1"}{:,:}
-% 
-%         % We can use the same approach even when there are more than two 
-%         % samples. For example, with three samples S0, S1 and S2, we use 
-%         % two dummy variables d1 = 1 if the data comes from sample S1 and 
-%         % d1 = 0 otherwise and d2 = 1 if the data comes from sample S2 and 
-%         % d2 = 0 otherwise.
-%         % 
-%         % The regression model takes the form: 
-%         % 
-%         %               y = b0 + b1x + b2d1 + b3d2 + b4d1x+ b5d2x
-%         %         
-% 
-%         i=1;
-%         j=1;
-% 
-%         emg_space = strjoin(distances_to_calc{i});
-%         group = j;
-% 
-%         % get observed values from calc_variables
-%         dependant = calc_variables(:, emg_space);
-%         dependant = table2array(dependant);
-%         
-%         % get explanatory values from calc_variables
-%         regressor = calc_variables(:, ["day" "session" "trial" "g2_binary" "g3_binary" "day_g2" "day_g3" "session_g2" "session_g3" "trial_g2" "trial_g3"]); 
-%         regressor_names = regressor.Properties.VariableNames;
-%         regressor = table2array(regressor);
-%         
-%         % fit a robust linear regression model
-%         mdlr = fitlm(regressor,dependant,'RobustOpts','on')
-%         disp("regressors:")
-%         disp(regressor_names)
-%
-        %%
-    
     case 30 % view model
         %%
         %% input
@@ -931,6 +721,268 @@ switch action
         disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
         %%
 
+    case 34 % plot regression models
+        %%
+        fprintf("<strong>creating regression plot</strong>\n")
+        %% input
+        % n_days
+        n_days = input('n_days: ');
+
+        if n_days == 1
+            day = input('day:   ');
+        else
+            day = nan;
+        end
+
+        line_width = 2;
+        legend_labels = [];
+        y_dimensions = [];
+
+        %% scaffold
+        tiledlayout(1,n_days);
+
+        % Tile 1 - training sessions
+        if day == 1 || n_days == 2
+            nexttile
+            emptyplot = plot(NaN,NaN,'b','Linewidth',line_width);
+            set(gca,'box','off')
+            set(gca,'XLim',[1 120],'XTick',15:30:105)
+            xticklabels(["T1", "T2", "T3", "T4"])
+            xlabel("session")
+            ylabel("variability")
+        end
+
+        % Tile 2 - control sessions
+        if day == 2 || n_days == 2
+            nexttile
+            emptyplot = plot(NaN,NaN,'g','Linewidth',line_width);
+            set(gca,'box','off')
+
+            if n_days == 1
+                set(gca,'XLim',[1 120],'XTick',15:30:105)
+            else
+                set(gca,'XLim',[121 240],'XTick',135:30:225)
+            end
+
+            xticklabels(["C1", "C2", "C3", "C4"])
+            xlabel("session")
+            if day ~= 2
+                ax1 = gca;                   % gca = get current axis
+                ax1.YAxis.Visible = 'off';   % remove y-axis
+            end
+        end
+
+        % Tile 3 - indifferent sessions
+        if day == 3
+            nexttile
+            emptyplot = plot(NaN,NaN,'g','Linewidth',line_width);
+            xlim([121 240])
+            set(gca,'box','off')
+            set(gca,'XLim',[1 120],'XTick',15:30:105)
+            xticklabels(["1", "2", "3", "4"])
+            xlabel("session")
+            ylabel("variability")
+        end
+
+        %% loop plot models
+        % show available emg spaces
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp(' ')
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        disp(' ––––––––––––––––––––')
+        plotting = input('  Plot a model? ','s');
+
+        if plotting == 'y'
+            plot_loop_state = 1;
+            plot_counter = 0;
+        end
+        %%
+
+        while plot_loop_state == 1
+
+            plot_counter = plot_counter+1;
+
+            %% generate model to plot
+            %  √ emg space
+            %  √ group
+            %  √ multiple or simple
+            %  √ 1- or 2- day
+            %   √ • which day
+            %
+
+            % emg space selector
+            disp(' ')
+            emg_space   = input('  emg space: ')+6;
+            emg_space = emg_spaces{emg_space};
+
+            % other input
+            group       = input('  group:     ');
+            multiple_yn = input('  multiple:  ','s');
+            % n_days      = input('days:     ');
+
+            if n_days == 2
+                clear day
+            elseif day == 3
+                day = input('day:   ');
+            end
+
+            % get subset of calc_variables to be tested
+            if n_days == 1
+                stencil = (calc_variables.group == group & calc_variables.day == day);
+            else
+                stencil = (calc_variables.group == group);
+            end
+
+            calc_variables_subset = calc_variables(stencil,:);
+
+            % get observed values from calc_variables_subset
+            dependant = calc_variables_subset(:, emg_space);
+            dependant = table2array(dependant);
+
+            % get regressors
+            if multiple_yn == "n"
+                regressors_names = "time";
+            elseif n_days == 2
+                regressors_names = ["day" "session" "trial"];
+            else
+                regressors_names = ["session" "trial"];
+            end
+
+            regressors = calc_variables_subset(:, regressors_names);
+
+            regressors_names = regressors.Properties.VariableNames;
+            regressors = table2array(regressors);
+
+            % create model
+            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+            %% reapply model
+            if multiple_yn == 'n'
+                intercept   = mdlr.Coefficients{1,1};
+                effect      = mdlr.Coefficients{2,1};
+
+                if n_days == 2
+                    time_scaffold = 1:240;
+                else
+                    time_scaffold = transpose((1:120)+120*(day-1));
+                end
+
+                reapplied_model = intercept + effect*time_scaffold(:,1);
+
+            elseif n_days == 2
+                intercept       = mdlr.Coefficients{1,1};
+                effect_day      = mdlr.Coefficients{2,1};
+                effect_session  = mdlr.Coefficients{3,1};
+                effect_trial    = mdlr.Coefficients{4,1};
+
+                time_scaffold = [...
+                    [ones([120,1]);ones([120,1])*2],... create day column
+                    repmat([ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],[2 1]),... create session column
+                    repmat(transpose(1:30),[8 1])... create trial column
+                    ];
+
+                reapplied_model = intercept + effect_day*time_scaffold(:,1) + effect_session*time_scaffold(:,2) + effect_trial*time_scaffold(:,3);
+            else
+                intercept       = mdlr.Coefficients{1,1};
+                effect_session  = mdlr.Coefficients{2,1};
+                effect_trial    = mdlr.Coefficients{3,1};
+
+                time_scaffold = [...
+                    [ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],... create session column
+                    repmat(transpose(1:30),[4 1])... create trial column
+                    ];
+
+                reapplied_model = intercept + effect_session*time_scaffold(:,1) + effect_trial*time_scaffold(:,2);
+            end
+
+            %% plot reapplied model
+            % asemble legend
+            if multiple_yn == 'y'
+                complexity = 'multiple';
+            else
+                complexity = 'simple';
+            end
+
+            if n_days == 2
+                legend_labels = [legend_labels "G"+string(group)+" "+emg_space+" "+complexity];
+            else
+                if day == 3
+                    legend_labels = [legend_labels "G"+string(group)+"d"+string(day)+" "+emg_space+" "+complexity];
+                else
+                    legend_labels = [legend_labels "G"+string(group)+" "+emg_space+" "+complexity];
+                end
+            end
+
+            % plot to tile
+            if n_days == 1
+                %...in a 1 tile figure
+                nexttile(1)
+                hold on
+                plot(reapplied_model,'Linewidth',line_width)
+                if plot_counter == 1
+                    delete(emptyplot)
+                end
+                legend(legend_labels,'Location','bestoutside')
+                hold off
+                drawnow()
+
+            else
+                %...in a 2 tile figure
+                nexttile(1)
+                hold on
+                plot(reapplied_model,'Linewidth',line_width)
+                if plot_counter == 1
+                    delete(emptyplot)
+                end
+                %legend(legend_labels,'Location','bestoutside')
+                hold off
+
+                nexttile(2)
+                hold on
+                plot(reapplied_model,'Linewidth',line_width)
+                if plot_counter == 1
+                    delete(emptyplot)
+                end
+                legend(legend_labels,'Location','bestoutside')
+                hold off
+
+                drawnow()
+                y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+            end
+
+            %% plot model query
+            disp(' ')
+            disp(' ––––––––––––––––––––')
+            plotting = input('  Plot a model? ','s');
+            if plotting == 'n'
+                plot_loop_state = 0;
+            end
+
+            %% sync y limits in 2 tile figure
+            if n_days == 2
+                y_max = ceil(max(y_dimensions));
+                y_min = floor(min(y_dimensions));
+
+                nexttile(1)
+                ylim([y_min y_max])
+
+                nexttile(2)
+                ylim([y_min y_max])
+
+                drawnow()
+                disp('  y axis synced √')
+            end
+        end
+        %%
+
     case 51 % save
         %%
         disp('1 alldat as struct')
@@ -985,3 +1037,4 @@ switch action
 
 end % end of master switch
 end % end of master while loop
+
