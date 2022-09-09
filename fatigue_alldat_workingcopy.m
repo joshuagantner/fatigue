@@ -49,7 +49,9 @@ operations_list = ... "–––––––––––––––––––
 "30  view model\n"+...
 "31  compare 1-day models\n"+...
 "32  compare 2-day models\n"+...
-"34  plot regression models\"+...
+"34  plot regression models\n"+...
+"\n"+...
+"39  styling options\n"+...
 "\n"+...
 "output\n"+...
 "51  save…\n"+...
@@ -119,7 +121,7 @@ switch action
             case 4
                 [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select calc_variables (.csv)');
                 calc_variables = readtable(fullfile(p,f));
-                calc_variables.Properties.VariableNames = ["group" "subject" "day" "session" "trial" "time" transpose(cellfun(@strjoin, distances_to_calc))];
+                % calc_variables.Properties.VariableNames = ["group" "subject" "day" "session" "trial" "time" transpose(cellfun(@strjoin, distances_to_calc))];
 
         end
         %% end Case 12: load data
@@ -471,10 +473,12 @@ switch action
         % emg space selector
         emg_spaces = calc_variables.Properties.VariableNames;
         non_emg_calc_vars = 6;
-        disp("available emg spaces")
+        disp("  available emg spaces")
+        fprintf(' ')
         for i = 1:length(emg_spaces)-non_emg_calc_vars
-            disp("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars))
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
         end
+        fprintf('\n')
 
         disp(' ')
         emg_space = input('emg space:  ')+6;
@@ -483,16 +487,16 @@ switch action
         % other input
         group       = input('group:    ');
         multiple_yn = input('multiple: ','s');
-        n_days      = input('days:     ');
+        days_on_graph      = input('days:     ');
 
-        if n_days == 1
+        if days_on_graph == 1
             day     = input('day:      ');
         else
             clear day
         end
 
         % get subset of calc_variables to be tested
-        if n_days == 1
+        if days_on_graph == 1
             stencil = (calc_variables.group == group & calc_variables.day == day);
         else
             stencil = (calc_variables.group == group);
@@ -507,7 +511,7 @@ switch action
         % get regressors
         if multiple_yn == "n"
             regressors_names = "time";
-        elseif n_days == 2
+        elseif days_on_graph == 2
             regressors_names = ["day" "session" "trial"];
         else
             regressors_names = ["session" "trial"];
@@ -536,9 +540,15 @@ switch action
 
         %%
         %output
+        if days_on_graph == 2
+            output_heading_days = " Both Days";
+        else
+            output_heading_days = " Day "+string(day);
+        end
+        
         disp(' ')
         disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
-        fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+"</strong>")
+        fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+output_heading_days+"</strong>")
         disp(' ')
         disp("dependant:  "+emg_space)
         disp("regressors: " + strjoin(regressors_names+", "))
@@ -726,24 +736,29 @@ switch action
         fprintf("<strong>creating regression plot</strong>\n")
         %% input
         % n_days
-        n_days = input('n_days: ');
+        days_on_graph = input('n_days: ');
 
-        if n_days == 1
+        if days_on_graph == 1
             day = input('day:   ');
         else
             day = nan;
         end
 
         line_width = 2;
+
         legend_labels = [];
+        legend_labels_plot1 = [];
+        legend_labels_plot2 = [];
+        individual_legends = false;
+
         y_dimensions = [];
 
         %% scaffold
-        t = tiledlayout(1,n_days,'TileSpacing','Compact');
+        t = tiledlayout(1,days_on_graph,'TileSpacing','Compact');
         title(t,'Robust Multiple Linear Regression of Variability')
 
         % Tile 1 - training sessions
-        if day == 1 || n_days == 2
+        if day == 1 || days_on_graph == 2
             nexttile
             emptyplot = plot(NaN,NaN,'b','Linewidth',line_width);
             set(gca,'box','off')
@@ -754,12 +769,12 @@ switch action
         end
 
         % Tile 2 - control sessions
-        if day == 2 || n_days == 2
+        if day == 2 || days_on_graph == 2
             nexttile
-            emptyplot = plot(NaN,NaN,'g','Linewidth',line_width);
+            emptyplot2 = plot(NaN,NaN,'g','Linewidth',line_width);
             set(gca,'box','off')
 
-            if n_days == 1
+            if days_on_graph == 1
                 set(gca,'XLim',[1 120],'XTick',15:30:105)
             else
                 set(gca,'XLim',[121 240],'XTick',135:30:225)
@@ -827,16 +842,16 @@ switch action
             % other input
             group       = input('  group:     ');
             multiple_yn = input('  multiple:  ','s');
-            % n_days      = input('days:     ');
+            days_in_model      = input('  days:      ');
 
-            if n_days == 2
+            if days_in_model == 2
                 clear day
-            elseif day == 3
-                day = input('day:   ');
+            else %if day == 3
+                day = input('  day:   ');
             end
 
             % get subset of calc_variables to be tested
-            if n_days == 1
+            if days_in_model == 1
                 stencil = (calc_variables.group == group & calc_variables.day == day);
             else
                 stencil = (calc_variables.group == group);
@@ -851,7 +866,7 @@ switch action
             % get regressors
             if multiple_yn == "n"
                 regressors_names = "time";
-            elseif n_days == 2
+            elseif days_in_model == 2
                 regressors_names = ["day" "session" "trial"];
             else
                 regressors_names = ["session" "trial"];
@@ -870,7 +885,7 @@ switch action
                 intercept   = mdlr.Coefficients{1,1};
                 effect      = mdlr.Coefficients{2,1};
 
-                if n_days == 2
+                if days_in_model == 2
                     time_scaffold = 1:240;
                 else
                     time_scaffold = transpose((1:120)+120*(day-1));
@@ -878,7 +893,7 @@ switch action
 
                 reapplied_model = intercept + effect*time_scaffold(:,1);
 
-            elseif n_days == 2
+            elseif days_in_model == 2
                 intercept       = mdlr.Coefficients{1,1};
                 effect_day      = mdlr.Coefficients{2,1};
                 effect_session  = mdlr.Coefficients{3,1};
@@ -912,8 +927,20 @@ switch action
                 complexity = 'simple';
             end
 
-            if n_days == 2
-                legend_labels = [legend_labels "G"+string(group)+" "+emg_space+" "+complexity];
+            % TODO - fix issue: 1 day model in 2 day graph -> variable 1 or 2 legends
+            if days_on_graph == 2 
+                if days_in_model == 2
+                    legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+                    legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+                else
+                    if day == 1
+                        legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+                        individual_legends = true;
+                    else
+                        legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+                        individual_legends = true;
+                    end
+                end
             else
                 if day == 3
                     legend_labels = [legend_labels "G"+string(group)+"d"+string(day)+" "+emg_space+" "+complexity];
@@ -923,7 +950,7 @@ switch action
             end
 
             % plot to tile
-            if n_days == 1
+            if days_on_graph == 1
                 %...in a 1 tile figure
                 nexttile(1)
                 hold on
@@ -931,29 +958,75 @@ switch action
                 if plot_counter == 1
                     delete(emptyplot)
                 end
-                legend(legend_labels,'Location','bestoutside')
+                legend(legend_labels,'Location','southoutside')
                 hold off
                 drawnow()
 
             else
                 %...in a 2 tile figure
-                nexttile(1)
-                hold on
-                plot(reapplied_model,'Linewidth',line_width)
-                if plot_counter == 1
-                    delete(emptyplot)
-                end
-                %legend(legend_labels,'Location','bestoutside')
-                hold off
 
-                nexttile(2)
-                hold on
-                plot(reapplied_model,'Linewidth',line_width)
                 if plot_counter == 1
+                    hold on
+                    nexttile(1)
                     delete(emptyplot)
+                    hold off
+
+                    hold on
+                    nexttile(2)
+                    delete(emptyplot2)
+                    hold off
                 end
-                legend(legend_labels,'Location','bestoutside')
-                hold off
+
+                if days_in_model == 2 % plot 2 day model in 2 day figure
+                    nexttile(1)
+                    hold on
+                    plot(reapplied_model,'Linewidth',line_width)
+%                     if plot_counter == 1
+%                         delete(emptyplot)
+%                     end
+                    
+                    if individual_legends
+                        legend(legend_labels_plot1,'Location','southoutside')
+                    end
+                    hold off
+
+                    nexttile(2)
+                    hold on
+                    plot(reapplied_model,'Linewidth',line_width)
+%                     if plot_counter == 1
+%                         delete(emptyplot)
+%                     end
+                    legend(legend_labels_plot2,'Location','southoutside')
+                    hold off
+
+                else % plot 1 day model in 2 day figure
+%                     if plot_counter == 1
+%                         hold on
+%                         nexttile(1)
+%                         delete(emptyplot)
+%                         nexttile(2)
+%                         delete(emptyplot)
+%                         hold off
+%                     end
+
+                    nexttile(day)
+                    hold on
+
+                    if day == 2
+                        reapplied_model = [zeros([120 1]); reapplied_model];
+                    end
+
+                    plot(reapplied_model,'Linewidth',line_width)
+
+                    if day == 1 && individual_legends
+                        legend(legend_labels_plot1,'Location','southoutside')
+                    end
+
+                    if day == 2
+                        legend(legend_labels_plot2,'Location','southoutside')
+                    end
+                    hold off
+                end
 
                 drawnow()
                 y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
@@ -968,7 +1041,7 @@ switch action
             end
 
             %% sync y limits in 2 tile figure
-            if n_days == 2
+            if days_on_graph == 2
                 y_max = ceil(max(y_dimensions));
                 y_min = floor(min(y_dimensions));
 
@@ -982,6 +1055,12 @@ switch action
                 disp('  y axis synced √')
             end
         end
+        drawnow() % redundancy drawnow()
+        %%
+
+    case 39 % styling options
+        %% figure styling options
+        set(findall(gcf,'-property','FontSize'),'FontSize',12)
         %%
 
     case 51 % save
