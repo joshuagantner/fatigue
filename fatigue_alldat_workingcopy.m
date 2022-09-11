@@ -801,6 +801,7 @@ switch action
         end
 
         %% loop plot models
+
         % show available emg spaces
         emg_spaces = calc_variables.Properties.VariableNames;
         non_emg_calc_vars = 6;
@@ -927,7 +928,7 @@ switch action
                 complexity = 'simple';
             end
 
-            % TODO - fix issue: 1 day model in 2 day graph -> variable 1 or 2 legends
+            % assemble legend
             if days_on_graph == 2 
                 if days_in_model == 2
                     legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
@@ -1013,7 +1014,7 @@ switch action
                     hold on
 
                     if day == 2
-                        reapplied_model = [zeros([120 1]); reapplied_model];
+                        reapplied_model = [nan([120 1]); reapplied_model];
                     end
 
                     plot(reapplied_model,'Linewidth',line_width)
