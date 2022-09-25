@@ -50,12 +50,8 @@ operations_list = ... "–––––––––––––––––––
 "31  compare 1-day models\n"+...
 "32  compare 2-day models\n"+...
 "34  plot regression models\n"+...
-"35  reapply model\n"+...
-"37  ttest\n"+...
 "\n"+...
-"41  styling options\n"+...
-"42  empty legend\n"+...
-"43  plot skill measire\n"+...
+"39  styling options\n"+...
 "\n"+...
 "output\n"+...
 "51  save…\n"+...
@@ -584,15 +580,13 @@ switch action
         % emg space selector
         emg_spaces = calc_variables.Properties.VariableNames;
         non_emg_calc_vars = 6;
-        disp("  available emg spaces")
-        fprintf(' ')
+        disp("available emg spaces")
         for i = 1:length(emg_spaces)-non_emg_calc_vars
-            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+            disp("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars))
         end
-        fprintf('\n')
 
         disp(' ')
-        emg_space = input('emg space:  ')+6;
+        emg_space = input('emg space:   ')+6;
         emg_space = emg_spaces{emg_space};
 
         % other input
@@ -807,7 +801,6 @@ switch action
         end
 
         %% loop plot models
-
         % show available emg spaces
         emg_spaces = calc_variables.Properties.VariableNames;
         non_emg_calc_vars = 6;
@@ -934,7 +927,7 @@ switch action
                 complexity = 'simple';
             end
 
-            % assemble legend
+            % TODO - fix issue: 1 day model in 2 day graph -> variable 1 or 2 legends
             if days_on_graph == 2 
                 if days_in_model == 2
                     legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
@@ -1020,7 +1013,7 @@ switch action
                     hold on
 
                     if day == 2
-                        reapplied_model = [nan([120 1]); reapplied_model];
+                        reapplied_model = [zeros([120 1]); reapplied_model];
                     end
 
                     plot(reapplied_model,'Linewidth',line_width)
@@ -1065,421 +1058,9 @@ switch action
         drawnow() % redundancy drawnow()
         %%
 
-    case 35 % reapply model
-        %%
-        %% fit model
-        % emg space selector
-        emg_spaces = calc_variables.Properties.VariableNames;
-        non_emg_calc_vars = 6;
-        disp("  available emg spaces")
-        fprintf(' ')
-        for i = 1:length(emg_spaces)-non_emg_calc_vars
-            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
-        end
-        fprintf('\n')
-
-        disp(' ')
-        emg_space = input('emg space:  ')+6;
-        emg_space = emg_spaces{emg_space};
-
-        % other input
-        group       = input('group:    ');
-        multiple_yn = input('multiple: ','s');
-        days_in_model      = input('days:     ');
-
-        if days_in_model == 1
-            day     = input('day:      ');
-        else
-            clear day
-        end
-
-        % get subset of calc_variables to be tested
-        if days_in_model == 1
-            stencil = (calc_variables.group == group & calc_variables.day == day);
-        else
-            stencil = (calc_variables.group == group);
-        end
-
-        calc_variables_subset = calc_variables(stencil,:);
-
-        % get observed values from calc_variables_subset
-        dependant = calc_variables_subset(:, emg_space);
-        dependant = table2array(dependant);
-
-        % get regressors
-        if multiple_yn == "n"
-            regressors_names = "time";
-        elseif days_in_model == 2
-            regressors_names = ["day" "session" "trial"];
-        else
-            regressors_names = ["session" "trial"];
-        end
-
-        regressors = calc_variables_subset(:, regressors_names);
-        regressors_names = regressors.Properties.VariableNames;
-        regressors = table2array(regressors);
-
-        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
-
-        %% reapply model
-        if multiple_yn == 'n'
-                intercept   = mdlr.Coefficients{1,1};
-                effect      = mdlr.Coefficients{2,1};
-
-                if days_in_model == 2
-                    time_scaffold = 1:240;
-                else
-                    time_scaffold = transpose((1:120)+120*(day-1));
-                end
-
-                reapplied_model = intercept + effect*time_scaffold(:,1);
-
-            elseif days_in_model == 2
-                intercept       = mdlr.Coefficients{1,1};
-                effect_day      = mdlr.Coefficients{2,1};
-                effect_session  = mdlr.Coefficients{3,1};
-                effect_trial    = mdlr.Coefficients{4,1};
-
-                time_scaffold = [...
-                    [ones([120,1]);ones([120,1])*2],... create day column
-                    repmat([ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],[2 1]),... create session column
-                    repmat(transpose(1:30),[8 1])... create trial column
-                    ];
-
-                reapplied_model = intercept + effect_day*time_scaffold(:,1) + effect_session*time_scaffold(:,2) + effect_trial*time_scaffold(:,3);
-            else
-                intercept       = mdlr.Coefficients{1,1};
-                effect_session  = mdlr.Coefficients{2,1};
-                effect_trial    = mdlr.Coefficients{3,1};
-
-                time_scaffold = [...
-                    [ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],... create session column
-                    repmat(transpose(1:30),[4 1])... create trial column
-                    ];
-
-                reapplied_model = intercept + effect_session*time_scaffold(:,1) + effect_trial*time_scaffold(:,2);
-        end
-
-        disp('reapplied model:')
-        disp('  - start: '+string(reapplied_model(1)))
-        disp('  - end:   '+string(reapplied_model(end)))
-        disp('  - max:   '+string(max(reapplied_model)))
-        disp('  - min:   '+string(min(reapplied_model)))
-        %%
-
-    case 36 % view model for skill
-        %%
-        %input
-        disp(' ')
-        disp(' Regression Model of Skill')
-        disp(' ')
-        group = input('  group:   ');
-        day   = input('  day:     ');
-        disp(' ')
-
-        % get subset of calc_variables to be tested
-        parameters = struct2table(Parameters);
-
-        stencil = (parameters.label == group & parameters.day == day);
-        dependant = table2array(parameters(stencil,'skillp'));
-        regressor = table2array(parameters(stencil,'BN'));
-
-        %plot(regressor, dependant)
-
-        % fit model
-        mdlr = fitlm(regressor,dependant,'RobustOpts','on')
-        plot(mdlr)
-
-        %%
-
-    case 38 % ttest
-        %%
-        %input
-        disp(' ')
-        disp(' T Test')
-        what_to_test = input('  var or skill? ','s');
-        disp(' ')
-        disp(' Sample A')
-        sample_a = zeros([1 3]);
-        sample_a(1) = input('  group:   ');
-        sample_a(2) = input('  day:     ');
-        sample_a(3) = input('  session: ');
-        disp(' ')
-        disp(' Sample B')
-        sample_b = zeros([1 3]);
-        sample_b(1) = input('  group:   ');
-        sample_b(2) = input('  day:     ');
-        sample_b(3) = input('  session: ');
-
-        switch what_to_test
-            case 'var'
-            % emg space selector
-            emg_spaces = calc_variables.Properties.VariableNames;
-            non_emg_calc_vars = 6;
-            disp("  available emg spaces")
-            fprintf(' ')
-            for i = 1:length(emg_spaces)-non_emg_calc_vars
-                fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
-            end
-            fprintf('\n')
-
-            disp(' ')
-            emg_space = input('emg space:  ')+6;
-            emg_space = emg_spaces{emg_space};
-
-            % get subset of calc_variables to be tested
-            stencil = (calc_variables.group == sample_a(1) & calc_variables.day == sample_a(2) & calc_variables.session == sample_a(3));
-            subset_a = table2array(calc_variables(stencil,emg_space));
-
-            stencil = (calc_variables.group == sample_b(1) & calc_variables.day == sample_b(2) & calc_variables.session == sample_b(3));
-            subset_b = table2array(calc_variables(stencil,emg_space));
-
-            % test
-%             if sample_a(1) == sample_b(1)
-%                 kind = 'onesample';
-%             else
-%                 kind = 'independent';
-%             end
-
-            kind = 'independent';
-
-            [t,p] = ttest(subset_a, subset_b, 2, kind);
-
-            case 'skill'
-                % get subset of calc_variables to be tested
-                parameters = struct2table(Parameters);
-
-                stencil = (parameters.label == sample_a(1) & parameters.day == sample_a(2) & parameters.BN == sample_a(3));
-                subset_a = table2array(parameters(stencil,'skillp'));
-
-                stencil = (parameters.label == sample_b(1) & parameters.day == sample_b(2) & parameters.BN == sample_b(3));
-                subset_b = table2array(parameters(stencil,'skillp'));
-
-                % test
-%                 if sample_a(1) == sample_b(1)
-%                     kind = 'onesample';
-%                 else
-%                     kind = 'independent';
-%                 end
-
-                kind = 'independent';
-
-                [t,p] = ttest(subset_a, subset_b, 2, kind);
-
-        end
-        disp(' ')
-        %%
-
-    case 39 % correlate reapplied model and skill measure
-        %%
-        %% calculate mean skill by group per session from parameters
-        p = struct2table(Parameters);
-        mean_skill_measure = [];
-        for i = 1:3
-            mean_skill_group = zeros([8 1]);
-            for j = 1:2
-                for k=1:4
-                    mean_skill_group(k+((j-1)*4)) = mean(p(p.label == i & p.day == j & p.BN == k,:).skillp,'omitnan');
-                end
-            end
-            mean_skill_measure = [mean_skill_measure mean_skill_group];
-        end
-
-        %% fit model
-        % emg space selector
-        emg_spaces = calc_variables.Properties.VariableNames;
-        non_emg_calc_vars = 6;
-        disp("  available emg spaces")
-        fprintf(' ')
-        for i = 1:length(emg_spaces)-non_emg_calc_vars
-            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
-        end
-        fprintf('\n')
-
-        disp(' ')
-        emg_space = input('emg space:  ')+6;
-        emg_space = emg_spaces{emg_space};
-
-        % other input
-        group       = input('group:    ');
-        multiple_yn = input('multiple: ','s');
-        days_in_model      = input('days:     ');
-
-        if days_in_model == 1
-            day     = input('day:      ');
-        else
-            clear day
-        end
-
-        % get subset of calc_variables to be tested
-        if days_in_model == 1
-            stencil = (calc_variables.group == group & calc_variables.day == day);
-        else
-            stencil = (calc_variables.group == group);
-        end
-
-        calc_variables_subset = calc_variables(stencil,:);
-
-        % get observed values from calc_variables_subset
-        dependant = calc_variables_subset(:, emg_space);
-        dependant = table2array(dependant);
-
-        % get regressors
-        if multiple_yn == "n"
-            regressors_names = "time";
-        elseif days_on_graph == 2
-            regressors_names = ["day" "session" "trial"];
-        else
-            regressors_names = ["session" "trial"];
-        end
-
-        regressors = calc_variables_subset(:, regressors_names);
-        regressors_names = regressors.Properties.VariableNames;
-        regressors = table2array(regressors);
-
-        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
-
-        %% reapply model
-        if multiple_yn == 'n'
-                intercept   = mdlr.Coefficients{1,1};
-                effect      = mdlr.Coefficients{2,1};
-
-                if days_in_model == 2
-                    time_scaffold = 1:240;
-                else
-                    time_scaffold = transpose((1:120)+120*(day-1));
-                end
-
-                reapplied_model = intercept + effect*time_scaffold(:,1);
-
-            elseif days_in_model == 2
-                intercept       = mdlr.Coefficients{1,1};
-                effect_day      = mdlr.Coefficients{2,1};
-                effect_session  = mdlr.Coefficients{3,1};
-                effect_trial    = mdlr.Coefficients{4,1};
-
-                time_scaffold = [...
-                    [ones([120,1]);ones([120,1])*2],... create day column
-                    repmat([ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],[2 1]),... create session column
-                    repmat(transpose(1:30),[8 1])... create trial column
-                    ];
-
-                reapplied_model = intercept + effect_day*time_scaffold(:,1) + effect_session*time_scaffold(:,2) + effect_trial*time_scaffold(:,3);
-            else
-                intercept       = mdlr.Coefficients{1,1};
-                effect_session  = mdlr.Coefficients{2,1};
-                effect_trial    = mdlr.Coefficients{3,1};
-
-                time_scaffold = [...
-                    [ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],... create session column
-                    repmat(transpose(1:30),[4 1])... create trial column
-                    ];
-
-                reapplied_model = intercept + effect_session*time_scaffold(:,1) + effect_trial*time_scaffold(:,2);
-        end
-
-        if days_in_model == 2
-            mean_skill_subset = mean_skill_measure(1:8,group);
-        else
-            if day == 1
-                mean_skill_subset = mean_skill_measure(1:4,group);
-            else
-                mean_skill_subset = mean_skill_measure(5:8,group);
-            end
-        end
-
-        mean_skill_subset = imresize(mean_skill_subset,[length(reapplied_model) 1], 'nearest');
-
-        corr(mean_skill_subset, reapplied_model)
-        %%
-
-    case 41 % styling options
+    case 39 % styling options
         %% figure styling options
-        set(findall(gcf,'-property','FontSize'),'FontSize',20);
-        %legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','eastoutside');
-        t.Title.String = 'Robust Multiple Regression Models';
-        t.Title.FontSize = 20;
-        t.Title.FontWeight = 'normal';
-        %legend([]);
-        %%
-
-    case 42 % empty legend
-        %%
-        figure(1)
-        hold on
-        emptyplot = plot(NaN,NaN,'Linewidth',line_width);
-        plot(NaN,NaN,'Linewidth',line_width);
-        plot(NaN,NaN,'Linewidth',line_width);
-        plot(NaN,NaN,'Linewidth',line_width);
-        hold off
-        delete(emptyplot)
-        legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"]);
-        set(findall(gcf,'-property','FontSize'),'FontSize',20);
-        legend('Location','bestoutside')
-        %%
-
-    case 43 % plot skill measure
-        %%
-        % calculate mean skill by group per session from parameters
-        p = struct2table(Parameters);
-        mean_skill_measure = [];
-        for i = 1:3
-            mean_skill_group = zeros([8 1]);
-            for j = 1:2
-                for k=1:4
-                    mean_skill_group(k+((j-1)*4)) = mean(p(p.label == i & p.day == j & p.BN == k,:).skillp,'omitnan');
-                end
-            end
-            mean_skill_measure = [mean_skill_measure mean_skill_group];
-        end
-
-        % create scaffold
-        line_width = 2;
-        t = tiledlayout(1,2,'TileSpacing','Compact');
-        title(t,'Mean Skill Measure')
-
-        % Tile 1 - training sessions
-        nexttile
-        emptyplot = plot(NaN,NaN,'Linewidth',line_width);
-        set(gca,'box','off')
-        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
-        xticklabels(["T1", "T2", "T3", "T4"])
-        xlabel("session")
-        ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
-        ylabel("skill measure")
-
-        % Tile 2 - control sessions
-        nexttile
-        emptyplot2 = plot(NaN,NaN,'Linewidth',line_width);
-        set(gca,'box','off')
-        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
-        xticklabels(["C1", "C2", "C3", "C4"])
-        xlabel("session")
-        ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
-        ax1 = gca;                   % gca = get current axis
-        ax1.YAxis.Visible = 'off';   % remove y-axis
-
-        % plot skill measure
-        nexttile(1)
-        hold on
-        plot(mean_skill_measure(1:4,:),'Linewidth',line_width)
-        delete(emptyplot)
-        hold off
-
-        nexttile(2)
-        hold on
-        plot(mean_skill_measure(5:8,:),'Linewidth',line_width)
-        delete(emptyplot)
-        %legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','eastoutside');
-        hold off
-
-        set(findall(gcf,'-property','FontSize'),'FontSize',20);
-t.Title.String = 'Mean Skill Measure';
-t.Title.FontSize = 20;
-t.Title.FontWeight = 'normal';
-
-        drawnow()
-
+        set(findall(gcf,'-property','FontSize'),'FontSize',12)
         %%
 
     case 51 % save
