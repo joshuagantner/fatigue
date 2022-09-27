@@ -51,11 +51,15 @@ operations_list = ... "–––––––––––––––––––
 "32  compare 2-day models\n"+...
 "34  plot regression models\n"+...
 "35  reapply model\n"+...
-"37  ttest\n"+...
+"\n"+...
+"36  view skill model\n"+...
+"37  plot skill model\n"+...
+"38  plot var // learning\n"+...
 "\n"+...
 "41  styling options\n"+...
 "42  empty legend\n"+...
 "43  plot skill measire\n"+...
+"44  ttest\n"+...
 "\n"+...
 "output\n"+...
 "51  save…\n"+...
@@ -1192,103 +1196,213 @@ switch action
 
         %%
 
-    case 38 % ttest
+    case 37 % plot skill model
         %%
-        %input
-        disp(' ')
-        disp(' T Test')
-        what_to_test = input('  var or skill? ','s');
-        disp(' ')
-        disp(' Sample A')
-        sample_a = zeros([1 3]);
-        sample_a(1) = input('  group:   ');
-        sample_a(2) = input('  day:     ');
-        sample_a(3) = input('  session: ');
-        disp(' ')
-        disp(' Sample B')
-        sample_b = zeros([1 3]);
-        sample_b(1) = input('  group:   ');
-        sample_b(2) = input('  day:     ');
-        sample_b(3) = input('  session: ');
+        fprintf("<strong>creating regression plot</strong>\n")
+        %% input
+        % n_days
+        days_on_graph = input('n_days: ');
 
-        switch what_to_test
-            case 'var'
-            % emg space selector
-            emg_spaces = calc_variables.Properties.VariableNames;
-            non_emg_calc_vars = 6;
-            disp("  available emg spaces")
-            fprintf(' ')
-            for i = 1:length(emg_spaces)-non_emg_calc_vars
-                fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
-            end
-            fprintf('\n')
-
-            disp(' ')
-            emg_space = input('emg space:  ')+6;
-            emg_space = emg_spaces{emg_space};
-
-            % get subset of calc_variables to be tested
-            stencil = (calc_variables.group == sample_a(1) & calc_variables.day == sample_a(2) & calc_variables.session == sample_a(3));
-            subset_a = table2array(calc_variables(stencil,emg_space));
-
-            stencil = (calc_variables.group == sample_b(1) & calc_variables.day == sample_b(2) & calc_variables.session == sample_b(3));
-            subset_b = table2array(calc_variables(stencil,emg_space));
-
-            % test
-%             if sample_a(1) == sample_b(1)
-%                 kind = 'onesample';
-%             else
-%                 kind = 'independent';
-%             end
-
-            kind = 'independent';
-
-            [t,p] = ttest(subset_a, subset_b, 2, kind);
-
-            case 'skill'
-                % get subset of calc_variables to be tested
-                parameters = struct2table(Parameters);
-
-                stencil = (parameters.label == sample_a(1) & parameters.day == sample_a(2) & parameters.BN == sample_a(3));
-                subset_a = table2array(parameters(stencil,'skillp'));
-
-                stencil = (parameters.label == sample_b(1) & parameters.day == sample_b(2) & parameters.BN == sample_b(3));
-                subset_b = table2array(parameters(stencil,'skillp'));
-
-                % test
-%                 if sample_a(1) == sample_b(1)
-%                     kind = 'onesample';
-%                 else
-%                     kind = 'independent';
-%                 end
-
-                kind = 'independent';
-
-                [t,p] = ttest(subset_a, subset_b, 2, kind);
-
+        if days_on_graph == 1
+            day = input('day:   ');
+        else
+            day = nan;
         end
-        disp(' ')
-        %%
 
-    case 39 % correlate reapplied model and skill measure
-        %%
-        %% calculate mean skill by group per session from parameters
-        p = struct2table(Parameters);
-        mean_skill_measure = [];
-        for i = 1:3
-            mean_skill_group = zeros([8 1]);
-            for j = 1:2
-                for k=1:4
-                    mean_skill_group(k+((j-1)*4)) = mean(p(p.label == i & p.day == j & p.BN == k,:).skillp,'omitnan');
+        line_width = 2;
+
+        legend_labels = [];
+        legend_labels_plot1 = [];
+        legend_labels_plot2 = [];
+        individual_legends = false;
+
+        y_dimensions = [];
+
+        %% scaffold
+        t = tiledlayout(1,days_on_graph,'TileSpacing','Compact');
+        title(t,'Learning Rate')
+
+        % Tile 1 - training sessions
+        if day == 1 || days_on_graph == 2
+            nexttile
+            emptyplot = plot(NaN,NaN,'b','Linewidth',line_width);
+            set(gca,'box','off')
+            set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+            xticklabels(["T1", "T2", "T3", "T4"])
+            xlabel("session")
+            ylabel("skill")
+        end
+
+        % Tile 2 - control sessions
+        if day == 2 || days_on_graph == 2
+            nexttile
+            emptyplot2 = plot(NaN,NaN,'g','Linewidth',line_width); % changed emptyplot2 to emptyplot
+            set(gca,'box','off')
+            set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+            xticklabels(["C1", "C2", "C3", "C4"])
+            xlabel("session")
+            if day ~= 2
+                ax1 = gca;                   % gca = get current axis
+                ax1.YAxis.Visible = 'off';   % remove y-axis
+            end
+        end
+
+        % Tile 3 - indifferent sessions
+        if day == 3
+            nexttile
+            emptyplot = plot(NaN,NaN,'g','Linewidth',line_width);
+            set(gca,'box','off')
+            set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+            xticklabels(["1", "2", "3", "4"])
+            xlabel("session")
+            ylabel("skill")
+        end
+
+        %% loop plot models
+        disp(' ')
+        plotting = input('  Plot a model? ','s');
+
+        if plotting == 'y'
+            plot_loop_state = 1;
+            plot_counter = 0;
+        end
+
+
+        while plot_loop_state == 1
+
+            plot_counter = plot_counter+1;
+
+            %% generate model to plot
+            %input
+            disp(' ')
+            group = input('  group:   ');
+            day   = input('  day:     ');
+            disp(' ')
+
+            
+            % get subset of calc_variables to be tested
+            parameters = struct2table(Parameters);
+
+            stencil = (parameters.label == group & parameters.day == day);
+            dependant = table2array(parameters(stencil,'skillp'));
+            regressor = table2array(parameters(stencil,'BN'));
+
+            % create model
+            mdlr = fitlm(regressor,dependant,'RobustOpts','on');
+
+            %% reapply model
+            intercept   = mdlr.Coefficients{1,1};
+            effect      = mdlr.Coefficients{2,1};
+
+            time_scaffold = 1:4; % transpose(1:4);
+
+            reapplied_model = intercept + effect*time_scaffold; % reapplied_model = intercept + effect*time_scaffold(:,1);
+
+
+            %% plot reapplied model
+            % assemble legend
+            if days_on_graph == 2 
+                if day == 1
+                    legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)];
+                    individual_legends = true;
+                else
+                    legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)];
+                    individual_legends = true;
+                end
+            else
+                if day == 3
+                    legend_labels = [legend_labels "G"+string(group)+"d"+string(day)];
+                else
+                    legend_labels = [legend_labels "G"+string(group)];
                 end
             end
-            mean_skill_measure = [mean_skill_measure mean_skill_group];
-        end
 
-        %% fit model
-        % emg space selector
+            % plot to tile
+            if days_on_graph == 1 %...in a 1 tile figure
+                
+                nexttile(1)
+                hold on
+                plot(reapplied_model,'Linewidth',line_width)
+                if plot_counter == 1
+                    if day == 1 || day == 3
+                        delete(emptyplot)
+                    else
+                        delete(emptyplot2)
+                    end
+                end
+                legend(legend_labels,'Location','southoutside')
+                hold off
+                drawnow()
+
+            else %...in a 2 tile figure
+
+                if plot_counter == 1
+                    nexttile(1)
+                    hold on
+                    delete(emptyplot)
+                    hold off
+
+                    nexttile(2)
+                    hold on
+                    delete(emptyplot2)
+                    hold off
+                end
+
+                nexttile(day)
+                hold on
+
+                plot(reapplied_model,'Linewidth',line_width)
+
+                if day == 1 && individual_legends
+                    legend(legend_labels_plot1,'Location','southoutside')
+                end
+
+                if day == 2
+                    legend(legend_labels_plot2,'Location','southoutside')
+                end
+                hold off
+
+                drawnow()
+                y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+            end
+
+            %% plot model query
+            disp(' ')
+            disp(' ––––––––––––––––––––')
+            plotting = input('  Plot a model? ','s');
+            if plotting == 'n'
+                plot_loop_state = 0;
+            end
+
+            %% sync y limits in 2 tile figure
+            if days_on_graph == 2
+                y_max = 0.3; % ceil(max(y_dimensions));
+                y_min = 0; % floor(min(y_dimensions));
+
+                nexttile(1)
+                ylim([y_min y_max])
+
+                nexttile(2)
+                ylim([y_min y_max])
+
+                drawnow()
+                disp('  y axis synced √')
+            end
+        end
+        drawnow() % redundancy drawnow()
+        %%
+
+    case 38 % plot var & learning within group
+        %%
+        fprintf("<strong>creating plot</strong>\n")
+        %% input
+        % n_days
+        days_on_graph = 2;
+
+        % show available emg spaces
         emg_spaces = calc_variables.Properties.VariableNames;
         non_emg_calc_vars = 6;
+        disp(' ')
         disp("  available emg spaces")
         fprintf(' ')
         for i = 1:length(emg_spaces)-non_emg_calc_vars
@@ -1296,109 +1410,249 @@ switch action
         end
         fprintf('\n')
 
+        % emg space selector
         disp(' ')
-        emg_space = input('emg space:  ')+6;
+        emg_space   = input('  emg space: ')+6;
         emg_space = emg_spaces{emg_space};
 
-        % other input
-        group       = input('group:    ');
-        multiple_yn = input('multiple: ','s');
-        days_in_model      = input('days:     ');
+        % group to plot
+        group       = input('  group:     ');
 
-        if days_in_model == 1
-            day     = input('day:      ');
-        else
-            clear day
+        %% scaffold
+        t = tiledlayout(1,days_on_graph,'TileSpacing','Compact');
+
+        switch group
+            case 1
+                title_string = "Non-Fatigued Sham Depo";
+            case 2
+                title_string = "Fatigued Sham Depo";
+            case 3
+                title_string = "Fatigued Real Depo";
         end
+        
+        title(t,title_string)
 
-        % get subset of calc_variables to be tested
-        if days_in_model == 1
-            stencil = (calc_variables.group == group & calc_variables.day == day);
-        else
-            stencil = (calc_variables.group == group);
-        end
+        %% plot variability
 
-        calc_variables_subset = calc_variables(stencil,:);
+        legend_array = [];
+        for i = 1:2
+            day = i;
 
-        % get observed values from calc_variables_subset
-        dependant = calc_variables_subset(:, emg_space);
-        dependant = table2array(dependant);
+            stencil = calc_variables.group == group & calc_variables.day == day;
 
-        % get regressors
-        if multiple_yn == "n"
+            calc_variables_subset = calc_variables(stencil,:);
+
+            % get observed values from calc_variables_subset
+            dependant = calc_variables_subset(:, emg_space);
+            dependant = table2array(dependant);
+
+            % get regressors
             regressors_names = "time";
-        elseif days_on_graph == 2
-            regressors_names = ["day" "session" "trial"];
-        else
-            regressors_names = ["session" "trial"];
+
+            regressors = calc_variables_subset(:, regressors_names);
+
+            regressors_names = regressors.Properties.VariableNames;
+            regressors = table2array(regressors);
+
+            % create model
+            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+            % reapply model
+            intercept   = mdlr.Coefficients{1,1};
+            effect      = mdlr.Coefficients{2,1};
+            time_scaffold = transpose((1:120)+120*(day-1));
+
+            reapplied_model = intercept + effect*time_scaffold;
+
+
+            % plot reapplied model
+            % asemble legend
+            %             if multiple_yn == 'y'
+            %                 complexity = 'multiple';
+            %             else
+            %                 complexity = 'simple';
+            %             end
+            %
+            %             % assemble legend
+            %             if days_on_graph == 2
+            %                 if days_in_model == 2
+            %                     legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                     legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                 else
+            %                     if day == 1
+            %                         legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                         individual_legends = true;
+            %                     else
+            %                         legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                         individual_legends = true;
+            %                     end
+            %                 end
+            %             else
+            %                 if day == 3
+            %                     legend_labels = [legend_labels "G"+string(group)+"d"+string(day)+" "+emg_space+" "+complexity];
+            %                 else
+            %                     legend_labels = [legend_labels "G"+string(group)+" "+emg_space+" "+complexity];
+            %                 end
+            %             end
+
+            % plot to tile
+
+            % plot 1 day model in 2 day figure
+            %                     if plot_counter == 1
+            %                         hold on
+            %                         nexttile(1)
+            %                         delete(emptyplot)
+            %                         nexttile(2)
+            %                         delete(emptyplot)
+            %                         hold off
+            %                     end
+
+            nexttile(1)
+            hold on
+
+            plot(reapplied_model,'Linewidth',line_width)
+
+            set(gca,'box','off')
+            set(gca,'XLim',[1 120],'XTick',15:30:105)
+            xticklabels(["1", "2", "3", "4"])
+            xlabel("session")
+            ylabel("variability")
+
+            legend(["day 1" "day 2"],'Location','southoutside')
+
+            hold off
+
+            drawnow()
+            % y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+
+
+            %% sync y limits in 2 tile figure
+            %             if days_on_graph == 2
+            %                 y_max = ceil(max(y_dimensions));
+            %                 y_min = floor(min(y_dimensions));
+            %
+            %                 nexttile(1)
+            %                 ylim([y_min y_max])
+            %
+            %                 nexttile(2)
+            %                 ylim([y_min y_max])
+            %
+            %                 drawnow()
+            %                 disp('  y axis synced √')
+            %             end
+
+            drawnow() % redundancy drawnow()
         end
+        %%
 
-        regressors = calc_variables_subset(:, regressors_names);
-        regressors_names = regressors.Properties.VariableNames;
-        regressors = table2array(regressors);
+        %% plot skill
+        for i = 1:2
+            day = i;
 
-        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+            % get subset of calc_variables to be tested
+            parameters = struct2table(Parameters);
 
-        %% reapply model
-        if multiple_yn == 'n'
-                intercept   = mdlr.Coefficients{1,1};
-                effect      = mdlr.Coefficients{2,1};
+            stencil = (parameters.label == group & parameters.day == day);
+            dependant = table2array(parameters(stencil,'skillp'));
+            regressor = table2array(parameters(stencil,'BN'));
 
-                if days_in_model == 2
-                    time_scaffold = 1:240;
-                else
-                    time_scaffold = transpose((1:120)+120*(day-1));
-                end
+            % create model
+            mdlr = fitlm(regressor,dependant,'RobustOpts','on');
 
-                reapplied_model = intercept + effect*time_scaffold(:,1);
+            % reapply model
+            intercept   = mdlr.Coefficients{1,1};
+            effect      = mdlr.Coefficients{2,1};
 
-            elseif days_in_model == 2
-                intercept       = mdlr.Coefficients{1,1};
-                effect_day      = mdlr.Coefficients{2,1};
-                effect_session  = mdlr.Coefficients{3,1};
-                effect_trial    = mdlr.Coefficients{4,1};
+            time_scaffold = 1:4; % transpose(1:4);
 
-                time_scaffold = [...
-                    [ones([120,1]);ones([120,1])*2],... create day column
-                    repmat([ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],[2 1]),... create session column
-                    repmat(transpose(1:30),[8 1])... create trial column
-                    ];
+            reapplied_model = intercept + effect*time_scaffold;
 
-                reapplied_model = intercept + effect_day*time_scaffold(:,1) + effect_session*time_scaffold(:,2) + effect_trial*time_scaffold(:,3);
-            else
-                intercept       = mdlr.Coefficients{1,1};
-                effect_session  = mdlr.Coefficients{2,1};
-                effect_trial    = mdlr.Coefficients{3,1};
 
-                time_scaffold = [...
-                    [ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],... create session column
-                    repmat(transpose(1:30),[4 1])... create trial column
-                    ];
+            % plot reapplied model
+            % asemble legend
+            %             if multiple_yn == 'y'
+            %                 complexity = 'multiple';
+            %             else
+            %                 complexity = 'simple';
+            %             end
+            %
+            %             % assemble legend
+            %             if days_on_graph == 2
+            %                 if days_in_model == 2
+            %                     legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                     legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                 else
+            %                     if day == 1
+            %                         legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                         individual_legends = true;
+            %                     else
+            %                         legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                         individual_legends = true;
+            %                     end
+            %                 end
+            %             else
+            %                 if day == 3
+            %                     legend_labels = [legend_labels "G"+string(group)+"d"+string(day)+" "+emg_space+" "+complexity];
+            %                 else
+            %                     legend_labels = [legend_labels "G"+string(group)+" "+emg_space+" "+complexity];
+            %                 end
+            %             end
 
-                reapplied_model = intercept + effect_session*time_scaffold(:,1) + effect_trial*time_scaffold(:,2);
+            nexttile(2)
+            hold on
+
+            plot(reapplied_model,'Linewidth',line_width)
+
+            set(gca,'box','off')
+            set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+            xticklabels(["1", "2", "3", "4"])
+            xlabel("session")
+            ylabel("skill")
+
+            %                     if day == 1 && individual_legends
+            %                         legend(legend_labels_plot1,'Location','southoutside')
+            %                     end
+            %
+            %                     if day == 2
+            %                         legend(legend_labels_plot2,'Location','southoutside')
+            %                     end
+
+            hold off
+
+            legend(["day 1" "day 2"],'Location','southoutside')
+
+            drawnow()
+            
+            %y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+
+
+            %% sync y limits in 2 tile figure
+            %             if days_on_graph == 2
+            %                 y_max = ceil(max(y_dimensions));
+            %                 y_min = floor(min(y_dimensions));
+            %
+            %                 nexttile(1)
+            %                 ylim([y_min y_max])
+            %
+            %                 nexttile(2)
+            %                 ylim([y_min y_max])
+            %
+            %                 drawnow()
+            %                 disp('  y axis synced √')
+            %             end
+
+            drawnow() % redundancy drawnow()
         end
+        %%
 
-        if days_in_model == 2
-            mean_skill_subset = mean_skill_measure(1:8,group);
-        else
-            if day == 1
-                mean_skill_subset = mean_skill_measure(1:4,group);
-            else
-                mean_skill_subset = mean_skill_measure(5:8,group);
-            end
-        end
-
-        mean_skill_subset = imresize(mean_skill_subset,[length(reapplied_model) 1], 'nearest');
-
-        corr(mean_skill_subset, reapplied_model)
         %%
 
     case 41 % styling options
         %% figure styling options
-        set(findall(gcf,'-property','FontSize'),'FontSize',20);
-        %legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','eastoutside');
-        t.Title.String = 'Robust Multiple Regression Models';
-        t.Title.FontSize = 20;
+        set(findall(gcf,'-property','FontSize'),'FontSize',12);
+        %legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','southoutside');
+        %t.Title.String = 'Robust Multiple Regression Models';
+        t.Title.FontSize = 16;
         t.Title.FontWeight = 'normal';
         %legend([]);
         %%
@@ -1480,6 +1734,84 @@ t.Title.FontWeight = 'normal';
 
         drawnow()
 
+        %%
+
+    case 44 % ttest
+        %%
+        %input
+        disp(' ')
+        disp(' T Test')
+        what_to_test = input('  var or skill? ','s');
+        disp(' ')
+        disp(' Sample A')
+        sample_a = zeros([1 3]);
+        sample_a(1) = input('  group:   ');
+        sample_a(2) = input('  day:     ');
+        sample_a(3) = input('  session: ');
+        disp(' ')
+        disp(' Sample B')
+        sample_b = zeros([1 3]);
+        sample_b(1) = input('  group:   ');
+        sample_b(2) = input('  day:     ');
+        sample_b(3) = input('  session: ');
+
+        switch what_to_test
+            case 'var'
+            % emg space selector
+            emg_spaces = calc_variables.Properties.VariableNames;
+            non_emg_calc_vars = 6;
+            disp("  available emg spaces")
+            fprintf(' ')
+            for i = 1:length(emg_spaces)-non_emg_calc_vars
+                fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+            end
+            fprintf('\n')
+
+            disp(' ')
+            emg_space = input('emg space:  ')+6;
+            emg_space = emg_spaces{emg_space};
+
+            % get subset of calc_variables to be tested
+            stencil = (calc_variables.group == sample_a(1) & calc_variables.day == sample_a(2) & calc_variables.session == sample_a(3));
+            subset_a = table2array(calc_variables(stencil,emg_space));
+
+            stencil = (calc_variables.group == sample_b(1) & calc_variables.day == sample_b(2) & calc_variables.session == sample_b(3));
+            subset_b = table2array(calc_variables(stencil,emg_space));
+
+            % test
+%             if sample_a(1) == sample_b(1)
+%                 kind = 'onesample';
+%             else
+%                 kind = 'independent';
+%             end
+
+            kind = 'independent';
+
+            [t,p] = ttest(subset_a, subset_b, 2, kind);
+
+            case 'skill'
+                % get subset of calc_variables to be tested
+                parameters = struct2table(Parameters);
+
+                stencil = (parameters.label == sample_a(1) & parameters.day == sample_a(2) & parameters.BN == sample_a(3));
+                subset_a = table2array(parameters(stencil,'skillp'));
+
+                stencil = (parameters.label == sample_b(1) & parameters.day == sample_b(2) & parameters.BN == sample_b(3));
+                subset_b = table2array(parameters(stencil,'skillp'));
+
+                % test
+%                 if sample_a(1) == sample_b(1)
+%                     kind = 'onesample';
+%                 else
+%                     kind = 'independent';
+%                 end
+
+                kind = 'independent';
+
+                [t,p] = ttest(subset_a, subset_b, 2, kind);
+
+        end
+        disp(' ')
         %%
 
     case 51 % save
