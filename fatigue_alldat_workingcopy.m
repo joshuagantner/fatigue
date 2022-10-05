@@ -47,7 +47,8 @@ operations_list = ... "–––––––––––––––––––
 "\n"+...
 "regression analysis\n"+...
 "30  view model\n"+...
-"31  compare 1-day models\n"+...
+"31  compare 1-day models multiple\n"+...
+"39  compare 1-day models simple\n"+...
 "32  compare 2-day models\n"+...
 "34  plot regression models\n"+...
 "35  reapply model\n"+...
@@ -73,12 +74,13 @@ fprintf(operations_list);
 
 %% master while loop
 while run_script == 1
-    
+%%    
 %Select Operation
 disp(' ')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
 action = input('What would you like me to do? ');
 disp(' ')
+%%
 
 switch action
     %% 
@@ -655,6 +657,94 @@ switch action
         disp(mdlr)
         disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
         %%
+
+    case 39 % compare 1-day models simple
+        %
+        % Model
+        %
+        %     y =	int +	x1*time +	x2*gX_binary +	x3*gX_binary*session
+        %
+        %
+        % Interpretation of Coefficients
+        %
+        % 	             group A  |  group X vs group A
+        %   ––––––––––––––––––––––––––––––––––––––––––––
+        %   intercept |	intercept |	    x2
+        %   time	  |    x1	  |     x3
+        %
+
+        %%
+        coefficient_interpretation = table(["intercept"; "x1"], ["x2"; "x3"], ["intercept + x2"; "x1 + x3"],'RowNames',["intercept" "time"]);
+
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+
+        % other input
+        disp('base')
+        base_group = input(' • group: ');
+        base_day   = input(' • day:   ');
+        disp('test')
+        test_group = input(' • group: ');
+        test_day   = input(' • day:   ');
+
+        % get subset of calc_variables to be tested
+        calc_variables_subset = calc_variables( ...
+                                    ... get rows according to input
+                                    (calc_variables.group == base_group & calc_variables.day == base_day)| ...for base group
+                                    (calc_variables.group == test_group & calc_variables.day == test_day), ...for test group
+                                    ... get all columns
+                                    :);
+
+        % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+        % get regressors
+        regressors = calc_variables_subset(:, "time");
+
+        % add binary dummy regressor
+        binary = array2table(calc_variables_subset.group == test_group & calc_variables_subset.day == test_day, 'VariableNames', "binary");
+        regressors = [regressors binary];
+
+        % create intercept terms: dummy*regressor
+        intercep_terms =    table(...
+                                    regressors{:,"binary"}.*regressors{:,"time"},...                                    
+                                    'VariableNames', ["binary*time"]...
+                                  ); % end of dummy*regressor creator
+
+        % add intercept terms to regressors
+        regressors = [regressors intercep_terms];
+        regressors_names = regressors.Properties.VariableNames;
+
+        regressors = table2array(regressors);
+
+        % fit a robust linear regression model
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %output
+        coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
     
     case 32 % compare 2-day models
         %
@@ -967,7 +1057,11 @@ switch action
                 hold on
                 plot(reapplied_model,'Linewidth',line_width)
                 if plot_counter == 1
-                    delete(emptyplot)
+                    if day == 1
+                        delete(emptyplot)
+                    else
+                        delete(emptyplot2)
+                    end
                 end
                 legend(legend_labels,'Location','southoutside')
                 hold off
@@ -1650,7 +1744,7 @@ switch action
     case 41 % styling options
         %% figure styling options
         set(findall(gcf,'-property','FontSize'),'FontSize',12);
-        %legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','southoutside');
+        legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','southoutside');
         %t.Title.String = 'Robust Multiple Regression Models';
         t.Title.FontSize = 16;
         t.Title.FontWeight = 'normal';
