@@ -61,6 +61,7 @@ operations_list = ... "–––––––––––––––––––
 "42  empty legend\n"+...
 "43  plot skill measire\n"+...
 "44  ttest\n"+...
+"45  correlation\n"+...
 "\n"+...
 "output\n"+...
 "51  save…\n"+...
@@ -566,6 +567,73 @@ switch action
         %disp(coefficient_interpretation)
         disp(mdlr)
         disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
+
+    case 302 % compare spaces
+        %%
+        group = input('group: ');
+        day   = input('day:   ');
+
+        spaces = [9 7 8 6 2 3 1 4 5];
+
+        for i = 1:length(spaces)
+            %% input
+            % emg space selector
+            space_index = spaces(i);
+            emg_spaces = calc_variables.Properties.VariableNames;
+            emg_space = emg_spaces{space_index+6};
+    
+            % other input
+            multiple_yn  = 'n'; %input('multiple: ','s');
+            days_on_graph = 1; %input('days:     ');
+    
+            % get subset of calc_variables to be tested
+            if days_on_graph == 1
+                stencil = (calc_variables.group == group & calc_variables.day == day);
+            else
+                stencil = (calc_variables.group == group);
+            end
+    
+            calc_variables_subset = calc_variables(stencil,:);
+    
+            % get observed values from calc_variables_subset
+            dependant = calc_variables_subset(:, emg_space);
+            dependant = table2array(dependant);
+    
+            % get regressors
+            if multiple_yn == "n"
+                regressors_names = "time";
+            elseif days_on_graph == 2
+                regressors_names = ["day" "session" "trial"];
+            else
+                regressors_names = ["session" "trial"];
+            end
+    
+            regressors = calc_variables_subset(:, regressors_names);
+            regressors_names = regressors.Properties.VariableNames;
+            regressors = table2array(regressors);
+            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+    
+            %%
+            %output
+            if days_on_graph == 2
+                output_heading_days = " Both Days";
+            else
+                output_heading_days = " Day "+string(day);
+            end
+            
+            disp(' ')
+            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+            fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+output_heading_days+"</strong>")
+            disp(' ')
+            disp("dependant:  "+emg_space)
+            disp("regressors: " + strjoin(regressors_names+", "))
+            disp(' ')
+            %disp(coefficient_interpretation)
+            disp(mdlr)
+            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+            %%
+        end
         %%
 
     case 31 % compare 1-day models
@@ -1830,6 +1898,71 @@ t.Title.FontWeight = 'normal';
 
         %%
 
+    case 432 % plot skill measure
+        %%
+        % calculate mean skill by group per session from parameters
+        p = struct2table(Parameters);
+        mean_skill_measure = [];
+        for i = 1:3
+            mean_skill_group = zeros([8 1]);
+            for j = 1:2
+                for k=1:4
+                    mean_skill_group(k+((j-1)*4)) = mean(p(p.label == i & p.day == j & p.BN == k,:).skillp,'omitnan');
+                end
+            end
+            mean_skill_measure = [mean_skill_measure mean_skill_group];
+        end
+
+        % create scaffold
+        line_width = 2;
+        t = tiledlayout(1,1,'TileSpacing','Compact');
+        title(t,'Mean Skill Measure')
+
+%         % Tile 1 - training sessions
+%         nexttile
+%         emptyplot = plot(NaN,NaN,'Linewidth',line_width);
+%         set(gca,'box','off')
+%         set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+%         xticklabels(["T1", "T2", "T3", "T4"])
+%         xlabel("session")
+%         ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
+%         ylabel("skill measure")
+
+        % Tile 2 - control sessions
+        nexttile
+        emptyplot2 = plot(NaN,NaN,'Linewidth',line_width);
+        set(gca,'box','off')
+        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+        xticklabels(["C1", "C2", "C3", "C4"])
+        xlabel("session")
+        ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
+        ylabel("skill measure")
+        % ax1 = gca;                   % gca = get current axis
+        % ax1.YAxis.Visible = 'off';   % remove y-axis
+
+         % plot skill measure
+%         nexttile(1)
+%         hold on
+%         plot(mean_skill_measure(1:4,:),'Linewidth',line_width)
+%         delete(emptyplot)
+%         hold off
+
+        nexttile(1) %nexttile(2)
+        hold on
+        plot(mean_skill_measure(5:8,:),'Linewidth',line_width)
+        delete(emptyplot)
+        %legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','eastoutside');
+        hold off
+
+        set(findall(gcf,'-property','FontSize'),'FontSize',20);
+t.Title.String = 'Mean Skill Measure';
+t.Title.FontSize = 20;
+t.Title.FontWeight = 'normal';
+
+        drawnow()
+
+        %%
+
     case 44 % ttest
         %%
         %input
@@ -1852,18 +1985,7 @@ t.Title.FontWeight = 'normal';
         switch what_to_test
             case 'var'
             % emg space selector
-            emg_spaces = calc_variables.Properties.VariableNames;
-            non_emg_calc_vars = 6;
-            disp("  available emg spaces")
-            fprintf(' ')
-            for i = 1:length(emg_spaces)-non_emg_calc_vars
-                fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
-            end
-            fprintf('\n')
-
-            disp(' ')
-            emg_space = input('emg space:  ')+6;
-            emg_space = emg_spaces{emg_space};
+            emg_space = emgSpaceSelector(calc_variables);
 
             % get subset of calc_variables to be tested
             stencil = (calc_variables.group == sample_a(1) & calc_variables.day == sample_a(2) & calc_variables.session == sample_a(3));
@@ -1906,6 +2028,376 @@ t.Title.FontWeight = 'normal';
 
         end
         disp(' ')
+        %%
+
+    
+    case 45 % correlation
+        %%
+        emg_space = emgSpaceSelector(calc_variables);
+
+        % 1 | get list of volunteers to itterate
+        % subject_list = unique(Parameters.SubjN);
+    
+        subject_list = [5	6	8	9	11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
+            % manually excluded: 10, 45
+        
+
+        % 2 | create list to store intra subject r values
+        correlation_list = nan( length(subject_list), 6);
+        mean_variability_list = nan( length(subject_list), 8);
+
+        for i = 1:length(subject_list)
+            subject = subject_list(i);
+
+        % 3 | get skill and variability values
+            skill       = Parameters.skillmeas(Parameters.SubjN == subject);
+            variability = calc_variables(calc_variables.subject == subject, ["day", "session", "group" emg_space]);
+
+        % 4 | ¿ Match vector length ? -> calculate variability mean of
+        % block OR stnd4time(skill)
+
+            version = "variability_session_mean";
+            corr_type = 'Spearman'; % 'Pearson', 'Spearman' or 'Kendall'
+            switch version
+
+                case "variability_session_mean"
+                    variability_session_mean = [];
+                    for day = 1:2
+                        for session = 1:4
+                            variability_session_mean = [variability_session_mean; mean( table2array( variability( variability.day == day & variability.session == session, emg_space) ), 'omitnan')];
+                        end
+                    end
+
+                    mean_variability_list(i,:) = transpose(variability_session_mean);
+                
+                    [day1_r, day1_p] = corr( skill(1:4, :), variability_session_mean(1:4, :), 'Type', corr_type );
+                    [day2_r, day2_p] = corr( skill(5:8, :), variability_session_mean(5:8, :), 'Type', corr_type );
+                    correlation_list(i, :) = [unique(variability.group), subject, day1_r, day1_p, day2_r, day2_p];
+
+                case "stnd_skill"
+                    variability_day1 = table2array(variability(variability.day == 1, emg_space));
+                    skill_day1 = stnd4time(skill(1:4,:), length(variability_day1));
+                    variability_day2 = table2array(variability(variability.day == 2, emg_space));
+                    skill_day2 = stnd4time(skill(5:8,:), length(variability_day2));
+                    
+
+                    [day1_r, day1_p] = corr( skill_day1, variability_day1, 'Type', corr_type );
+                    [day2_r, day2_p] = corr( skill_day1, variability_day1, 'Type', corr_type );
+                    correlation_list(i, :) = [unique(variability.group), subject, day1_r, day1_p, day2_r, day2_p];
+            end
+
+        end
+
+        % mean_variability_list
+                
+        correlation_list
+
+        for i = 1:3
+            disp('group '+string(i))
+            corrleation_con = correlation_list(correlation_list(:, 1) == i, :)
+            mean(corrleation_con, "omitnan")
+            std(corrleation_con, "omitnan")
+        end
+
+        % 6 | plot by group ¿only lines or including data points?
+
+        %%
+
+    case 46 % correlate reapplied models
+       
+        %% reapply variability model
+            % fit model
+                % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+
+                % other input
+        group         = input('group:    ');
+        multiple_yn   = "n"; % input('multiple: ','s');
+        days_in_model = 1;   % input('days:     ');
+
+        if days_in_model == 1
+            day     = input('day:      ');
+        else
+            clear day
+        end
+
+                % get subset of calc_variables to be tested
+        if days_in_model == 1
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+        else
+            stencil = (calc_variables.group == group);
+        end
+
+        calc_variables_subset = calc_variables(stencil,:);
+
+                % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+                % get regressors
+        if multiple_yn == "n"
+            regressors_names = "time";
+        elseif days_in_model == 2
+            regressors_names = ["day" "session" "trial"];
+        else
+            regressors_names = ["session" "trial"];
+        end
+
+        regressors = calc_variables_subset(:, regressors_names);
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        % reapply
+        if multiple_yn == 'n'
+                intercept   = mdlr.Coefficients{1,1};
+                effect      = mdlr.Coefficients{2,1};
+
+                if days_in_model == 2
+                    time_scaffold = 1:240;
+                else
+                    time_scaffold = transpose((1:120)+120*(day-1));
+                end
+
+                reapplied_model_variability = intercept + effect*time_scaffold(:,1);
+
+            elseif days_in_model == 2
+                intercept       = mdlr.Coefficients{1,1};
+                effect_day      = mdlr.Coefficients{2,1};
+                effect_session  = mdlr.Coefficients{3,1};
+                effect_trial    = mdlr.Coefficients{4,1};
+
+                time_scaffold = [...
+                    [ones([120,1]);ones([120,1])*2],... create day column
+                    repmat([ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],[2 1]),... create session column
+                    repmat(transpose(1:30),[8 1])... create trial column
+                    ];
+
+                reapplied_model_variability = intercept + effect_day*time_scaffold(:,1) + effect_session*time_scaffold(:,2) + effect_trial*time_scaffold(:,3);
+            else
+                intercept       = mdlr.Coefficients{1,1};
+                effect_session  = mdlr.Coefficients{2,1};
+                effect_trial    = mdlr.Coefficients{3,1};
+
+                time_scaffold = [...
+                    [ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],... create session column
+                    repmat(transpose(1:30),[4 1])... create trial column
+                    ];
+
+                reapplied_model_variability = intercept + effect_session*time_scaffold(:,1) + effect_trial*time_scaffold(:,2);
+        end
+        %% reapply skill model
+        % generate model to plot
+            %input
+%             disp(' ')
+%             group = input('  group:   ');
+%             day   = input('  day:     ');
+%             disp(' ')
+
+            
+            % get subset of calc_variables to be tested
+            parameters = struct2table(Parameters);
+
+            stencil = (parameters.label == group & parameters.day == day);
+            dependant = table2array(parameters(stencil,'skillp'));
+            regressor = table2array(parameters(stencil,'BN'));
+
+            % create model
+            mdlr = fitlm(regressor,dependant,'RobustOpts','on');
+
+            % reapply model
+            intercept   = mdlr.Coefficients{1,1};
+            effect      = mdlr.Coefficients{2,1};
+
+            time_scaffold = transpose(1:3/120:3.99); % 1:4; % transpose(1:4);
+
+            reapplied_model_skill = intercept + effect*time_scaffold; % reapplied_model = intercept + effect*time_scaffold(:,1);
+            
+        %% correlate reapplied models
+        disp('spearman')
+        [r, p] = corr(reapplied_model_skill, reapplied_model_variability, 'Type', 'Spearman' )
+        disp(' ')
+        disp('kendall')
+        [r, p] = corr(reapplied_model_skill, reapplied_model_variability, 'Type', 'Kendall' )
+        disp(' ')
+        disp('pearson')
+        [r, p] = corr(reapplied_model_skill, reapplied_model_variability, 'Type', 'Pearson' )
+        %%
+
+    case 47 % correlation coefficient from intercept
+        %% fit variability model
+            % fit model
+                % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+
+                % other input
+        group         = input('group:    ');
+        multiple_yn   = "n"; % input('multiple: ','s');
+        days_in_model = 1;   % input('days:     ');
+
+        if days_in_model == 1
+            day     = input('day:      ');
+        else
+            clear day
+        end
+
+                % get subset of calc_variables to be tested
+        if days_in_model == 1
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+        else
+            stencil = (calc_variables.group == group);
+        end
+
+        calc_variables_subset = calc_variables(stencil,:);
+
+                % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+                % get regressors
+        if multiple_yn == "n"
+            regressors_names = "time";
+        elseif days_in_model == 2
+            regressors_names = ["day" "session" "trial"];
+        else
+            regressors_names = ["session" "trial"];
+        end
+
+        regressors = calc_variables_subset(:, regressors_names);
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+
+        mdlr_variability = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %% fit skill model
+        % generate model to plot
+            %input
+%             disp(' ')
+%             group = input('  group:   ');
+%             day   = input('  day:     ');
+%             disp(' ')
+
+            
+            % get subset of calc_variables to be tested
+            parameters = struct2table(Parameters);
+
+            stencil = (parameters.label == group & parameters.day == day);
+            dependant = table2array(parameters(stencil,'skillp'));
+            regressor = table2array(parameters(stencil,'BN'));
+
+            % create model
+            mdlr_skill = fitlm(regressor,dependant,'RobustOpts','on');
+
+        %% calcualte r | https://www.toppr.com/ask/question/find-the-coefficient-of-correlation-from-the-regression-lines-x2y30/
+        effect_skill = mdlr_skill.Coefficients{'x1','Estimate'}
+        effect_variability = mdlr_variability.Coefficients{'x1','Estimate'}
+
+        r2 = effect_skill * (-1/effect_variability)
+        r = sqrt(effect_skill * (-1/effect_variability))
+        %%
+
+    case 48 % correlation coefficient from intercept
+        %%
+
+        emg_space = emgSpaceSelector(calc_variables);
+
+        for group = 1:3
+            for day = 1:2
+
+                %% fit variability model
+                % fit model
+%                 group         = input('group:    ');
+                multiple_yn   = "n"; % input('multiple: ','s');
+                days_in_model = 1;   % input('days:     ');
+        
+%                 if days_in_model == 1
+%                     day     = input('day:      ');
+%                 else
+%                     clear day
+%                 end
+        
+                        % get subset of calc_variables to be tested
+                if days_in_model == 1
+                    stencil = (calc_variables.group == group & calc_variables.day == day);
+                else
+                    stencil = (calc_variables.group == group);
+                end
+        
+                calc_variables_subset = calc_variables(stencil,:);
+        
+                        % get observed values from calc_variables_subset
+                dependant = calc_variables_subset(:, emg_space);
+                dependant = table2array(dependant);
+        
+                        % get regressors
+                if multiple_yn == "n"
+                    regressors_names = "time";
+                elseif days_in_model == 2
+                    regressors_names = ["day" "session" "trial"];
+                else
+                    regressors_names = ["session" "trial"];
+                end
+        
+                regressors = calc_variables_subset(:, regressors_names);
+                regressors_names = regressors.Properties.VariableNames;
+                regressors = table2array(regressors);
+        
+                mdlr_variability = fitlm(regressors,dependant,'RobustOpts','on');
+        
+                %% fit skill model
+                % generate model to plot
+                    %input
+        %             disp(' ')
+        %             group = input('  group:   ');
+        %             day   = input('  day:     ');
+        %             disp(' ')
+        
+                    
+                    % get subset of calc_variables to be tested
+                    parameters = struct2table(Parameters);
+        
+                    stencil = (parameters.label == group & parameters.day == day);
+                    dependant = table2array(parameters(stencil,'skillp'));
+                    regressor = table2array(parameters(stencil,'BN'));
+        
+                    % create model
+                    mdlr_skill = fitlm(regressor,dependant,'RobustOpts','on');
+        
+                %% calcualte r | https://www.toppr.com/ask/question/find-the-coefficient-of-correlation-from-the-regression-lines-x2y30/
+                
+                disp('group ' + string(group) + ' day ' + string(day))
+                effect_skill = mdlr_skill.Coefficients{'x1','Estimate'}
+                effect_variability = mdlr_variability.Coefficients{'x1','Estimate'}
+        
+                r2 = effect_skill * (-1/effect_variability)
+                r = sqrt(effect_skill * (-1/effect_variability))
+                
+
+            end
+        end
         %%
 
     case 51 % save
@@ -1963,3 +2455,17 @@ t.Title.FontWeight = 'normal';
 end % end of master switch
 end % end of master while loop
 
+function emg_space = emgSpaceSelector(calc_variables)
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+end
