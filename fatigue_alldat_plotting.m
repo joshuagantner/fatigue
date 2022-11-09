@@ -58,8 +58,7 @@ fprintf(operations_list);
 
 %% master while loop
 while run_script == 1
-%%    
-%Select Operation
+%% Select Operation
 disp(' ')
 disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
 action = input('What would you like me to do? ');
@@ -125,127 +124,89 @@ switch action
         figure()
         t = tiledlayout(1,2);
         emg_space = emgSpaceSelector(calc_variables);
-        day = input('  day:   ');
+        day = input('day:  ');
 
-        %% scaffold
-%         t = tiledlayout(1,days_on_graph,'TileSpacing','Compact');
-%         title(t,'Robust Multiple Linear Regression of Variability')
-% 
-%         % Tile 1 - training sessions
-%         if day == 1 || days_on_graph == 2
-%             nexttile
-%             emptyplot = plot(NaN,NaN,'b','Linewidth',line_width);
-%             set(gca,'box','off')
-%             set(gca,'XLim',[1 120],'XTick',15:30:105)
-%             xticklabels(["T1", "T2", "T3", "T4"])
-%             xlabel("session")
-%             ylabel("variability")
-%         end
-% 
-%         % Tile 2 - control sessions
-%         if day == 2 || days_on_graph == 2
-%             nexttile
-%             emptyplot2 = plot(NaN,NaN,'g','Linewidth',line_width);
-%             set(gca,'box','off')
-% 
-%             if days_on_graph == 1
-%                 set(gca,'XLim',[1 120],'XTick',15:30:105)
-%             else
-%                 set(gca,'XLim',[121 240],'XTick',135:30:225)
-%             end
-% 
-%             xticklabels(["C1", "C2", "C3", "C4"])
-%             xlabel("session")
-%             if day ~= 2
-%                 ax1 = gca;                   % gca = get current axis
-%                 ax1.YAxis.Visible = 'off';   % remove y-axis
-%             end
-%         end
-% 
-%         % Tile 3 - indifferent sessions
-%         if day == 3
-%             nexttile
-%             emptyplot = plot(NaN,NaN,'g','Linewidth',line_width);
-%             xlim([121 240])
-%             set(gca,'box','off')
-%             set(gca,'XLim',[1 120],'XTick',15:30:105)
-%             xticklabels(["1", "2", "3", "4"])
-%             xlabel("session")
-%             ylabel("variability")
-%         end
+        % set day dependant variables
+        if day == 1
+            x_labels = ["T1", "T2", "T3", "T4"];
+            mean_skill_range = 1:4;
+        else
+            x_labels = ["C1", "C2", "C3", "C4"];
+            mean_skill_range = 5:8;
+        end
 
-        %% loop plot models
+
+        %% plot variability
+        nexttile(1)
+        hold on
         for group = 1:3
 
-            %% generate model to plot
-            % get subset of calc_variables to be tested
-
-%                 stencil = (calc_variables.group == group & calc_variables.day == day);
-
+            % generate model to plot
             calc_variables_subset = calc_variables(calc_variables.group == group & calc_variables.day == day, :); % calc_variables(stencil,:);
-
-            % get observed values from calc_variables_subset
             dependant = calc_variables_subset{:, emg_space};
-%             dependant = table2array(dependant);
-
-            % get regressors
             regressors = calc_variables_subset{:, "time"};
-
-            % create model
             mdlr = fitlm(regressors,dependant,'RobustOpts','on');
 
-            %% reapply model
+            % reapply model
             intercept   = mdlr.Coefficients{1,1};
             effect      = mdlr.Coefficients{2,1};
             time_scaffold = transpose((1:120)+120*(day-1));
             reapplied_model = intercept + effect*time_scaffold(:,1);
 
-            %% plot reapplied model
+            % create and delete empty plot to match color schema
 
-            % plot to tile
-                %...in a 1 tile figure
-                nexttile(1)
-                hold on
-                plot(reapplied_model,'Linewidth',line_width)
-                if plot_counter == 1
-                    if day == 1
-                        delete(emptyplot)
-                    else
-                        delete(emptyplot2)
-                    end
-                end
-                legend(legend_labels,'Location','southoutside')
-                hold off
-                drawnow()
+            % plot reapplied model
+            plot(reapplied_model,'Linewidth',line_width)
 
-            %% plot model query
-            disp(' ')
-            disp(' ––––––––––––––––––––')
-            plotting = input('  Plot a model? ','s');
-            if plotting == 'n'
-                plot_loop_state = 0;
-            end
-
-            %% sync y limits in 2 tile figure
-            if days_on_graph == 2
-                y_max = ceil(max(y_dimensions));
-                y_min = floor(min(y_dimensions));
-
-                nexttile(1)
-                ylim([y_min y_max])
-
-                nexttile(2)
-                ylim([y_min y_max])
-
-                drawnow()
-                disp('  y axis synced √')
-            end
+            % sync y limits: ceil(max), floor(min)
         end
-        drawnow() % redundancy drawnow()
 
-        % plot skill
+        % styling
+        set(gca,'box','off')
+        set(gca,'XLim',[1 120],'XTick',15:30:105)
+        xticklabels(x_labels)
+        xlabel("session")
+        ylabel("variability")
+
+        hold off
+
+        %% plot skill
         nexttile(2)
-        
+        hold on
+
+        % calculate mean skill by group per session from parameters
+        p = struct2table(Parameters);
+        mean_skill_measure = [];
+        for i = 1:3
+            mean_skill_group = zeros([8 1]);
+            for j = 1:2
+                for k=1:4
+                    mean_skill_group(k+((j-1)*4)) = mean(p(p.label == i & p.day == j & p.BN == k,:).skillp,'omitnan');
+                end
+            end
+            mean_skill_measure = [mean_skill_measure mean_skill_group];
+        end
+
+        % plot
+        plot(mean_skill_measure(mean_skill_range,:),'Linewidth',line_width)
+
+        %styling
+        set(gca,'box','off')
+        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+        xticklabels(x_labels)
+        xlabel("session")
+%         ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
+        ylabel("skill measure")
+
+        % legend
+%         legend(["CON" "FSD" "FRD"],'Location','eastoutside')
+
+        hold off
+        %%
+        % styling
+        set(findall(gcf,'-property','FontSize'),'FontSize',10);
+        set(gcf, 'Units', 'centimeters', 'Position', [5, 5, 17, 7])
+        drawnow()
         %%
     
     case 30 % view model
@@ -947,15 +908,16 @@ switch action
         %%
         figure(1)
         hold on
-        emptyplot = plot(NaN,NaN,'Linewidth',line_width);
+%         emptyplot = plot(NaN,NaN,'Linewidth',line_width);
         plot(NaN,NaN,'Linewidth',line_width);
         plot(NaN,NaN,'Linewidth',line_width);
         plot(NaN,NaN,'Linewidth',line_width);
         hold off
         delete(emptyplot)
-        legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"]);
+        legend(["CON","FSD","FRD"]); % legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"]);
         set(findall(gcf,'-property','FontSize'),'FontSize',20);
         legend('Location','bestoutside')
+        drawnow()
         %%
 
     case 43 % plot skill measure
@@ -1014,9 +976,9 @@ switch action
         hold off
 
         set(findall(gcf,'-property','FontSize'),'FontSize',20);
-t.Title.String = 'Mean Skill Measure';
-t.Title.FontSize = 20;
-t.Title.FontWeight = 'normal';
+        t.Title.String = 'Mean Skill Measure';
+        t.Title.FontSize = 20;
+        t.Title.FontWeight = 'normal';
 
         drawnow()
 
@@ -1113,6 +1075,6 @@ function emg_space = emgSpaceSelector(calc_variables)
         fprintf('\n')
 
         disp(' ')
-        emg_space = input('emg space:  ')+6;
+        emg_space = input('emg space: ')+6;
         emg_space = emg_spaces{emg_space};
 end
