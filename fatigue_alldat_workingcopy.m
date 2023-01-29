@@ -59,7 +59,7 @@ operations_list = ... "–––––––––––––––––––
 "\n"+...
 "41  styling options\n"+...
 "42  empty legend\n"+...
-"43  plot skill measire\n"+...
+"43  plot skill measure\n"+...
 "44  ttest\n"+...
 "45  correlation\n"+...
 "\n"+...
@@ -95,9 +95,9 @@ switch action
     case 12 % load data
         %%
         disp('1 alldat (w/wo emg data)')
-        disp('2 parameters')
+        disp('2 parameters.csv')
         disp('3 missing trials list')
-        disp('4 load calc_variables')
+        disp('4 load calc_variables.csv')
         disp(' ')
         what_to_load = input('what to load: ');
 
@@ -114,7 +114,7 @@ switch action
 
             case 2 %load parameters
                 [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Fatigue Parameter File (.tsv)');
-                Parameters = dload(fullfile(p,f));
+                Parameters = readtable(fullfile(p,f)); %dload(fullfile(p,f));
                 disp('  -> Parameters loaded')
 
             case 3
@@ -1344,7 +1344,7 @@ switch action
         disp(' ')
 
         % get subset of calc_variables to be tested
-        parameters = struct2table(Parameters);
+        parameters = Parameters; % struct2table(Parameters);
 
         stencil = (parameters.label == group & parameters.day == day);
         dependant = table2array(parameters(stencil,'skillp'));
@@ -1356,6 +1356,104 @@ switch action
         mdlr = fitlm(regressor,dependant,'RobustOpts','on')
         plot(mdlr)
 
+        %%
+
+    case 36.2 % comparative skill model
+        %%
+        %
+        % Model
+        %
+        %     y =	int +	x1*time +	x2*gX_binary +	x3*gX_binary*session
+        %
+        %
+        % Interpretation of Coefficients
+        %
+        % 	             group A  |  group X vs group A
+        %   ––––––––––––––––––––––––––––––––––––––––––––
+        %   intercept |	intercept |	    x2
+        %   time	  |    x1	  |     x3
+        %
+
+        %%
+        coefficient_interpretation = table(["intercept"; "x1"], ["x2"; "x3"], ["intercept + x2"; "x1 + x3"],'RowNames',["intercept" "time"]);
+
+%         % emg space selector
+%         emg_spaces = calc_variables.Properties.VariableNames;
+%         non_emg_calc_vars = 6;
+%         disp("  available emg spaces")
+%         fprintf(' ')
+%         for i = 1:length(emg_spaces)-non_emg_calc_vars
+%             fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+%         end
+%         fprintf('\n')
+% 
+%         disp(' ')
+%         emg_space = input('emg space:  ')+6;
+%         emg_space = emg_spaces{emg_space};
+
+        % other input
+        disp('Comparing Skill & Learning')
+        disp('base')
+        base_group = input(' • group: ');
+        base_day   = input(' • day:   ');
+        disp('test')
+        test_group = input(' • group: ');
+        test_day   = input(' • day:   ');
+
+        % get subset of calc_variables to be tested
+        parameters = Parameters; % struct2table(Parameters);
+
+%        stencil = (parameters.label == group & parameters.day == day);
+
+        parameters_subset = parameters( ...
+                                    ... get rows according to input
+                                    (parameters.group == base_group & parameters.day == base_day)| ...for base group
+                                    (parameters.group == test_group & parameters.day == test_day), ...for test group
+                                    ... get all columns
+                                    :);
+
+        % get observed values from calc_variables_subset
+%        dependant = table2array(parameters(stencil,'skillp'));
+
+        dependant = parameters_subset(:, 'skillp');
+        dependant = table2array(dependant);
+
+        % get regressors
+%        regressor = table2array(parameters(stencil,'BN'));
+        
+        regressors = parameters_subset(:, "BN");
+
+        % add binary dummy regressor
+        binary = array2table(parameters_subset.group == test_group & parameters_subset.day == test_day, 'VariableNames', "binary");
+        regressors = [regressors binary];
+
+        % create intercept terms: dummy*regressor
+        intercep_terms =    table(...
+                                    regressors{:,"binary"}.*regressors{:,"BN"},...                                    
+                                    'VariableNames', ["binary*BN"]...
+                                  ); % end of dummy*regressor creator
+
+        % add intercept terms to regressors
+        regressors = [regressors intercep_terms];
+        regressors_names = regressors.Properties.VariableNames;
+
+        regressors = table2array(regressors);
+
+        % fit a robust linear regression model
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %output
+        coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+"skillp") % disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
         %%
 
     case 37 % plot skill model
@@ -1443,7 +1541,7 @@ switch action
 
             
             % get subset of calc_variables to be tested
-            parameters = struct2table(Parameters);
+            parameters = Parameters; % struct2table(Parameters);
 
             stencil = (parameters.label == group & parameters.day == day);
             dependant = table2array(parameters(stencil,'skillp'));
@@ -1712,7 +1810,7 @@ switch action
             day = i;
 
             % get subset of calc_variables to be tested
-            parameters = struct2table(Parameters);
+            parameters = Parameters; % struct2table(Parameters);
 
             stencil = (parameters.label == group & parameters.day == day);
             dependant = table2array(parameters(stencil,'skillp'));
@@ -1837,7 +1935,7 @@ switch action
     case 43 % plot skill measure
         %%
         % calculate mean skill by group per session from parameters
-        p = struct2table(Parameters);
+        p = Parameters; %struct2table(Parameters);
         mean_skill_measure = [];
         for i = 1:3
             mean_skill_group = zeros([8 1]);
@@ -2007,7 +2105,7 @@ t.Title.FontWeight = 'normal';
 
             case 'skill'
                 % get subset of calc_variables to be tested
-                parameters = struct2table(Parameters);
+                parameters = Parameters; % struct2table(Parameters);
 
                 stencil = (parameters.label == sample_a(1) & parameters.day == sample_a(2) & parameters.BN == sample_a(3));
                 subset_a = table2array(parameters(stencil,'skillp'));
@@ -2050,7 +2148,7 @@ t.Title.FontWeight = 'normal';
             subject = subject_list(i);
 
         % 3 | get skill and variability values
-            skill       = Parameters.skillmeas(Parameters.SubjN == subject);
+            skill       = Parameters.skillp(Parameters.SubjN == subject);
             variability = calc_variables(calc_variables.subject == subject, ["day", "session", "group" emg_space]);
 
         % 4 | ¿ Match vector length ? -> calculate variability mean of
@@ -2208,7 +2306,7 @@ t.Title.FontWeight = 'normal';
 
             
             % get subset of calc_variables to be tested
-            parameters = struct2table(Parameters);
+            parameters = Parameters; % struct2table(Parameters);
 
             stencil = (parameters.label == group & parameters.day == day);
             dependant = table2array(parameters(stencil,'skillp'));
@@ -2302,7 +2400,7 @@ t.Title.FontWeight = 'normal';
 
             
             % get subset of calc_variables to be tested
-            parameters = struct2table(Parameters);
+            parameters = Parameters; % struct2table(Parameters);
 
             stencil = (parameters.label == group & parameters.day == day);
             dependant = table2array(parameters(stencil,'skillp'));
@@ -2377,7 +2475,7 @@ t.Title.FontWeight = 'normal';
         
                     
                     % get subset of calc_variables to be tested
-                    parameters = struct2table(Parameters);
+                    parameters = Parameters; % struct2table(Parameters);
         
                     stencil = (parameters.label == group & parameters.day == day);
                     dependant = table2array(parameters(stencil,'skillp'));

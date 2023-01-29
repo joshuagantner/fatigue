@@ -115,7 +115,7 @@ switch action
     case 21 % visual inspection
         %% create mean value tables for skill and variability
         emg_space = emgSpaceSelector(calc_variables);
-        parameters = struct2table(Parameters);
+        parameters = Parameters;
         subject_list = unique(Parameters.SubjN);
     
         % subject_list = [5	6	8	9	10  11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
@@ -185,7 +185,7 @@ switch action
 
         %% create mean value 80 tables for skill and variability
 %         emg_space = emgSpaceSelector(calc_variables);
-%         parameters = struct2table(Parameters);
+%         parameters = Parameters;
 %         subject_list = unique(Parameters.SubjN);
     
         % subject_list = [5	6	8	9	10  11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
@@ -258,7 +258,7 @@ switch action
       %% create table of correlations -> export to csv to format
         %% create mean value tables for skill and variability
 %         emg_space = emgSpaceSelector(calc_variables);
-%         parameters = struct2table(Parameters);
+%         parameters = Parameters;
 %         subject_list = unique(Parameters.SubjN);
     
         % subject_list = [5	6	8	9	10  11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
@@ -321,7 +321,7 @@ switch action
         %%
         %% create mean value 80 tables for skill and variability
 %         emg_space = emgSpaceSelector(calc_variables);
-%         parameters = struct2table(Parameters);
+%         parameters = Parameters;
 %         subject_list = unique(Parameters.SubjN);
     
         % subject_list = [5	6	8	9	10  11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
@@ -487,7 +487,7 @@ switch action
         
                     
                     % get subset of calc_variables to be tested
-%                     parameters = struct2table(Parameters);
+%                     parameters = Parameters;
         
                     stencil = (parameters.label == group & parameters.day == day);
                     dependant = table2array(parameters(stencil,'skillp'));
@@ -535,7 +535,7 @@ switch action
         %% scatter and correlation for pooled data points
         %% create mean value tables for skill and variability
 %         emg_space = emgSpaceSelector(calc_variables);
-%         parameters = struct2table(Parameters);
+%         parameters = Parameters;
 %         subject_list = unique(Parameters.SubjN);
     
         % subject_list = [5	6	8	9	10  11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
@@ -621,7 +621,7 @@ switch action
         %% scatter and correlation for pooled data points with 80 percentil cutt-off
         %% create mean value tables for skill and variability
 %         emg_space = emgSpaceSelector(calc_variables);
-%         parameters = struct2table(Parameters);
+%         parameters = Parameters;
 %         subject_list = unique(Parameters.SubjN);
     
         % subject_list = [5	6	8	9	10  11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
@@ -1042,7 +1042,7 @@ switch action
 
             
             % get subset of calc_variables to be tested
-            parameters = struct2table(Parameters);
+            parameters = Parameters;
 
             stencil = (parameters.label == group & parameters.day == day);
             dependant = table2array(parameters(stencil,'skillp'));
@@ -1136,7 +1136,7 @@ switch action
 
             
             % get subset of calc_variables to be tested
-            parameters = struct2table(Parameters);
+            parameters = Parameters;
 
             stencil = (parameters.label == group & parameters.day == day);
             dependant = table2array(parameters(stencil,'skillp'));
@@ -1211,7 +1211,7 @@ switch action
         
                     
                     % get subset of calc_variables to be tested
-                    parameters = struct2table(Parameters);
+                    parameters = Parameters;
         
                     stencil = (parameters.label == group & parameters.day == day);
                     dependant = table2array(parameters(stencil,'skillp'));
@@ -1238,7 +1238,7 @@ switch action
         fprintf("<strong>sams approach</strong>\n")
         %% calculations
         emg_space = emgSpaceSelector(calc_variables);
-        parameters = struct2table(Parameters);
+        parameters = Parameters;
 %         subject_list = unique(Parameters.SubjN);
         
         subject_list = [5	6	8	9   11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
@@ -1328,7 +1328,7 @@ switch action
         fprintf("<strong>sams approach</strong>\n")
         %% calculations
         emg_space = emgSpaceSelector(calc_variables);
-        parameters = struct2table(Parameters);
+        parameters = Parameters;
         subject_list = unique(Parameters.SubjN);
 
         change_table = array2table(zeros(80, 5));
@@ -1449,7 +1449,7 @@ end
 
 %%  template
 %         emg_space = emgSpaceSelector(calc_variables);
-%         parameters = struct2table(Parameters);
+%         parameters = Parameters;
 %         subject_list = unique(Parameters.SubjN);
 %     
 % 

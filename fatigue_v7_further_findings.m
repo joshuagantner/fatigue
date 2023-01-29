@@ -224,7 +224,7 @@ switch action
         fprintf("<strong>combine description and change table</strong>\n")
         %% calculate change table with slope and difference of variability and skill difference
         emg_space = emgSpaceSelector(calc_variables);
-        parameters = struct2table(Parameters);
+        parameters = Parameters;
 %         subject_list = unique(Parameters.SubjN);
         
         subject_list = [5	6	8	9   11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
@@ -237,7 +237,7 @@ switch action
             subject = subject_list(i);
             group = unique(parameters{parameters.SubjN == subject,"label"});
         
-            skill       = Parameters.skillmeas(Parameters.SubjN == subject);
+            skill       = Parameters.skillp(Parameters.SubjN == subject);
             variability = calc_variables(calc_variables.subject == subject, ["day", "session", "group", "time", emg_space]);
             
             variability_session_mean = [];
@@ -405,6 +405,10 @@ switch action
         fprintf("<strong> group " + group + "  day " + day + "</strong>\n")
         subtable = description(description.group == group & description.day == day, vars);
         disp(subtable)
+        disp("mean")
+        mean(table2array(subtable),"omitnan")
+        disp("stdv")
+        std(table2array(subtable),"omitnan")
         %%
 
     case 25 % manual ttest
