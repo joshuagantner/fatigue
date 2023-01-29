@@ -30,6 +30,9 @@ operations_list = ... "–––––––––––––––––––
 "25  manual ttest loop\n"+...
 "26  compare spaces manualy\n"+...
 "27  compare spaces automaticaly\n"+...
+"28  comparative model for subspaces"+...
+"\n"+...
+"30  view model"+...
 "\n"+...
 "\n"+...
 "clear cml & display operations with 0\n"+...
@@ -441,7 +444,7 @@ switch action
         group = input('group: ');
         day   = input('day:   ');
 
-        spaces = [9 7 8 6 2 3 1 4 5];
+        spaces = [11 12 2 3 1]; %[9 7 8 6 2 3 1 4 5];
 
         for i = 1:length(spaces)
             %% input
@@ -511,7 +514,7 @@ switch action
         day   = input('day:   ');
 
         % measure each space
-        spaces = [9 7 8 6 2 3 1 4 5];
+        spaces = [11 12 2 3 1]; %[9 7 8 6 2 3 1 4 5];
 
         effects_spaces_table = {};
 
@@ -612,6 +615,168 @@ switch action
         disp(ttest_results)
         %%
 
+    case 28 % comparative model for subspaces
+        %%
+        coefficient_interpretation = table(["intercept"; "x1"], ["x2"; "x3"], ["intercept + x2"; "x1 + x3"],'RowNames',["intercept" "time"]);
+
+        fprintf("<strong>compartive model for subspaces</strong>\n")
+        group = input('group: ');
+        day   = input('day:   ');
+        disp(' ');
+        disp('test emg space:');
+        emg_space_1 = string(emgSpaceSelector(calc_variables));
+        disp(' ');
+        disp('base emg space:');
+        emg_space_2 = string(emgSpaceSelector(calc_variables));
+
+         % get subset of calc_variables to be tested
+        calc_variables_subset = calc_variables( ...
+                                    ... get rows according to input
+                                    (calc_variables.group == group & calc_variables.day == day), ...for test group
+                                    ... get all columns
+                                    :);
+
+        % get observed values from calc_variables_subset & create binary
+        dependant = calc_variables_subset(:, [emg_space_1 emg_space_2]);
+        binary = [ones(height(dependant),1); zeros(height(dependant),1)];
+        dependant = [dependant{:,1}; dependant{:,2}];
+
+        % get regressors
+        regressors = calc_variables_subset{:, "time"};
+        regressors = [regressors; regressors];
+
+
+        % create intercept terms: dummy*regressor
+        intercept_terms = binary.*regressors;
+
+
+%         intercep_terms =    table(...
+%                                     regressors{:,"binary"}.*regressors{:,"time"},...                                    
+%                                     'VariableNames', ["binary*time"]...
+%                                   ); % end of dummy*regressor creator
+
+        % add intercept terms to regressors
+        regressors = [regressors binary intercept_terms];
+        
+%         regressors_names = regressors.Properties.VariableNames;
+%         regressors = table2array(regressors);
+
+        % fit a robust linear regression model
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %output
+        coefficient_interpretation.Properties.VariableNames = [emg_space_2 emg_space_1+" vs G"+emg_space_2 emg_space_1];
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>RMLR - Group "+string(group)+" day "+string(day)+"  "+string(emg_space_1)+" vs "+string(emg_space_2)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space_1+" & "+emg_space_2)
+        disp("regressors: time, binary, binary.*time")
+        disp(' ')
+         disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
+
+    case 30 % view model
+        %%
+        %% input
+        %  √ emg space
+        %  √ group
+        %  √ multiple or simple
+        %  √ 1- or 2- day
+        %   √ • which day
+        % 
+
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+
+        % other input
+        group       = input('group:    ');
+        multiple_yn = input('multiple: ','s');
+        days_on_graph      = input('days:     ');
+
+        if days_on_graph == 1
+            day     = input('day:      ');
+        else
+            clear day
+        end
+
+        % get subset of calc_variables to be tested
+        if days_on_graph == 1
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+        else
+            stencil = (calc_variables.group == group);
+        end
+
+        calc_variables_subset = calc_variables(stencil,:);
+
+        % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+        % get regressors
+        if multiple_yn == "n"
+            regressors_names = "time";
+        elseif days_on_graph == 2
+            regressors_names = ["day" "session" "trial"];
+        else
+            regressors_names = ["session" "trial"];
+        end
+
+        regressors = calc_variables_subset(:, regressors_names);
+        
+%       NOT RELEVANT UNLESS COMPARING GROUPS
+%         add binary dummy regressor
+%         binary = array2table(calc_variables_subset.group == test_group & calc_variables_subset.day == test_day, 'VariableNames', "binary");
+%         regressors = [regressors binary];
+% 
+%         % create intercept terms: dummy*regressor
+%         intercep_terms =    table(...
+%                                     regressors{:,"binary"}.*regressors{:,"session"},...
+%                                     regressors{:,"binary"}.*regressors{:,"trial"},...
+%                                     'VariableNames', ["binary*session" "binary*trial"]...
+%                                   ); % end of dummy*regressor creator
+% 
+%         % add intercept terms to regressors
+%         regressors = [regressors intercep_terms];
+
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %%
+        %output
+        if days_on_graph == 2
+            output_heading_days = " Both Days";
+        else
+            output_heading_days = " Day "+string(day);
+        end
+        
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+output_heading_days+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        %disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
+
+    
     case 0 % reset cml view
         %%
         clc
