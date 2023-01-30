@@ -54,6 +54,7 @@ operations_list = ... "–––––––––––––––––––
 "35  reapply model\n"+...
 "\n"+...
 "36  view skill model\n"+...
+"36.2 compare skill models\n"+...
 "37  plot skill model\n"+...
 "38  plot var // learning\n"+...
 "\n"+...
@@ -62,6 +63,8 @@ operations_list = ... "–––––––––––––––––––
 "43  plot skill measure\n"+...
 "44  ttest\n"+...
 "45  correlation\n"+...
+"\n"+...
+"77  plot var & learning all groups one day\n"+...
 "\n"+...
 "output\n"+...
 "51  save…\n"+...
@@ -1909,10 +1912,10 @@ switch action
 
     case 41 % styling options
         %% figure styling options
-        set(findall(gcf,'-property','FontSize'),'FontSize',12);
+        set(findall(gcf,'-property','FontSize'),'FontSize',20);
         legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','southoutside');
         %t.Title.String = 'Robust Multiple Regression Models';
-        t.Title.FontSize = 16;
+        t.Title.FontSize = 25;
         t.Title.FontWeight = 'normal';
         %legend([]);
         %%
@@ -1933,7 +1936,7 @@ switch action
         %%
 
     case 43 % plot skill measure
-        %%
+        %% SKILL
         % calculate mean skill by group per session from parameters
         p = Parameters; %struct2table(Parameters);
         mean_skill_measure = [];
@@ -2496,6 +2499,137 @@ t.Title.FontWeight = 'normal';
 
             end
         end
+        %%
+
+    case 77 % plot var & learning all groups one day
+        
+        %%
+        day = input('day: ');
+        emg_spaces = emgSpaceSelector(calc_variables);
+
+        f = figure;
+        line_width = 5;
+        colororder([0 0 1; 1 0 0; 1 0.9 0])
+        y_dimensions = [];       
+        t = tiledlayout(1,2); % t = tiledlayout(1,2,'TileSpacing','Compact');
+
+        % VARIABILITY
+        for group = 1:3
+            % get subset of calc_variables to be tested
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+            calc_variables_subset = calc_variables(stencil,:);
+
+            % get observed values from calc_variables_subset
+            dependant = calc_variables_subset(:, emg_space);
+            dependant = table2array(dependant);
+
+            % get regressors
+            if multiple_yn == "n"
+                regressors_names = "time";
+            elseif days_in_model == 2
+                regressors_names = ["day" "session" "trial"];
+            else
+                regressors_names = ["session" "trial"];
+            end
+
+            regressors = calc_variables_subset(:, regressors_names);
+
+            regressors_names = regressors.Properties.VariableNames;
+            regressors = table2array(regressors);
+
+            % create model
+            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+            %% reapply model
+                intercept   = mdlr.Coefficients{1,1};
+                effect      = mdlr.Coefficients{2,1};
+
+                    time_scaffold = transpose((1:120)+120*(day-1));
+
+                reapplied_model = intercept + effect*time_scaffold(:,1);
+
+
+            %% plot reapplied model
+                nexttile(1)
+                hold on
+                plot(reapplied_model,'Linewidth',line_width)
+                if plot_counter == 1
+                    if day == 1
+                        delete(emptyplot)
+                    else
+                        delete(emptyplot2)
+                    end
+                end
+                hold off
+                drawnow()
+                y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+
+        end
+        %
+        
+        % SKILL
+        % calculate mean skill by group per session from parameters
+        p = Parameters; %struct2table(Parameters);
+        mean_skill_measure = [];
+        for i = 1:3
+            mean_skill_group = zeros([8 1]);
+            for j = 1:2
+                for k=1:4
+                    mean_skill_group(k+((j-1)*4)) = mean(p(p.label == i & p.day == j & p.BN == k,:).skillp,'omitnan');
+                end
+            end
+            mean_skill_measure = [mean_skill_measure mean_skill_group];
+        end
+
+        nexttile(2)
+        if day == 1
+            plot(mean_skill_measure(1:4,:),'Linewidth',line_width)
+        else
+            plot(mean_skill_measure(5:8,:),'Linewidth',line_width)
+        end
+
+
+        % figure styling options
+        f.Position = [300 300 900 400];
+        set(findall(gcf,'-property','FontSize'),'FontSize',20);
+
+        nexttile(1)
+        set(gca,'box','off')
+        set(gca,'XLim',[1 120],'XTick',15:30:105)
+        xticklabels(["T1", "T2", "T3", "T4"])
+        xlabel("session")
+        ylabel("variability")
+        % y_max = ceil(max(y_dimensions));
+        % y_min = floor(min(y_dimensions));
+        ylim([15 35]) % ylim([y_min y_max])
+        ax = gca;
+        ax.XAxis.LineWidth = 3.5;
+        ax.YAxis.LineWidth = 2.5;
+
+        nexttile(2)
+        set(gca,'box','off')
+        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+        xlabel("session")
+        ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
+        ylabel("skill measure")
+        ax = gca;
+        ax.XAxis.LineWidth = 3.5;
+        ax.YAxis.LineWidth = 2.5;
+
+        if day == 1
+            nexttile(1)
+            xticklabels(["T1", "T2", "T3", "T4"])
+            nexttile(2)
+            xticklabels(["T1", "T2", "T3", "T4"])
+        else
+            nexttile(1)
+            xticklabels(["C1", "C2", "C3", "C4"])
+            nexttile(2)
+            xticklabels(["C1", "C2", "C3", "C4"])
+        end
+
+%        legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','southoutside');
+
         %%
 
     case 51 % save
