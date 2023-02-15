@@ -25,6 +25,7 @@ operations_list = ... "–––––––––––––––––––
 "\n"+...
 "4  exploration of variability w/ variable resolution\n"+...
 "5  histograms\n"+...
+"6  tables\n"+...
 "\n"+...
 "\n"+...
 "clear cml & display operations with 0\n"+...
@@ -490,7 +491,7 @@ switch action
             subset = unstack(subset,emg_space,"dayXsession");
             for session = 1:8
                 nexttile
-                histogram(subset{:,group+2});
+                histogram(subset{:,session+2});
                 title("session "+num2str(session))
                 ylabel("count")
                 xlabel("variability")
@@ -536,6 +537,46 @@ switch action
         disp("calc_variables length: "+num2str(height(calc_variables)))
         %%
     
+    case 6 % tables
+        %%
+        emg_space = emgSpaceSelector(calc_variables);
+        percentile_cutoff = 90;
+        % dname = uigetdir(rootDir);
+        % dname = dname+"/";
+
+        % percentile cut calc_variables
+        calc_variables_backup = calc_variables;
+        calc_variables = calc_variables(calc_variables{:,emg_space}<=prctile(calc_variables{:,emg_space},percentile_cutoff),:);
+
+        % plot by count
+        t = array2table(zeros(3,8));
+        t.Properties.VariableNames = ["1" "2" "3" "4" "5" "6" "7" "8"];
+        t.Properties.RowNames = ["Group 1" "Group 2" "Group 3"];
+
+        skew_table = t;
+        kurtosis_table = t;
+
+        for group = 1:3
+            subset = calc_variables(calc_variables.group==group, :);
+            subset.dayXsession = ((subset.day-1).*4)+subset.session;
+            subset = subset(:,["subject" "trial" "dayXsession" emg_space]);
+            subset = unstack(subset,emg_space,"dayXsession");
+            for session = 1:8
+                skew_table{group, session}     =    skewness(subset{:,session+2});
+                kurtosis_table{group, session} =    kurtosis(subset{:,session+2});
+            end
+        end
+
+        skew_table
+        kurtosis_table
+
+        writetable(skew_table, dname+"skew_table.txt")
+        writetable(kurtosis_table, dname+"kurtosis_table.txt")
+        
+        % restore calc_variables
+        calc_variables = calc_variables_backup;
+        disp("calc_variables length: "+num2str(height(calc_variables)))
+        %%
     
     case 0 % reset cml view
         %%
