@@ -1065,7 +1065,8 @@ switch action
         calc_variables = calc_variables(calc_variables{:,emg_space}<=prctile(calc_variables{:,emg_space},percentile_cutoff),:);
 
         % boxplot by group
-        f = figure(1);
+        f = figure();
+        f.Position = [300 300 600 400];
         t = tiledlayout(2,3);
         t.Title.String = 'Exploration of Variability';
         for group = 1:3
@@ -1076,6 +1077,8 @@ switch action
             subset = unstack(subset,emg_space,"dayXsession");
             boxplot(subset{:,3:10})
             title("group "+num2str(group))
+            ylabel("variability by trial")
+            xlabel("session")
         end
         for group = 1:3
             nexttile
@@ -1086,14 +1089,17 @@ switch action
             boxplot(subset{:,3:10})
             ylim([0 croped_boxplots])
             title("group "+num2str(group))
+            ylabel("variability by trial")
+            xlabel("session")
         end
 
         saveas(f, dname+"boxplots-group.png")
         close(f)
 
         % boxplot by session
-        f = figure(2);
-        t = tiledlayout(4,4,"TileSpacing","tight","Padding","tight");
+        f = figure();
+        f.Position = [300 300 900 900];
+        t = tiledlayout(4,4,"Padding","tight");
         t.Title.String = 'Exploration of Variability';
         
         subset = calc_variables;
@@ -1106,6 +1112,8 @@ switch action
             subsubset = unstack(subsubset,emg_space,"group");
             boxplot(subsubset{:,3:5})
             title("session "+num2str(session))
+            ylabel("variability by trial")
+            xlabel("group")
         end
         for session = 1:8
             nexttile
@@ -1115,6 +1123,8 @@ switch action
             boxplot(subsubset{:,3:5})
             ylim([0 croped_boxplots])
             title("session "+num2str(session))
+            ylabel("variability by trial")
+            xlabel("group")
         end
         
         saveas(f, dname+"boxplots-session.png")
@@ -1165,36 +1175,67 @@ switch action
             end
         end
 
-        %plot descriptive numbers
+        writetable(var_exploration, dname+"values.txt")
+
+        % plot descriptive numbers
+        linewidth = 2.5;
         for group = 1:3
             for operation = 1:length(operations)
 
                 if operation ~= 5
                     f = figure();
+                    f.Position = [300 300 450 200];
                     t = tiledlayout(1,2);
                     t.Title.String = "Exploration of Variability: Group "+num2str(group)+" "+operations(operation,1);
+
                     nexttile
-                    plot(var_exploration{var_exploration.group==group,operations(operation)}(1:4*descriptive_res))
+                    plot(var_exploration{var_exploration.group==group,operations(operation)}(1:4*descriptive_res),'LineWidth',linewidth);
                     title("day 1")
+                    ylabel(operations(operation,1))
+                    xlabel("session")
+                    set(gca,'box','off')
+                    ax = gca;
+                    ax.XAxis.LineWidth = 2;
+                    ax.YAxis.LineWidth = 2;
+
                     nexttile
-                    plot(var_exploration{var_exploration.group==group,operations(operation)}(4*descriptive_res+1:8*descriptive_res))
+                    plot(var_exploration{var_exploration.group==group,operations(operation)}(4*descriptive_res+1:8*descriptive_res),'LineWidth',linewidth);
                     title("day 2")
-                    saveas(f, dname+"numbers-"+num2str(group)+"-"+operations(operation)+".png")
+                    ylabel(operations(operation,1))
+                    xlabel("session")
+                    set(gca,'box','off')
+                    ax = gca;
+                    ax.XAxis.LineWidth = 2;
+                    ax.YAxis.LineWidth = 2;
+                    saveas(f, dname+num2str(group)+"-"+operations(operation)+".png")
                 else
                     f = figure();
+                    f.Position = [300 300 450 200];
                     t = tiledlayout(1,2);
                     t.Title.String = "Exploration of Variability: Group "+num2str(group)+" "+operations(operation,1);
 
                     nexttile
                     a = var_exploration{var_exploration.group==group,operations(operation)}(1:4*descriptive_res);
-                    plot(cell2mat(a))
+                    plot(cell2mat(a),'LineWidth',linewidth)
                     title("day 1")
+                    ylabel(operations(operation,1))
+                    xlabel("session")
+                    set(gca,'box','off')
+                    ax = gca;
+                    ax.XAxis.LineWidth = 2;
+                    ax.YAxis.LineWidth = 2;
 
                     nexttile
                     a = var_exploration{var_exploration.group==group,operations(operation)}(4*descriptive_res+1:8*descriptive_res);
-                    plot(cell2mat(a))
+                    plot(cell2mat(a),'LineWidth',linewidth)
                     title("day 2")
-                    saveas(f, dname+"numbers-"+num2str(group)+"-"+operations(operation)+".png")
+                    ylabel(operations(operation,1))
+                    xlabel("session")
+                    set(gca,'box','off')
+                    ax = gca;
+                    ax.XAxis.LineWidth = 2;
+                    ax.YAxis.LineWidth = 2;
+                    saveas(f, dname+num2str(group)+"-"+operations(operation)+".png")
                         
                 end
                 close(f)
@@ -1278,51 +1319,105 @@ switch action
             end
         end
 
+        writetable(var_exploration_corr, dname+"correlations.txt")
+
         % plot descriptives & models overlay 
         for group = 1:3
             for operation = 1:length(operations)
 
                 if operation ~= 5
                     f = figure();
+                    f.Position = [300 300 450 200];
                     t = tiledlayout(1,2);
                     t.Title.String = "Exploration of Variability: Group "+num2str(group)+" "+operations(operation,1);
+
                     nexttile
-                    plot(var_exploration{var_exploration.group==group,operations(operation)}(1:4*descriptive_res))
+                    plot(var_exploration{var_exploration.group==group,operations(operation)}(1:4*descriptive_res),'LineWidth',linewidth)
+                    ylabel(operations(operation,1))
+                    xlabel("session")
+                    ax = gca;
+                    ax.XAxis.LineWidth = 2;
+                    ax.YAxis.LineWidth = 2;
+
                     yyaxis right
-                    plot(var_sessionmeans{var_sessionmeans.group==group,"variability"}(1:4*descriptive_res))
+                    plot(var_sessionmeans{var_sessionmeans.group==group,"variability"}(1:4*descriptive_res),'LineWidth',linewidth)
+                    ylabel("variability regression model")
+                    ax = gca;
+                    ax.YAxis(2).LineWidth = 2;
                     title("day 1")
+
                     nexttile
-                    plot(var_exploration{var_exploration.group==group,operations(operation)}(4*descriptive_res+1:8*descriptive_res))
+                    plot(var_exploration{var_exploration.group==group,operations(operation)}(4*descriptive_res+1:8*descriptive_res),'LineWidth',linewidth)
+                    ylabel(operations(operation,1))
+                    xlabel("session")
+                    ax = gca;
+                    ax.XAxis.LineWidth = 2;
+                    ax.YAxis.LineWidth = 2;
+
                     yyaxis right
-                    plot(var_sessionmeans{var_sessionmeans.group==group,"variability"}(4*descriptive_res+1:8*descriptive_res))
+                    plot(var_sessionmeans{var_sessionmeans.group==group,"variability"}(4*descriptive_res+1:8*descriptive_res),'LineWidth',linewidth)
+                    ylabel("variability regression model")
+                    ax = gca;
+                    ax.YAxis(2).LineWidth = 2;
                     title("day 2")
-                    saveas(f, dname+"numbersXdescription-"+num2str(group)+"-"+operations(operation)+".png")
+
+                    saveas(f, dname+"overlay-"+num2str(group)+"-"+operations(operation)+".png")
                 else
                     f = figure();
+                    f.Position = [300 300 450 200];
                     t = tiledlayout(1,2);
                     t.Title.String = "Exploration of Variability: Group "+num2str(group)+" "+operations(operation,1);
                     
                     nexttile
                     a = var_exploration{var_exploration.group==group,operations(operation)}(1:4*descriptive_res);
-                    plot(cell2mat(a))
+                    plot(cell2mat(a),'LineWidth',linewidth)
+                    ylabel(operations(operation,1))
+                    xlabel("session")
+                    ax = gca;
+                    ax.XAxis.LineWidth = 2;
+                    ax.YAxis.LineWidth = 2;
                     yyaxis right
-                    plot(var_sessionmeans{var_sessionmeans.group==group,"variability"}(1:4*descriptive_res))
+                    plot(var_sessionmeans{var_sessionmeans.group==group,"variability"}(1:4*descriptive_res),'LineWidth',linewidth)
+                    ylabel("variability regression model")
+                    ax = gca;
+                    ax.YAxis(2).LineWidth = 2;
                     title("day 1")
 
                     nexttile
                     a = var_exploration{var_exploration.group==group,operations(operation)}(4*descriptive_res+1:8*descriptive_res);
-                    plot(cell2mat(a))
+                    plot(cell2mat(a),'LineWidth',linewidth)
+                    ylabel(operations(operation,1))
+                    xlabel("session")
+                    ax = gca;
+                    ax.XAxis.LineWidth = 2;
+                    ax.YAxis.LineWidth = 2;
                     yyaxis right
-                    plot(var_sessionmeans{var_sessionmeans.group==group,"variability"}(4*descriptive_res+1:8*descriptive_res))
+                    plot(var_sessionmeans{var_sessionmeans.group==group,"variability"}(4*descriptive_res+1:8*descriptive_res),'LineWidth',linewidth)
+                    ylabel("variability regression model")
+                    ax = gca;
+                    ax.YAxis(2).LineWidth = 2;
                     title("day 2")
-                    saveas(f, dname+"numbersXdescription-"+num2str(group)+"-"+operations(operation)+".png")
-                        
+
+                    saveas(f, dname+"overlay-"+num2str(group)+"-"+operations(operation)+".png")
                 end
                 close(f)
             end
         end
         
-        %restore calc_variables
+        %% plot groups by descriptive
+        f = figure();
+        f.Position = [300 300 600 600];
+        t = tiledlayout(3,3);
+        t.Title.String = "Exploration of Variability");
+
+        for i = 1:length(operations)
+            nexttile()
+            operation = operations(i,1);
+            subset = var_exploration(:, ["group" "session" "subsession" operation]);
+            plot(subset, )
+
+        end
+        %% restore calc_variables
         calc_variables = calc_variables_backup;
         %%
     
