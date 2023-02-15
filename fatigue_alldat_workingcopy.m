@@ -1,4 +1,4 @@
-%% FATIGUE v7
+%% FATIGUE v8
 
 %% setup
 run_script = 1;
