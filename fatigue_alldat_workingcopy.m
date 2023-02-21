@@ -2,15 +2,11 @@
 
 %% setup
 run_script = 1;
-
-% set root directory
 %rootDir    = '/Volumes/smb fatigue'; % mac root
 %rootDir = '\\JOSHUAS-MACBOOK\smb fatigue\database'; % windows root network
 %rootDir = 'F:\database'; %windows root hd over usb
 %rootDir = '\\jmg\home\Drive\fatigue\database'; %windows root nas
 rootDir = 'D:\Joshua\fatigue\database'; %windows root internal hd
-
-% distances to calculate
 distances_to_calc = {...
     "adm";...
     "fdi";...
@@ -23,8 +19,12 @@ distances_to_calc = {...
     ["fdi" "apb" "adm" "fcr" "bic"]...
     };
 
-% struct for regression models
-lin_reg_models = [];
+if count(py.sys.path, '/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/z functions/Functions Joshua') == 0
+    insert(py.sys.path, int32(0), '/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/z functions/Functions Joshua');
+end
+pyModule = py.importlib.import_module('mongodb');
+get_data = pyModule.get_data;
+
 
 % supress warnings
 warning('off','MATLAB:table:RowsAddedNewVars')
@@ -2682,12 +2682,13 @@ t.Title.FontWeight = 'normal';
         run_script = 0;
         
     case 911 %Case 911: Clear Workspace
-        clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update calc_variables lin_reg_models distances_to_calc
+        clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update calc_variables  distances_to_calc
 
 end % end of master switch
 end % end of master while loop
 
 function emg_space = emgSpaceSelector(calc_variables)
+
         emg_spaces = calc_variables.Properties.VariableNames;
         non_emg_calc_vars = 6;
         disp("  available emg spaces")
@@ -2700,4 +2701,15 @@ function emg_space = emgSpaceSelector(calc_variables)
         disp(' ')
         emg_space = input('emg space:  ')+6;
         emg_space = emg_spaces{emg_space};
+        
+end
+
+function data = loadData(identifier, type, day, block, trial, lead) %"F007C", "EMG", 1, 2, 28, "ADM"
+
+    query_result = get_data(identifier, type, day, block, trial, lead);
+    query_result{'id'} = query_result.pop('_id');
+    query_result{'data_type'} = query_result.pop('data type');
+    query_result = struct(query_result);
+    data = double(transpose(string(query_result.data)));
+
 end
