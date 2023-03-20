@@ -152,7 +152,8 @@ while run_script == 1
                     disp('1 mark outliers')
                     disp('2 filter, rectify & stnd4time')
                     disp('3 mean trials')
-                    disp('4 euclidean distances')
+                    disp('4 measure euclidean distances')
+                    disp('5 calcualte other variables')
                     disp(' ')
                     what_to_process_2 = input('what to process: ');
         
@@ -206,7 +207,6 @@ while run_script == 1
                             pipeline = py.list({py.dict(pyargs("$group", py.dict(pyargs("_id", py.dict(pyargs("identifier", "$identifier", "day", "$day", "block", "$block","lead","$lead"))))))});
                             sessions = aggregate('fatigue','processed',pipeline);
 
-                            n = 100;  % total number of iterations
                             h = waitbar(0, 'Calculating mean trials...');  % initialize progress bar
                             
                             for i = 1:length(sessions)
@@ -233,32 +233,30 @@ while run_script == 1
 
                         case 4 % measure euclidean distances
                             % get unique object ids
-                            query = py.dict(pyargs('data type','EMG'));
-                            object_ids = find_unique('fatigue','raw','_id',query);
+                            query = py.dict(pyargs());
+                            projection = py.dict(pyargs('_id',int8(1)));
+                            object_ids = get_data('fatigue','processed',query,projection);
                             disp('ids done')
 
-                            % progress bar
-                            counter = 0;
-                            h = waitbar(0,['measuring euclidean distances ', num2str(counter*100),'%']);
-                            total = length(object_ids);
+                            h = waitbar(0, 'Measuring euclidean distances...');  % initialize progress bar
         
                             % itterate & process objects
                             start_time = now;
                             for i = 1:length(object_ids)
         
                                 % get data
-                                query = py.dict(pyargs('_id',object_ids{i}));
+                                query = object_ids{i};
                                 data_in = get_data('fatigue','processed',query);
                                 data_in = data_in{1};
 
-                                ID = data_in{'ID'};
+                                identifier = data_in{'identifier'};
                                 day = data_in{'day'};
-                                session = data_in{'SessN'};
+                                block = data_in{'block'};
                                 lead = data_in{'lead'};
 
-                                query = py.dict(pyargs('ID',ID,'day',day,'SessN',session,'lead',lead));
+                                query = py.dict(pyargs('identifier',identifier,'day',day,'block',block,'lead',lead));
                                 projection = py.dict(pyargs('mean trial',1));
-                                mean_trial = get_data('fatigue','mean',query,projection);   
+                                mean_trial = get_data('fatigue','mean',query,projection);
                                 mean_trial = double(string(mean_trial{1}{'mean trial'}));
                                 data = double(string(data_in{'data'}));
 
@@ -271,15 +269,17 @@ while run_script == 1
                                 data_in{'variability'} = result;
                                 put_data('fatigue','variability',data_in);
         
-                                %Update Progress bar
-                                counter = counter+1;
-                                waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
+                                waitbar(i/length(object_ids), h, sprintf('Measuring euclidean distances... %d%%', round(100*i/length(object_ids))));  % update progress bar
                             end
 
                             % timer output
                             disp("  -> Euclidean Distances calculated")
-                            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+                            disp(strcat("     runtime: ",datestr(now-start_time,"HH:MM:SS")))
                             close(h)
+
+                        case 5 % calcualte variables
+                            
+                        …option to run function in a loop with several spaces
 
                     end % end
             end % end
@@ -339,12 +339,63 @@ function emg_space = emgSpaceSelector(calc_variables)
         
 end
 
-function data = loadData(identifier, type, day, block, trial, lead) %"F007C", "EMG", 1, 2, 28, "ADM"
+function feedback = measure_space(space)
+        % get all unique trials in the processed collection
+        pipeline = py.list({py.dict(pyargs("$group",py.dict(pyargs('_id', py.dict(pyargs(...
+                                                                   'identifier', '$identifier', ...
+                                                                   'day', '$day', ...
+                                                                   'block', '$block', ...
+                                                                   'trial', '$trial')) ...
+                       )))),py.dict(pyargs("$project",py.dict(pyargs(...
+                                                                   '_id', int32(1)...
+                                                                    ))))});
+        object_ids = aggregate("fatigue", "processed", pipeline);
 
-    query_result = get_data(identifier, type, day, block, trial, lead);
-    query_result{'id'} = query_result.pop('_id');
-    query_result{'data_type'} = query_result.pop('data type');
-    query_result = struct(query_result);
-    data = double(transpose(string(query_result.data)));
+        % itterate object_ids
+        measured = [];
+        missing_leads = [];
 
+        for i = 1:length(object_ids)
+            % check if requiered leads exist
+            parameters = object_ids{i}{'_id'};
+            query = py.dict(pyargs( "identifier", parameters{"identifier"}, "day", parameters{"day"}, "block", parameters{"block"}, "trial", parameters{"trial"}));
+            projection = py.dict(pyargs("lead",1));
+            leads = get_data("fatigue","processed",query,projection);
+            leads = cellfun(@(d) strip(string(d{"lead"})), cell(leads), 'UniformOutput', true);
+
+            if isempty(setdiff(space, leads))
+                % get trial array
+                query = py.dict(pyargs( "identifier", parameters{"identifier"}, "day", parameters{"day"}, "block", parameters{"block"}, "trial", parameters{"trial"}, "lead", py.dict(pyargs('$in',py.list(cellstr(space))))));
+                data = get_data("fatigue","processed",query);
+                data = cellfun(@(d) double(d{"data"}), cell(data), 'UniformOutput', false);
+                data = cell2mat(transpose(data));
+
+                % get mean trial array
+                query = py.dict(pyargs( "identifier", parameters{"identifier"}, "day", parameters{"day"}, "block", parameters{"block"}, "lead", py.dict(pyargs('$in',py.list(cellstr(space))))));
+                mean_trial = get_data("fatigue","mean",query);
+                mean_trial = cellfun(@(d) double(d{"mean trial"}), cell(mean_trial), 'UniformOutput', false);
+                mean_trial = cell2mat(transpose(mean_trial));
+
+                % measure distance with Lpq norm
+                result = Lpq_norm(2,1,transpose(data-mean_trial));
+
+                % save result to db
+                output = parameters;
+                measured = [measured output.pop('_id')];
+                output{'space'} = py.list(cellstr(space));
+                output{'distance'} = result;
+                put_data('fatigue','variability',output);
+            else
+                % save missing leads to db
+                output = parameters;
+                missing_leads = [missing_leads output.pop('_id')];
+                output{'space'} = py.list(cellstr(space));
+                output{'distance'} = "missing leads";
+                output{'missing leads'} = setdiff(space, leads);
+                put_data('fatigue','variability',output);
+            end
+        end
+
+        % return list of measured and unmeasured trials
+        feedback = struct('measured', measured, 'missing_leads', missing_leads);
 end
