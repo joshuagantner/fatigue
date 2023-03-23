@@ -37,8 +37,14 @@ warning('off','MATLAB:table:RowsAddedNewVars')
 % print legend to cml
 operations_list = ...
     " \n"+...
-    "1 process data\n"+...
-    "6 view variability model\n";
+    "1 mark outliers\n"+...
+    "2 filter, rectify & stnd4time\n"+...
+    "3 mean trials\n"+...
+    "4 measure euclidean distances\n"+...
+    "5 calcualte other variables\n"+...
+    "6 view variability model\n" + ...
+    "7 comparative variability model\n"+...
+    "\n";
 fprintf(operations_list);
 
 %% master while loop
@@ -49,206 +55,184 @@ while run_script == 1
     action = input('What would you like me to do? ');
     disp(' ')
 
-    switch action
+    switch true
 
-        case 1 % process data
-            disp('1 db content table')
-            disp('2 db content table for lead')
-            disp('3 proces data')
-            
+        case what_to_process == 1 || what_to_process == 2 % db content table
+    
+            % get unique participant identifiers
+            collection = input('collection: ','s');
+            participants = find_unique('fatigue_sample',collection,'identifier');
+            participants = string(participants);
+            db_tableOfContents = array2table(zeros(240,length(participants)));
+            db_tableOfContents.Properties.VariableNames = participants;
+            db_tableOfContents.Properties.RowNames = string(1:240);
+    
+            % get data
+            if what_to_process == 1
+                query = py.dict(pyargs('data type','EMG'));
+            else
+                lead = input('lead: ','s');
+                query = py.dict(pyargs('data type','EMG','lead',lead));
+            end
+            projection = py.dict(pyargs('identifier',1,'day',1,'block',1,'trial',1));
+            data = get_data('fatigue_sample',collection,query, projection, batch_size = int8(10));
+            data = transpose(string(data));
+    
+            data = strrep(data, "'", '"'); % Replace single quotes with double quotes
+            data = strrep(data, "ObjectId(", ""); % Remove "ObjectId("
+            data = strrep(data, ")", ""); % Remove ")"
+    
+            disp('data fetched - now building table ')
+    
+            for i = 1:length(data)
+                datapoint = jsondecode(data(i));
+                row =   (datapoint.day-1)*120+...
+                        (datapoint.block-1)*30+...
+                         datapoint.trial;
+                column = datapoint.identifier;
+                db_tableOfContents{row,column} = db_tableOfContents{row,column}+1;
+            end
+    
+            % pass table on
             disp(' ')
-            what_to_process = input('what to process: ');
-
-            switch true
-                case what_to_process == 1 || what_to_process == 2 % db content table
-
-                    % get unique participant identifiers
-                    collection = input('collection: ','s');
-                    participants = find_unique('fatigue_sample',collection,'identifier');
-                    participants = string(participants);
-                    db_tableOfContents = array2table(zeros(240,length(participants)));
-                    db_tableOfContents.Properties.VariableNames = participants;
-                    db_tableOfContents.Properties.RowNames = string(1:240);
-
-                    % get data
-                    if what_to_process == 1
-                        query = py.dict(pyargs('data type','EMG'));
-                    else
-                        lead = input('lead: ','s');
-                        query = py.dict(pyargs('data type','EMG','lead',lead));
+            disp('1 show | 2 save | 3 latex | 4 continue')
+            todo = input('next: ');
+            switch todo
+                case 1
+                    fig = figure;
+                    % create a uitable object and set its position in the figure window
+                    uit = uitable(fig, 'Data', db_tableOfContents{:,:}, 'ColumnName', T.Properties.VariableNames, 'Position', [0 0 1000 500]);
+                    % set the column widths to fit the data
+                    uit.ColumnWidth = {'auto','auto','auto'};
+                case 2
+                    % prompt user to choose a file
+                    [filename, pathname] = uiputfile('*.csv', 'Save File As');
+    
+                    % if user clicked 'cancel', exit script
+                    if isequal(filename,0) || isequal(pathname,0)
+                        disp('File not saved');
+                        return
                     end
-                    projection = py.dict(pyargs('identifier',1,'day',1,'block',1,'trial',1));
-                    data = get_data('fatigue_sample',collection,query, projection, batch_size = int8(10));
-                    data = transpose(string(data));
-
-                    data = strrep(data, "'", '"'); % Replace single quotes with double quotes
-                    data = strrep(data, "ObjectId(", ""); % Remove "ObjectId("
-                    data = strrep(data, ")", ""); % Remove ")"
-
-                    disp('data fetched - now building table ')
-
-                    for i = 1:length(data)
-                        datapoint = jsondecode(data(i));
-                        row =   (datapoint.day-1)*120+...
-                                (datapoint.block-1)*30+...
-                                 datapoint.trial;
-                        column = datapoint.identifier;
-                        db_tableOfContents{row,column} = db_tableOfContents{row,column}+1;
+                    
+                    % Save table to a file in the selected folder
+                    writetable(db_tableOfContents, fullfile(pathname, filename));
+                    disp('Table saved successfully');
+                case 3
+                    % convert to latx
+                    output = table2latex(db_tableOfContents);
+    
+                    % prompt user to choose a file
+                    [filename, pathname] = uiputfile('*.txt', 'Save File As');
+                    
+                    % if user clicked 'cancel', exit script
+                    if isequal(filename,0) || isequal(pathname,0)
+                        disp('File not saved');
+                        return
                     end
-
-                    % pass table on
-                    disp(' ')
-                    disp('1 show | 2 save | 3 latex | 4 continue')
-                    todo = input('next: ');
-                    switch todo
-                        case 1
-                            fig = figure;
-                            % create a uitable object and set its position in the figure window
-                            uit = uitable(fig, 'Data', db_tableOfContents{:,:}, 'ColumnName', T.Properties.VariableNames, 'Position', [0 0 1000 500]);
-                            % set the column widths to fit the data
-                            uit.ColumnWidth = {'auto','auto','auto'};
-                        case 2
-                            % prompt user to choose a file
-                            [filename, pathname] = uiputfile('*.csv', 'Save File As');
-
-                            % if user clicked 'cancel', exit script
-                            if isequal(filename,0) || isequal(pathname,0)
-                                disp('File not saved');
-                                return
-                            end
-                            
-                            % Save table to a file in the selected folder
-                            writetable(db_tableOfContents, fullfile(pathname, filename));
-                            disp('Table saved successfully');
-                        case 3
-                            % convert to latx
-                            output = table2latex(db_tableOfContents);
-
-                            % prompt user to choose a file
-                            [filename, pathname] = uiputfile('*.txt', 'Save File As');
-                            
-                            % if user clicked 'cancel', exit script
-                            if isequal(filename,0) || isequal(pathname,0)
-                                disp('File not saved');
-                                return
-                            end
-                            
-                            % create full file path
-                            filepath = fullfile(pathname, filename);
-                            
-                            % open file for writing
-                            fileID = fopen(filepath, 'w');
-                            
-                            % write data to file
-                            for i = 1:length(output)
-                                fprintf(fileID, '%s\n', output{i});
-                            end
-                            
-                            % close file
-                            fclose(fileID);
-                            
-                            disp('Latex saved successfully');
+                    
+                    % create full file path
+                    filepath = fullfile(pathname, filename);
+                    
+                    % open file for writing
+                    fileID = fopen(filepath, 'w');
+                    
+                    % write data to file
+                    for i = 1:length(output)
+                        fprintf(fileID, '%s\n', output{i});
                     end
-                
-                case what_to_process == 3 % process raw data
-                    disp(' ')
-                    disp('1 mark outliers')
-                    disp('2 filter, rectify & stnd4time')
-                    disp('3 mean trials')
-                    disp('4 measure euclidean distances')
-                    disp('5 calcualte other variables')
-                    disp(' ')
-                    what_to_process_2 = input('what to process: ');
+                    
+                    % close file
+                    fclose(fileID);
+                    
+                    disp('Latex saved successfully');
+            end
         
-                    switch what_to_process_2
-                        case 1 % update inclusion status
         
-                        case 2 % process included raw data
-                            disp('started processing')
-                            % processing parameters
-                            SRATE = 5000;
-                            freq_h = 10;
-                            freq_l = 6;
-                            ORDER = 4;
-                            LENGTH = 100000;
-        
-                            % get unique object ids
-                            query = py.dict(pyargs('data type','EMG'));
-                            object_ids = find_unique('fatigue_sample','raw','_id',query);
-                            disp('ids done')
+        case action == 1 % update inclusion status
 
-                            % progress bar
-                            counter = 0;
-                            h = waitbar(0,['Processing Raw Data ', num2str(counter*100),'%']);
-                            total = length(object_ids);
-        
-                            % itterate & process objects
-                            start_time = now;
-                            for i = 1:length(object_ids)
-        
-                                % get, process & put trial data
-                                query = py.dict(pyargs('_id',object_ids{i}));
-                                data_in = get_data('fatigue_sample','raw',query);
-                                data = double(string(data_in{1}{'data'}));
-                                data = proc_std(data, SRATE, freq_h, freq_l, ORDER);
-                                data = stnd4time(data, LENGTH);
-                                data_in{1}{'data'} = py.list(data);
-                                data_in{1}.pop('_id');
-                                put_data('fatigue_sample','processed',data_in{1});
-        
-                                %Update Progress bar
-                                counter = counter+1;
-                                waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
-                            end
+        case action == 2 % process included raw data
+            disp('started processing')
+            % processing parameters
+            SRATE = 5000;
+            freq_h = 10;
+            freq_l = 6;
+            ORDER = 4;
+            LENGTH = 100000;
 
-                            % timer output
-                            disp("  -> Raw Data processed")
-                            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
-                            close(h)
+            % get unique object ids
+            query = py.dict(pyargs('data type','EMG'));
+            object_ids = find_unique('fatigue_sample','raw','_id',query);
+            disp('ids done')
 
-                        case 3 % calculate mean trials
-                            pipeline = py.list({py.dict(pyargs("$group", py.dict(pyargs("_id", py.dict(pyargs("identifier", "$identifier", "day", "$day", "block", "$block","lead","$lead"))))))});
-                            sessions = aggregate('fatigue_sample','processed',pipeline);
+            % progress bar
+            counter = 0;
+            h = waitbar(0,['Processing Raw Data ', num2str(counter*100),'%']);
+            total = length(object_ids);
 
-                            h = waitbar(0, 'Calculating mean trials...');  % initialize progress bar
-                            
-                            for i = 1:length(sessions)
-                                session = sessions{i}{'_id'};
+            % itterate & process objects
+            start_time = now;
+            for i = 1:length(object_ids)
+
+                % get, process & put trial data
+                query = py.dict(pyargs('_id',object_ids{i}));
+                data_in = get_data('fatigue_sample','raw',query);
+                data = double(string(data_in{1}{'data'}));
+                data = proc_std(data, SRATE, freq_h, freq_l, ORDER);
+                data = stnd4time(data, LENGTH);
+                data_in{1}{'data'} = py.list(data);
+                data_in{1}.pop('_id');
+                put_data('fatigue_sample','processed',data_in{1});
+
+                %Update Progress bar
+                counter = counter+1;
+                waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
+            end
+
+            % timer output
+            disp("  -> Raw Data processed")
+            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+            close(h)
+
+        case action == 3 % calculate mean trials
+            pipeline = py.list({py.dict(pyargs("$group", py.dict(pyargs("_id", py.dict(pyargs("identifier", "$identifier", "day", "$day", "block", "$block","lead","$lead"))))))});
+            sessions = aggregate('fatigue_sample','processed',pipeline);
+
+            h = waitbar(0, 'Calculating mean trials...');  % initialize progress bar
+            
+            for i = 1:length(sessions)
+                session = sessions{i}{'_id'};
 %                                 filter = py.dict(pyargs('identifier',session{'ID'},'day',session{'day'},'block',session{'BN'},'data type','EMG'));
 %                                 query = py.dict(pyargs('_id','$lead'));
 %                                 pipeline = py.list({py.dict(pyargs("$match",filter,"$group",query))});
 
-                                data = get_data('fatigue_sample','processed',session,batch_size=int8(10));
-                                mean_trial = zeros(1,100000);
-                                for j = 1:length(data)
-                                    mean_trial = mean_trial + double(data{j}{'data'});
-                                end
-                                mean_trial = mean_trial/length(data);
-                                
-                                output = py.dict(pyargs('identifier',session{'identifier'},'day',session{'day'},'block',session{'block'},'lead',session{'lead'},'mean trial',py.list(mean_trial)));
-                                put_data('fatigue_sample','mean',output);
+                data = get_data('fatigue_sample','processed',session,batch_size=int8(10));
+                mean_trial = zeros(1,100000);
+                for j = 1:length(data)
+                    mean_trial = mean_trial + double(data{j}{'data'});
+                end
+                mean_trial = mean_trial/length(data);
+                
+                output = py.dict(pyargs('identifier',session{'identifier'},'day',session{'day'},'block',session{'block'},'lead',session{'lead'},'mean trial',py.list(mean_trial)));
+                put_data('fatigue_sample','mean',output);
 
-                                waitbar(i/length(sessions), h, sprintf('Calculating mean trials... %d%%', round(100*i/length(sessions))));  % update progress bar
+                waitbar(i/length(sessions), h, sprintf('Calculating mean trials... %d%%', round(100*i/length(sessions))));  % update progress bar
 
-                            end
-                            
-                            close(h);  % close progress bar
-
-                        case 4 % measure euclidean distances
-                            spaces = {["ADM" "APB" "FDI"] ["BIC" "FCR"] ["ADM"] ["APB"] ["FDI"] ["BIC"] ["FCR"]};
-                            for i = 1:length(spaces)
-                                space = spaces{i};
-                                disp(string(datetime) + " " + strjoin(space,' '))
-                                measure_space(space);
-                            end
-
-                        case 5 % calcualte variables
-                            
-
-                    end % end
-            end % end
+            end
             
-        case 2 % invetigate processed data
+            close(h);  % close progress bar
+
+        case action == 4 % measure euclidean distances
+            spaces = {["ADM" "APB" "FDI"] ["BIC" "FCR"] ["ADM"] ["APB"] ["FDI"] ["BIC"] ["FCR"]};
+            for i = 1:length(spaces)
+                space = spaces{i};
+                disp(string(datetime) + " " + strjoin(space,' '))
+                measure_space(space);
+            end
+
+        case action == 5 % calcualte variables
+                    
+
+%        case 2 % invetigate processed data
 %             case 30 % view model
 %             case 302 % compare spaces
 %             case 31 % compare 1-day models
@@ -270,7 +254,7 @@ while run_script == 1
 %             case 47 % correlation coefficient from intercept
 %             case 48 % correlation coefficient from intercept
 
-        case 6 % view variability model
+        case action == 6 % view variability model
             % input
             emg_space   = emgSpaceSelector();
             group       = input('group: ');
@@ -326,28 +310,164 @@ while run_script == 1
             
             % output
             disp(' ')
-            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
-            fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+" Day "+string(day)+"</strong>")
-            disp(' ')
-            disp("dependant:  "+emg_space)
-            disp("regressors: " + strjoin(regressors_names+", "))
+            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––");
+            fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+" Day "+string(day)+"</strong>");
+            disp(' ');
+            disp("dependant:  "+strjoin(string(emg_space), " "));
+            disp("regressors: ((t.block-1)*30)+t.trial");
             disp(' ')
             %disp(coefficient_interpretation)
             disp(mdlr)
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
-            %%
 
-        case 77 % plot var & learning all groups one day
-        
-        case 01 % settings
-        case 011 % set root directory            
-        case 0 % reset cml view
+        case action == 7 % comparative model
+            % same code as view model, just twice. 
+            %  once for test and base group
+            %  and then the additional dummy regressor
+            %
+            % Model:
+            %     y =	int +	x1*time +	x2*gX_binary +	x3*gX_binary*session
+            %
+            % Interpretation of Coefficients
+            %
+            % 	             group A  |  group X vs group A
+            %   ––––––––––––––––––––––––––––––––––––––––––––
+            %   intercept |	intercept |	    x2
+            %   time	  |    x1	  |     x3
+            %
+            coefficient_interpretation = table(["intercept"; "x1"], ["x2"; "x3"], ["intercept + x2"; "x1 + x3"],'RowNames',["intercept" "time"]);
+
+            % input
+            disp('choose test group')
+            test_emg_space   = emgSpaceSelector();
+            test_group       = input(' group: ');
+            test_day         = input(' day:   ');
+            disp(' ')
+            disp('choose base group')
+            base_emg_space   = emgSpaceSelector();
+            base_group       = input(' group: ');
+            base_day         = input(' day:   ');
+
+            test_emg_space   = py.list(cellstr(test_emg_space));
+            test_group       = int32(test_group);
+            test_day         = int32(test_day);
+            base_emg_space   = py.list(cellstr(base_emg_space));
+            base_group       = int32(base_group);
+            base_day         = int32(base_day);
+            
+            % get members of group from parameters collection
+            % …for test group
+            pipeline = py.list({...
+                py.dict(pyargs('$match',py.dict(pyargs('label',test_group)))),...
+                py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
+                });
+            test_members = cell(aggregate('fatigue','parameters',pipeline));
+            test_members = test_members{1}{'ID'};
+            % …for base group
+            pipeline = py.list({...
+                py.dict(pyargs('$match',py.dict(pyargs('label',base_group)))),...
+                py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
+                });
+            base_members = cell(aggregate('fatigue','parameters',pipeline));
+            base_members = base_members{1}{'ID'};
+
+
+            % get variability values for all group members
+            % …for test group
+            pipeline = py.list({
+                py.dict(pyargs('$match', py.dict(pyargs(...
+                    'identifier', py.dict(pyargs('$in', test_members)),...
+                    'day', test_day,...
+                    'space', test_emg_space,...
+                    'distance', py.dict(pyargs("$ne", "missing leads"))...
+                    ))))
+                });
+            test_data = aggregate('fatigue_sample','variability',pipeline);
+            % …for base group
+            pipeline = py.list({
+                py.dict(pyargs('$match', py.dict(pyargs(...
+                    'identifier', py.dict(pyargs('$in', base_members)),...
+                    'day', base_day,...
+                    'space', base_emg_space,...
+                    'distance', py.dict(pyargs("$ne", "missing leads"))...
+                    ))))
+                });
+            base_data = aggregate('fatigue_sample','variability',pipeline);
+            
+            % convert mongodb result to matlab table
+            % …for test group
+            data = cell(test_data);
+            for i = 1:numel(data)
+                data{i}.pop('_id');
+            end
+            s = py.list(data);
+            s = cellfun(@struct, cell(s), 'UniformOutput', false);
+            s = [s{:}];
+            t = struct2table(s);
+            t.identifier = string(t{:,'identifier'});
+            t.day = cellfun(@double, t.day);
+            t.block = cellfun(@double, t.block);
+            t.trial = cellfun(@double, t.trial);
+            t.space = string(t{:,'space'});
+            t.distance = double(t{:,'distance'});
+            test_table = t;
+            % …for base group
+            data = cell(base_data);
+            for i = 1:numel(data)
+                data{i}.pop('_id');
+            end
+            s = py.list(data);
+            s = cellfun(@struct, cell(s), 'UniformOutput', false);
+            s = [s{:}];
+            t = struct2table(s);
+            t.identifier = string(t{:,'identifier'});
+            t.day = cellfun(@double, t.day);
+            t.block = cellfun(@double, t.block);
+            t.trial = cellfun(@double, t.trial);
+            t.space = string(t{:,'space'});
+            t.distance = double(t{:,'distance'});
+            base_table = t;
+
+
+            % get dependant
+            test_dependant = test_table{:, 'distance'};
+            base_dependant = base_table{:, 'distance'};
+            dependant = [test_dependant; base_dependant];
+            
+            % calculate regressors
+            test_regressors = ((test_table.block-1)*30)+test_table.trial;
+            base_regressors = ((base_table.block-1)*30)+base_table.trial;
+            % ... add binaries
+            test_binary = [test_regressors ones([height(test_regressors) 1])];
+            base_binary = [base_regressors zeros([height(base_regressors) 1])];
+            % ... add intercept term (time*binary)
+            regressors = [test_binary; base_binary];
+            regressors = [regressors regressors(:,1).*regressors(:,2)];
+
+
+
+            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+            
+            % output
+            coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
+            disp(' ')
+            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+            fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
+            disp(' ');
+            disp("dependant:  "+strjoin(string(emg_space), " "));
+            disp("regressors: ((t.block-1)*30)+t.trial ,  binary,  time*binary");
+            disp(' ')
+            disp(coefficient_interpretation)
+            disp(mdlr)
+            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+          
+        case action == 0 % reset cml view
             clc
 
-        case 666 % Case 666: Terminate Script   
+        case action == 666 % Case 666: Terminate Script   
             run_script = 0;
             
-        case 911 % Case 911: Clear Workspace
+        case action == 911 % Case 911: Clear Workspace
             clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update calc_variables  distances_to_calc
 
     end % end of master switch
