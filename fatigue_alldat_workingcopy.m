@@ -28,7 +28,6 @@ get_data = pyModule.get_data;
 find_unique = pyModule.find_unique;
 put_data = pyModule.put_data;
 aggregate = pyModule.aggregate;
-mongotable = pyModule.mongotable;
 
 
 % supress warnings
@@ -41,9 +40,10 @@ operations_list = ...
     "2 filter, rectify & stnd4time\n"+...
     "3 mean trials\n"+...
     "4 measure euclidean distances\n"+...
-    "5 calcualte other variables\n"+...
+    "5 describe variability\n"+...
     "6 view variability model\n" + ...
     "7 comparative variability model\n"+...
+    "8 create graphs\n"+...
     "\n";
 fprintf(operations_list);
 
@@ -54,6 +54,8 @@ while run_script == 1
     disp(' ')
     action = input('What would you like me to do? ');
     disp(' ')
+
+    what_to_process = 0;
 
     switch true
 
@@ -229,8 +231,66 @@ while run_script == 1
                 measure_space(space);
             end
 
-        case action == 5 % calcualte variables
-                    
+        case action == 5 % describe variability
+            % get variability by subject & block
+            pipeline = py.list({ ...
+                                py.dict(pyargs('$group', py.dict(pyargs( ...
+                                    '_id', py.dict(pyargs( ...
+                                        'identifier', '$identifier', ...
+                                        'day', '$day', ...
+                                        'block', '$block' ...
+                                    )) ...
+                                )))) ...
+                            });
+            data = aggregate('fatigue_sample', 'variability', pipeline);
+
+            % measure descriptives [ skew, kurtosis ]
+            h = waitbar(0, 'Analyzing variability...');  % initialize progress bar
+            for i = 1:length(data)
+                % Define the subject, day, and block inputs
+                data_in = data{i}{'_id'};
+                identifier_input = data_in{'identifier'};
+                day_input = data_in{'day'};
+                block_input = data_in{'block'};
+                
+                % Define the pipeline
+                pipeline = py.list({ ...
+                    py.dict(pyargs('$match', py.dict(pyargs( ...
+                        'identifier', identifier_input, ...
+                        'day', day_input, ...
+                        'block', block_input ...
+                    )))), ...
+                    py.dict(pyargs('$group', py.dict(pyargs( ...
+                        '_id', py.None, ...
+                        'distance', py.dict(pyargs( ...
+                            '$push', '$distance' ...
+                        )) ...
+                    )))), ...
+                    py.dict(pyargs('$project', py.dict(pyargs( ...
+                        '_id', py.False, ...
+                        'distance', py.True ...
+                    )))) ...
+                });
+                variability = aggregate('fatigue_sample', 'variability', pipeline);
+
+                % determine skew & kurtosis
+                variability = double(string(variability{1}{'distance'}));
+                skew = skewness(variability);
+                kurt = kurtosis(variability);
+                n = length(variability);
+                se_skew = sqrt(6*n*(n-1)/((n-2)*(n+1)*(n+3)));
+                se_kurt = sqrt(24*n*(n-1)/((n-2)*(n-3)*(n+3)*(n+5)));
+                
+                % put data
+                output = data_in;
+                output{'skew'} = skew;
+                output{'se_skew'} = se_skew;
+                output{'kurtosis'} = kurt;
+                output{'se_kurtosis'} = se_kurt;
+                put_data('fatigue_sample', 'describe_variability', output);
+                waitbar(i/length(data), h, sprintf('Analyzing variability... %d%%', round(100*i/length(data))));  % update progress bar
+            end
+            close(h) % close progress bar
 
 %        case 2 % invetigate processed data
 %             case 30 % view model
@@ -320,7 +380,7 @@ while run_script == 1
             disp(mdlr)
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
 
-        case action == 7 % comparative model
+        case action == 7 % comparative variability model
             % same code as view model, just twice. 
             %  once for test and base group
             %  and then the additional dummy regressor
@@ -338,6 +398,9 @@ while run_script == 1
             coefficient_interpretation = table(["intercept"; "x1"], ["x2"; "x3"], ["intercept + x2"; "x1 + x3"],'RowNames',["intercept" "time"]);
 
             % input
+            disp('creating comparative model')
+            data_type        = input('data type: ','s');
+            dispt(' ')
             disp('choose test group')
             test_emg_space   = emgSpaceSelector();
             test_group       = input(' group: ');
@@ -354,6 +417,14 @@ while run_script == 1
             base_emg_space   = py.list(cellstr(base_emg_space));
             base_group       = int32(base_group);
             base_day         = int32(base_day);
+
+            switch data_type
+                case 'variability'
+
+                case 'skill'
+                case 'v_d'
+                case 'emg_d'
+            end
             
             % get members of group from parameters collection
             % …for test group
@@ -372,7 +443,7 @@ while run_script == 1
             base_members = base_members{1}{'ID'};
 
 
-            % get variability values for all group members
+            % get data for all group members
             % …for test group
             pipeline = py.list({
                 py.dict(pyargs('$match', py.dict(pyargs(...
@@ -461,6 +532,140 @@ while run_script == 1
             disp(mdlr)
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
           
+        case action == 9
+%           NEW CASE statistical analysis of variability description
+%               -> build comparative models by group
+%                  		• time a/o variability as independant?
+
+        case action == 22 % create graphs
+            % initiate figure
+            titletext = input('title: ','s');
+            f = figure();
+            drawnow();
+            hold on;
+
+            % set title
+            title(titletext, 'FontSize', 25, 'FontWeight', 'bold');
+            drawnow()
+
+            % plot models
+            ylabeltext = input("y label: ","s");
+            legendcontent = [];
+            while true
+                % input
+                disp(' ');
+                emg_space   = emgSpaceSelector();
+                group       = input('group: ');
+                day         = input('day:   ');
+    
+                emg_space   = py.list(cellstr(emg_space));
+                group       = int32(group);
+                day         = int32(day);
+                
+                % get members of group from parameters collection
+                pipeline = py.list({...
+                    py.dict(pyargs('$match',py.dict(pyargs('label',group)))),... {"$match": {"label": 2}},
+                    py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
+                    });
+                members = cell(aggregate('fatigue','parameters',pipeline));
+                members = members{1}{'ID'};
+    
+    
+                % get variability values for all group members
+                pipeline = py.list({
+                    py.dict(pyargs('$match', py.dict(pyargs(...
+                        'identifier', py.dict(pyargs('$in', members)),...
+                        'day', day,...
+                        'space', emg_space,...
+                        'distance', py.dict(pyargs("$ne", "missing leads"))...
+                        ))))
+                    });
+                data = aggregate('fatigue_sample','variability',pipeline);
+                
+                % convert mongodb result to matlab table
+                data = cell(data);
+                for i = 1:numel(data)
+                    data{i}.pop('_id');
+                end
+                s = py.list(data);
+                s = cellfun(@struct, cell(s), 'UniformOutput', false);
+                s = [s{:}];
+                t = struct2table(s);
+                t.identifier = string(t{:,'identifier'});
+                t.day = cellfun(@double, t.day);
+                t.block = cellfun(@double, t.block);
+                t.trial = cellfun(@double, t.trial);
+                t.space = string(t{:,'space'});
+                t.distance = double(t{:,'distance'});
+    
+                % get dependant
+                dependant = t{:, 'distance'};
+                
+                % get regressors
+                regressors = ((t.block-1)*30)+t.trial;
+    
+                % fit robust model
+                mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+                % reapply model
+                intercept   = mdlr.Coefficients{1,1};
+                effect      = mdlr.Coefficients{2,1};
+                time_scaffold = transpose(1:120);
+                reapplied_model = intercept + effect*time_scaffold(:,1);
+
+                %plot model
+                linewidth = input("linewidth: ");
+                linecolor = input("linecolor: ","s");
+                plotlabel = input("legend label: ","s");
+
+                legendcontent = [legendcontent string(plotlabel)];
+
+                plot(reapplied_model, 'LineWidth', linewidth, 'Color', linecolor);
+                legend(legendcontent);
+
+                set(gca,'box','off');
+                set(gca,'XLim',[1 120],'XTick',15:30:105);
+                set(findall(gcf,'-property','FontSize'),'FontSize',20);
+                xticklabels(["1", "2", "3", "4"]);
+                xlabel("session");
+                ylabel(ylabeltext);
+                drawnow();
+
+                % continue?
+                action2 = input("continue (y/n): ","s");
+                if action2 == "n"
+                    break
+                end
+            end
+
+            % post creation editing loop
+            while true
+                listofedits = ...
+                        " \n"+...
+                        "1 first edit\n"+...
+                        "2 second edit\n"+...
+                        "9 save\n"+...
+                        "0 end\n"+...
+                        "\n";
+                fprintf(listofedits);
+                editing = input("edit: ");
+    
+                switch editing
+    
+                    case 1
+                        disp('edit 1')
+    
+                    case 2
+                        disp('edit 2')
+    
+                    case 9
+                        
+    
+                    case 0
+                        break
+                end
+            end
+
         case action == 0 % reset cml view
             clc
 
