@@ -41,8 +41,9 @@ operations_list = ...
     "3 mean trials\n"+...
     "4 measure euclidean distances\n"+...
     "5 describe variability\n"+...
-    "6 view variability model\n" + ...
-    "7 comparative variability model\n"+...
+    " \n"+...
+    "6 view model\n" + ...
+    "7 comparative model\n"+...
     "8 create graphs\n"+...
     "\n";
 fprintf(operations_list);
@@ -314,69 +315,119 @@ while run_script == 1
 %             case 47 % correlation coefficient from intercept
 %             case 48 % correlation coefficient from intercept
 
-        case action == 6 % view variability model
+        case action == 6 % view model
             % input
-            emg_space   = emgSpaceSelector();
-            group       = input('group: ');
-            day         = input('day:   ');
-
-            emg_space   = py.list(cellstr(emg_space));
-            group       = int32(group);
-            day         = int32(day);
+%             emg_space   = emgSpaceSelector();
+%             group       = input('group: ');
+%             day         = input('day:   ');
+% 
+%             emg_space   = py.list(cellstr(emg_space));
+%             group       = int32(group);
+%             day         = int32(day);
             
+            % input
+            disp('view model')
+            data_type        = input('data type: ','s');
+            if data_type == "variability" % only ask for emg space when modeling variability
+                emg_space   = py.list(cellstr(emgSpaceSelector()));
+            end
+            group       = int32(input(' group: '));
+            day         = int32(input(' day:   '));
+            if data_type == "v_d"
+                disp(' ');
+                descriptive2plot = input('descriptive: ','s');
+            end
+
             % get members of group from parameters collection
             pipeline = py.list({...
-                py.dict(pyargs('$match',py.dict(pyargs('label',group)))),... {"$match": {"label": 2}},
+                py.dict(pyargs('$match',py.dict(pyargs('label',group)))),...
                 py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
                 });
             members = cell(aggregate('fatigue','parameters',pipeline));
             members = members{1}{'ID'};
 
 
-            % get variability values for all group members
-            pipeline = py.list({
-                py.dict(pyargs('$match', py.dict(pyargs(...
-                    'identifier', py.dict(pyargs('$in', members)),...
-                    'day', day,...
-                    'space', emg_space,...
-                    'distance', py.dict(pyargs("$ne", "missing leads"))...
-                    ))))
-                });
-            data = aggregate('fatigue_sample','variability',pipeline);
+            % get data for all group members
+            switch data_type
+                case "variability"
+                    pipeline = py.list({
+                        py.dict(pyargs('$match', py.dict(pyargs(...
+                            'identifier', py.dict(pyargs('$in', members)),...
+                            'day', day,...
+                            'space', emg_space,...
+                            'distance', py.dict(pyargs("$ne", "missing leads"))...
+                            ))))
+                        });
+                    collection     = 'variability';
+                    dependant_name = 'distance';
+
+                case "skill"
+                    pipeline = py.list({
+                        py.dict(pyargs('$match', py.dict(pyargs(...
+                            'ID', py.dict(pyargs('$in', members)),...
+                            'day', day...
+                            )))), ...
+                        py.dict(pyargs('$project', py.dict(pyargs(...
+                            '_id', int32(1), ...
+                            'ID', int32(1), ...
+                            'day', int32(1), ...
+                            'BN', int32(1), ...
+                            'skillp', int32(1) ...
+                            ))))
+                        });
+                    collection     = 'parameters';
+                    dependant_name = 'skillp';
+
+                case "v_d"
+                    match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', members)), 'day', day, descriptive2analyse, py.dict(pyargs('$ne', NaN))))));
+                    project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2analyse, 1))));
+                    pipeline = py.list({match_stage, project_stage});
+                    collection = "describe_variability";
+                    dependant_name = descriptive2analyse;
+
+                case "s_d"
+            end
+
+            data = aggregate('fatigue_sample', collection, pipeline);
             
             % convert mongodb result to matlab table
-            data = cell(data);
-            for i = 1:numel(data)
-                data{i}.pop('_id');
-            end
-            s = py.list(data);
-            s = cellfun(@struct, cell(s), 'UniformOutput', false);
-            s = [s{:}];
-            t = struct2table(s);
-            t.identifier = string(t{:,'identifier'});
-            t.day = cellfun(@double, t.day);
-            t.block = cellfun(@double, t.block);
-            t.trial = cellfun(@double, t.trial);
-            t.space = string(t{:,'space'});
-            t.distance = double(t{:,'distance'});
+            t = mongoquery2table(data);
 
             % get dependant
-            dependant = t{:, 'distance'};
+            dependant = t{:, dependant_name};
             
             % get regressors
-            regressors = ((t.block-1)*30)+t.trial;
+            % calculate regressors
+            switch data_type
+                case 'variability'
+                    regressors = ((t.block-1)*30)+t.trial;
+
+                case 'skill'
+                    regressors = t.BN;
+                    
+                case 'v_d'
+                    regressors = t.block;
+
+                case 'emg_d'
+            end
 
             mdlr = fitlm(regressors,dependant,'RobustOpts','on');
             
             % output
+            if data_type == "variability"
+                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " ");
+                regressor_info = "regressor: ((t.block-1)*30)+t.trial";
+            elseif data_type == "skill" || data_type == "v_d"
+                dependant_info = "dependant:  " + dependant_name;
+                regressor_info = "regressor: block";
+            end
             disp(' ')
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––");
             fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+" Day "+string(day)+"</strong>");
             disp(' ');
-            disp("dependant:  "+strjoin(string(emg_space), " "));
-            disp("regressors: ((t.block-1)*30)+t.trial");
+            disp(dependant_info);
+            disp(regressor_info);
             disp(' ')
-            %disp(coefficient_interpretation)
             disp(mdlr)
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
 
@@ -400,30 +451,23 @@ while run_script == 1
             % input
             disp('creating comparative model')
             data_type        = input('data type: ','s');
-            dispt(' ')
+            disp(' ')
             disp('choose test group')
-            test_emg_space   = emgSpaceSelector();
-            test_group       = input(' group: ');
-            test_day         = input(' day:   ');
+            if data_type == "variability" % only ask for emg space when modeling variability
+                test_emg_space   = py.list(cellstr(emgSpaceSelector()));
+            end
+            test_group       = int32(input(' group: '));
+            test_day         = int32(input(' day:   '));
             disp(' ')
             disp('choose base group')
-            base_emg_space   = emgSpaceSelector();
-            base_group       = input(' group: ');
-            base_day         = input(' day:   ');
-
-            test_emg_space   = py.list(cellstr(test_emg_space));
-            test_group       = int32(test_group);
-            test_day         = int32(test_day);
-            base_emg_space   = py.list(cellstr(base_emg_space));
-            base_group       = int32(base_group);
-            base_day         = int32(base_day);
-
-            switch data_type
-                case 'variability'
-
-                case 'skill'
-                case 'v_d'
-                case 'emg_d'
+            if data_type == "variability" % only ask for emg space when modeling variability
+                base_emg_space   = py.list(cellstr(emgSpaceSelector()));
+            end
+            base_group       = int32(input(' group: '));
+            base_day         = int32(input(' day:   '));
+            if data_type == "v_d"
+                disp(' ');
+                descriptive2analyse = input('descriptive: ','s');
             end
             
             % get members of group from parameters collection
@@ -442,72 +486,100 @@ while run_script == 1
             base_members = cell(aggregate('fatigue','parameters',pipeline));
             base_members = base_members{1}{'ID'};
 
+            % set pipeline & collection for data type
+            switch data_type
+                case 'variability'
+                    pipeline_test = py.list({
+                        py.dict(pyargs('$match', py.dict(pyargs(...
+                            'identifier', py.dict(pyargs('$in', test_members)),...
+                            'day', test_day,...
+                            'space', test_emg_space,...
+                            'distance', py.dict(pyargs("$ne", "missing leads"))...
+                            ))))
+                        });
+                    pipeline_base = py.list({
+                        py.dict(pyargs('$match', py.dict(pyargs(...
+                            'identifier', py.dict(pyargs('$in', base_members)),...
+                            'day', base_day,...
+                            'space', base_emg_space,...
+                            'distance', py.dict(pyargs("$ne", "missing leads"))...
+                            ))))
+                        });
+                    collection     = 'variability';
+                    dependant_name = 'distance';
+
+                case 'skill'
+                    pipeline_test = py.list({
+                        py.dict(pyargs('$match', py.dict(pyargs(...
+                            'ID', py.dict(pyargs('$in', test_members)),...
+                            'day', test_day...
+                            )))), ...
+                        py.dict(pyargs('$project', py.dict(pyargs(...
+                            '_id', int32(1), ...
+                            'ID', int32(1), ...
+                            'day', int32(1), ...
+                            'BN', int32(1), ...
+                            'skillp', int32(1) ...
+                            ))))
+                        });
+                    pipeline_base = py.list({
+                        py.dict(pyargs('$match', py.dict(pyargs(...
+                            'ID', py.dict(pyargs('$in', base_members)),...
+                            'day', base_day...
+                            )))), ...
+                        py.dict(pyargs('$project', py.dict(pyargs(...
+                            '_id', int32(1), ...
+                            'ID', int32(1), ...
+                            'day', int32(1), ...
+                            'BN', int32(1), ...
+                            'skillp', int32(1) ...
+                            ))))
+                        });
+                    collection     = 'parameters';
+                    dependant_name = 'skillp';
+                case 'v_d'                   
+                    match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', test_members)), 'day', test_day, descriptive2analyse, py.dict(pyargs('$ne', NaN))))));
+                    project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2analyse, 1))));
+                    pipeline_test = py.list({match_stage, project_stage});
+                    match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', base_members)), 'day', base_day, descriptive2analyse, py.dict(pyargs('$ne', NaN))))));
+                    pipeline_base = py.list({match_stage, project_stage});
+
+                    collection = "describe_variability";
+                    dependant_name = descriptive2analyse;
+                case 'emg_d'
+            end
+
 
             % get data for all group members
-            % …for test group
-            pipeline = py.list({
-                py.dict(pyargs('$match', py.dict(pyargs(...
-                    'identifier', py.dict(pyargs('$in', test_members)),...
-                    'day', test_day,...
-                    'space', test_emg_space,...
-                    'distance', py.dict(pyargs("$ne", "missing leads"))...
-                    ))))
-                });
-            test_data = aggregate('fatigue_sample','variability',pipeline);
-            % …for base group
-            pipeline = py.list({
-                py.dict(pyargs('$match', py.dict(pyargs(...
-                    'identifier', py.dict(pyargs('$in', base_members)),...
-                    'day', base_day,...
-                    'space', base_emg_space,...
-                    'distance', py.dict(pyargs("$ne", "missing leads"))...
-                    ))))
-                });
-            base_data = aggregate('fatigue_sample','variability',pipeline);
+            test_data = aggregate('fatigue_sample', collection, pipeline_test);
+            base_data = aggregate('fatigue_sample', collection, pipeline_base);
             
             % convert mongodb result to matlab table
-            % …for test group
-            data = cell(test_data);
-            for i = 1:numel(data)
-                data{i}.pop('_id');
-            end
-            s = py.list(data);
-            s = cellfun(@struct, cell(s), 'UniformOutput', false);
-            s = [s{:}];
-            t = struct2table(s);
-            t.identifier = string(t{:,'identifier'});
-            t.day = cellfun(@double, t.day);
-            t.block = cellfun(@double, t.block);
-            t.trial = cellfun(@double, t.trial);
-            t.space = string(t{:,'space'});
-            t.distance = double(t{:,'distance'});
-            test_table = t;
-            % …for base group
-            data = cell(base_data);
-            for i = 1:numel(data)
-                data{i}.pop('_id');
-            end
-            s = py.list(data);
-            s = cellfun(@struct, cell(s), 'UniformOutput', false);
-            s = [s{:}];
-            t = struct2table(s);
-            t.identifier = string(t{:,'identifier'});
-            t.day = cellfun(@double, t.day);
-            t.block = cellfun(@double, t.block);
-            t.trial = cellfun(@double, t.trial);
-            t.space = string(t{:,'space'});
-            t.distance = double(t{:,'distance'});
-            base_table = t;
-
+            test_table = mongoquery2table(test_data);
+            base_table = mongoquery2table(base_data);
 
             % get dependant
-            test_dependant = test_table{:, 'distance'};
-            base_dependant = base_table{:, 'distance'};
+            test_dependant = test_table{:, dependant_name};
+            base_dependant = base_table{:, dependant_name};
             dependant = [test_dependant; base_dependant];
             
             % calculate regressors
-            test_regressors = ((test_table.block-1)*30)+test_table.trial;
-            base_regressors = ((base_table.block-1)*30)+base_table.trial;
+            switch data_type
+                case 'variability'
+                    test_regressors = ((test_table.block-1)*30)+test_table.trial;
+                    base_regressors = ((base_table.block-1)*30)+base_table.trial;
+
+                case 'skill'
+                    test_regressors = test_table.BN;
+                    base_regressors = base_table.BN;
+                    
+                case 'v_d'
+                    test_regressors = test_table.block;
+                    base_regressors = base_table.block;
+
+                case 'emg_d'
+            end
+
             % ... add binaries
             test_binary = [test_regressors ones([height(test_regressors) 1])];
             base_binary = [base_regressors zeros([height(base_regressors) 1])];
@@ -515,18 +587,24 @@ while run_script == 1
             regressors = [test_binary; base_binary];
             regressors = [regressors regressors(:,1).*regressors(:,2)];
 
-
-
+            % fit model
             mdlr = fitlm(regressors,dependant,'RobustOpts','on');
             
             % output
             coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
+            if data_type == "variability"
+                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(test_emg_space), " ")+" / "+strjoin(string(test_emg_space), " ");
+                regressor_info = "regressors: ((t.block-1)*30)+t.trial ,  binary,  time*binary";
+            elseif data_type == "skill" || data_type == "v_d"
+                dependant_info = "dependant:  " + dependant_name;
+                regressor_info = "regressors: block,  binary,  block*binary";
+            end
             disp(' ')
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
             fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
             disp(' ');
-            disp("dependant:  "+strjoin(string(emg_space), " "));
-            disp("regressors: ((t.block-1)*30)+t.trial ,  binary,  time*binary");
+            disp(dependant_info);
+            disp(regressor_info);
             disp(' ')
             disp(coefficient_interpretation)
             disp(mdlr)
@@ -686,23 +764,11 @@ function emg_space = emgSpaceSelector()
         aggregate = pyModule.aggregate;
 
         % get all spaces present in the variability collection
-        pipeline = py.list({
-                py.dict(pyargs(...
-                    '$unwind', py.str('$space')...
-                )),...
-                py.dict(pyargs(...
-                    '$group', py.dict(pyargs(...
-                    '_id', py.str('$_id'),...
-                    'space', py.dict(pyargs('$addToSet', py.str('$space')))...
-                ))...
-                )),...
-                py.dict(pyargs(...
-                    '$group', py.dict(pyargs(...
-                    '_id', py.str('$space'),...
-                    'count', py.dict(pyargs('$sum', py.int(1)))...
-                    ))...
-                ))...
-            });
+        unwind_stage = py.dict(pyargs('$unwind', py.str('$space')));
+        group_stage_1 = py.dict(pyargs('$group', py.dict(pyargs('_id', py.str('$_id'),'space', py.dict(pyargs('$addToSet', py.str('$space')))))));
+        group_stage_2 = py.dict(pyargs('$group', py.dict(pyargs('_id', py.str('$space'),'count', py.dict(pyargs('$sum', py.int(1)))))));
+        sort_stage = py.dict(pyargs('$sort', py.dict(pyargs('_id', py.int(1)))));
+        pipeline = py.list({unwind_stage, group_stage_1, group_stage_2, sort_stage});
         data = aggregate('fatigue_sample','variability',pipeline);
         spaces = {};
         for i = 1:length(data)
@@ -796,4 +862,42 @@ function feedback = measure_space(space)
         close(h)
         % return list of measured and unmeasured trials
         feedback = struct('measured', measured, 'missing_leads', missing_leads, 'duration', stop-start);
+end
+
+function feedback = mongoquery2table(query_in)
+        % Convert PyMongo query result to MATLAB table
+        data = cell(query_in);
+        for i = 1:numel(data)
+            data{i}.pop('_id');
+        end
+        s = py.list(data);
+        s = cellfun(@struct, cell(s), 'UniformOutput', false);
+        s = [s{:}];
+        t = struct2table(s);
+        
+        % Convert string columns to MATLAB string type, and double columns to double type
+        for col = 1:size(t, 2)
+            try
+                if strcmp(class(t{1, col}{1}), 'py.str')
+                    t.(col) = string(t{:, col});
+                elseif strcmp(class(t{1, col}{1}), 'py.int')
+                    t.(col) = cellfun(@(x) double(int64(x)), t.(col));
+                elseif strcmp(class(t{1, col}{1}), 'py.list')
+                    t.(col) = cellfun(@(x) strjoin(string(x), " "), t{:, col}); % string(t{:, col});
+                end
+            catch ME
+                % Catch indexing error and do nothing
+                if strcmp(ME.identifier, 'MATLAB:cellRefFromNonCell')
+                % Leave column as is
+                else
+                % Re-throw any other errors
+                rethrow(ME)
+                end
+            end
+        end
+        
+        % Convert all remaining columns to cell type
+        t = table2cell(t);
+        feedback = cell2table(t, 'VariableNames', fieldnames(s));
+
 end
