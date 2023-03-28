@@ -149,7 +149,7 @@ while run_script == 1
             end
         
         case action == 2 % process included raw data
-            disp('started processing')
+            disp('getting ids…')
             % processing parameters
             SRATE = 5000;
             freq_h = 10;
@@ -196,7 +196,7 @@ while run_script == 1
             sessions = aggregate('fatigue_sample','processed',pipeline);
 
             h = waitbar(0, 'Calculating mean trials...');  % initialize progress bar
-            
+            start_time = now;
             for i = 1:length(sessions)
                 session = sessions{i}{'_id'};
 %                                 filter = py.dict(pyargs('identifier',session{'ID'},'day',session{'day'},'block',session{'BN'},'data type','EMG'));
@@ -216,16 +216,20 @@ while run_script == 1
                 waitbar(i/length(sessions), h, sprintf('Calculating mean trials... %d%%', round(100*i/length(sessions))));  % update progress bar
 
             end
-            
+            disp("  -> Mean trials calculated")
+            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
             close(h);  % close progress bar
 
         case action == 4 % measure euclidean distances
             spaces = {["ADM" "APB" "FDI"] ["BIC" "FCR"] ["ADM"] ["APB"] ["FDI"] ["BIC"] ["FCR"]};
+            start_time = now;
             for i = 1:length(spaces)
                 space = spaces{i};
                 disp(string(datetime) + " " + strjoin(space,' '))
                 measure_space(space);
             end
+            disp("  -> spaces measure")
+            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
 
         case action == 5 % describe variability
             % get variability by subject & block
@@ -242,6 +246,7 @@ while run_script == 1
 
             % measure descriptives [ skew, kurtosis ]
             h = waitbar(0, 'Analyzing variability...');  % initialize progress bar
+            start_time = now;
             for i = 1:length(data)
                 % Define the subject, day, and block inputs
                 data_in = data{i}{'_id'};
@@ -287,13 +292,15 @@ while run_script == 1
                 waitbar(i/length(data), h, sprintf('Analyzing variability... %d%%', round(100*i/length(data))));  % update progress bar
             end
             close(h) % close progress bar
+            disp("  -> variability explored")
+            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
 
         case action == 6 % view model
             % input
             disp('view model')
             data_type        = input('data type: ','s');
             if data_type == "variability" % only ask for emg space when modeling variability
-                emg_space   = py.list(cellstr(emgSpaceSelector()));
+                emg_space   = emgSpaceSelector();
             end
             group       = int32(input(' group: '));
             day         = int32(input(' day:   '));
@@ -343,11 +350,11 @@ while run_script == 1
                     dependant_name = 'skillp';
 
                 case "v_d"
-                    match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', members)), 'day', day, descriptive2analyse, py.dict(pyargs('$ne', NaN))))));
-                    project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2analyse, 1))));
+                    match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', members)), 'day', day, descriptive2plot, py.dict(pyargs('$ne', NaN))))));
+                    project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2plot, 1))));
                     pipeline = py.list({match_stage, project_stage});
                     collection = "describe_variability";
-                    dependant_name = descriptive2analyse;
+                    dependant_name = descriptive2plot;
 
                 case "s_d"
             end
@@ -418,14 +425,14 @@ while run_script == 1
             disp(' ')
             disp('choose test group')
             if data_type == "variability" % only ask for emg space when modeling variability
-                test_emg_space   = py.list(cellstr(emgSpaceSelector()));
+                test_emg_space   = emgSpaceSelector();
             end
             test_group       = int32(input(' group: '));
             test_day         = int32(input(' day:   '));
             disp(' ')
             disp('choose base group')
             if data_type == "variability" % only ask for emg space when modeling variability
-                base_emg_space   = py.list(cellstr(emgSpaceSelector()));
+                base_emg_space   = emgSpaceSelector();
             end
             base_group       = int32(input(' group: '));
             base_day         = int32(input(' day:   '));
@@ -594,7 +601,7 @@ while run_script == 1
                 disp(' ');
                 data_type        = input('data type: ','s');
                 if data_type == "variability" % only ask for emg space when modeling variability
-                    emg_space   = py.list(cellstr(emgSpaceSelector()));
+                    emg_space   = emgSpaceSelector();
                 end
                 group       = int32(input(' group: '));
                 day         = int32(input(' day:   '));
@@ -772,13 +779,14 @@ while run_script == 1
             end
 
         case action == 0 % reset cml view
+            fprintf(operations_list);
             clc
 
         case action == 666 % Case 666: Terminate Script   
             run_script = 0;
             
         case action == 911 % Case 911: Clear Workspace
-            clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update calc_variables  distances_to_calc
+            clearvars -except action
 
     end % end of master switch
 end % end of master while loop
@@ -877,7 +885,7 @@ function feedback = measure_space(space)
                 % save missing leads to db
                 output = parameters;
                 missing_leads = [missing_leads struct(output)];
-                output{'space'} = py.list(cellstr(space));
+                output{'space'} = strjoin(space, " ");
                 output{'distance'} = "missing leads";
                 output{'missing leads'} = py.list(cellstr(setdiff(space, leads)));
                 put_data('fatigue_sample','variability',output);
