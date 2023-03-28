@@ -36,7 +36,7 @@ warning('off','MATLAB:table:RowsAddedNewVars')
 % print legend to cml
 operations_list = ...
     " \n"+...
-    "1 mark outliers\n"+...
+    "1 table of contents\n"+...
     "2 filter, rectify & stnd4time\n"+...
     "3 mean trials\n"+...
     "4 measure euclidean distances\n"+...
@@ -56,11 +56,8 @@ while run_script == 1
     action = input('What would you like me to do? ');
     disp(' ')
 
-    what_to_process = 0;
-
-    switch true
-
-        case what_to_process == 1 || what_to_process == 2 % db content table
+    switch true % master switch
+        case action == 1 % db content table
     
             % get unique participant identifiers
             collection = input('collection: ','s');
@@ -71,7 +68,8 @@ while run_script == 1
             db_tableOfContents.Properties.RowNames = string(1:240);
     
             % get data
-            if what_to_process == 1
+            what_to_process = input(' overview or lead (o/_): ','s');
+            if what_to_process == "o"
                 query = py.dict(pyargs('data type','EMG'));
             else
                 lead = input('lead: ','s');
@@ -150,9 +148,6 @@ while run_script == 1
                     disp('Latex saved successfully');
             end
         
-        
-        case action == 1 % update inclusion status
-
         case action == 2 % process included raw data
             disp('started processing')
             % processing parameters
@@ -293,38 +288,7 @@ while run_script == 1
             end
             close(h) % close progress bar
 
-%        case 2 % invetigate processed data
-%             case 30 % view model
-%             case 302 % compare spaces
-%             case 31 % compare 1-day models
-%             case 39 % compare 1-day models simple
-%             case 32 % compare 2-day models
-%             case 34 % plot regression models
-%             case 35 % reapply model
-%             case 36 % view model for skill
-%             case 36.2 % comparative skill model
-%             case 37 % plot skill model
-%             case 38 % plot var & learning within group
-%             case 41 % styling options
-%             case 42 % empty legend
-%             case 43 % plot skill measure
-%             case 432 % plot skill measure
-%             case 44 % ttest
-%             case 45 % correlation
-%             case 46 % correlate reapplied models
-%             case 47 % correlation coefficient from intercept
-%             case 48 % correlation coefficient from intercept
-
         case action == 6 % view model
-            % input
-%             emg_space   = emgSpaceSelector();
-%             group       = input('group: ');
-%             day         = input('day:   ');
-% 
-%             emg_space   = py.list(cellstr(emg_space));
-%             group       = int32(group);
-%             day         = int32(day);
-            
             % input
             disp('view model')
             data_type        = input('data type: ','s');
@@ -396,7 +360,6 @@ while run_script == 1
             % get dependant
             dependant = t{:, dependant_name};
             
-            % get regressors
             % calculate regressors
             switch data_type
                 case 'variability'
@@ -411,6 +374,7 @@ while run_script == 1
                 case 'emg_d'
             end
 
+            % fit model
             mdlr = fitlm(regressors,dependant,'RobustOpts','on');
             
             % output
@@ -610,12 +574,8 @@ while run_script == 1
             disp(mdlr)
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
           
-        case action == 9
-%           NEW CASE statistical analysis of variability description
-%               -> build comparative models by group
-%                  		• time a/o variability as independant?
-
-        case action == 22 % create graphs
+        case action == 8 % create graphs
+            disp('create graph')
             % initiate figure
             titletext = input('title: ','s');
             f = figure();
@@ -632,63 +592,110 @@ while run_script == 1
             while true
                 % input
                 disp(' ');
-                emg_space   = emgSpaceSelector();
-                group       = input('group: ');
-                day         = input('day:   ');
+                data_type        = input('data type: ','s');
+                if data_type == "variability" % only ask for emg space when modeling variability
+                    emg_space   = py.list(cellstr(emgSpaceSelector()));
+                end
+                group       = int32(input(' group: '));
+                day         = int32(input(' day:   '));
+                if data_type == "v_d"
+                    disp(' ');
+                    descriptive2plot = input('descriptive: ','s');
+                end
     
-                emg_space   = py.list(cellstr(emg_space));
-                group       = int32(group);
-                day         = int32(day);
-                
                 % get members of group from parameters collection
                 pipeline = py.list({...
-                    py.dict(pyargs('$match',py.dict(pyargs('label',group)))),... {"$match": {"label": 2}},
+                    py.dict(pyargs('$match',py.dict(pyargs('label',group)))),...
                     py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
                     });
                 members = cell(aggregate('fatigue','parameters',pipeline));
                 members = members{1}{'ID'};
     
     
-                % get variability values for all group members
-                pipeline = py.list({
-                    py.dict(pyargs('$match', py.dict(pyargs(...
-                        'identifier', py.dict(pyargs('$in', members)),...
-                        'day', day,...
-                        'space', emg_space,...
-                        'distance', py.dict(pyargs("$ne", "missing leads"))...
-                        ))))
-                    });
-                data = aggregate('fatigue_sample','variability',pipeline);
+                % get data for all group members
+                switch data_type
+                    case "variability"
+                        pipeline = py.list({
+                            py.dict(pyargs('$match', py.dict(pyargs(...
+                                'identifier', py.dict(pyargs('$in', members)),...
+                                'day', day,...
+                                'space', emg_space,...
+                                'distance', py.dict(pyargs("$ne", "missing leads"))...
+                                ))))
+                            });
+                        collection     = 'variability';
+                        dependant_name = 'distance';
+    
+                    case "skill"
+                        pipeline = py.list({
+                            py.dict(pyargs('$match', py.dict(pyargs(...
+                                'ID', py.dict(pyargs('$in', members)),...
+                                'day', day...
+                                )))), ...
+                            py.dict(pyargs('$project', py.dict(pyargs(...
+                                '_id', int32(1), ...
+                                'ID', int32(1), ...
+                                'day', int32(1), ...
+                                'BN', int32(1), ...
+                                'skillp', int32(1) ...
+                                ))))
+                            });
+                        collection     = 'parameters';
+                        dependant_name = 'skillp';
+    
+                    case "v_d"
+                        match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', members)), 'day', day, descriptive2plot, py.dict(pyargs('$ne', NaN))))));
+                        project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2plot, 1))));
+                        pipeline = py.list({match_stage, project_stage});
+                        collection = "describe_variability";
+                        dependant_name = descriptive2plot;
+    
+                    case "s_d"
+                end
+    
+                data = aggregate('fatigue_sample', collection, pipeline);
                 
                 % convert mongodb result to matlab table
-                data = cell(data);
-                for i = 1:numel(data)
-                    data{i}.pop('_id');
-                end
-                s = py.list(data);
-                s = cellfun(@struct, cell(s), 'UniformOutput', false);
-                s = [s{:}];
-                t = struct2table(s);
-                t.identifier = string(t{:,'identifier'});
-                t.day = cellfun(@double, t.day);
-                t.block = cellfun(@double, t.block);
-                t.trial = cellfun(@double, t.trial);
-                t.space = string(t{:,'space'});
-                t.distance = double(t{:,'distance'});
+                t = mongoquery2table(data);
     
                 % get dependant
-                dependant = t{:, 'distance'};
+                dependant = t{:, dependant_name};
                 
-                % get regressors
-                regressors = ((t.block-1)*30)+t.trial;
+                % calculate regressors
+                switch data_type
+                    case 'variability'
+                        regressors = ((t.block-1)*30)+t.trial;
     
-                % fit robust model
+                    case 'skill'
+                        regressors = t.BN;
+                        
+                    case 'v_d'
+                        regressors = t.block;
+    
+                    case 'emg_d'
+                end
+    
+                % fit model
                 mdlr = fitlm(regressors,dependant,'RobustOpts','on');
 
                 % reapply model
                 intercept   = mdlr.Coefficients{1,1};
                 effect      = mdlr.Coefficients{2,1};
-                time_scaffold = transpose(1:120);
+                switch data_type % calcualte scafold
+                    case 'variability'
+                        time_scaffold = transpose(1:120);
+                        set(gca,'XLim',[1 120],'XTick',15:30:105);
+    
+                    case 'skill'
+                        time_scaffold = transpose(1:4);
+                        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
+                        
+                    case 'v_d'
+                        time_scaffold = transpose(1:4);
+                        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
+    
+                    case 'emg_d'
+                end
                 reapplied_model = intercept + effect*time_scaffold(:,1);
 
                 %plot model
@@ -702,7 +709,6 @@ while run_script == 1
                 legend(legendcontent);
 
                 set(gca,'box','off');
-                set(gca,'XLim',[1 120],'XTick',15:30:105);
                 set(findall(gcf,'-property','FontSize'),'FontSize',20);
                 xticklabels(["1", "2", "3", "4"]);
                 xlabel("session");
@@ -716,12 +722,12 @@ while run_script == 1
                 end
             end
 
-            % post creation editing loop
+            % post creation edits
             while true
                 listofedits = ...
                         " \n"+...
-                        "1 first edit\n"+...
-                        "2 second edit\n"+...
+                        "1 reset x\n"+...
+                        "2 set y\n"+...
                         "9 save\n"+...
                         "0 end\n"+...
                         "\n";
@@ -729,19 +735,40 @@ while run_script == 1
                 editing = input("edit: ");
     
                 switch editing
+                    case 1 % reset x
+                        switch data_type % calcualte scafold
+                            case 'variability'
+                                set(gca,'XLim',[1 120],'XTick',15:30:105);
+            
+                            case 'skill'
+                                set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
+                                
+                            case 'v_d'
+                                set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
+            
+                            case 'emg_d'
+                        end
     
-                    case 1
-                        disp('edit 1')
+                    case 2 % set y
+                        disp('y lim:')
+                        high = input(' upper: ');
+                        low  = input(' lower: ');
+                        ylim([low high]);
     
-                    case 2
-                        disp('edit 2')
+                    case 9 % save
+                        set(f, 'Renderer', 'painters');
+                        [filename, pathname] = uiputfile('*.pdf', 'Save Graph');
+                        if isequal(filename,0) || isequal(pathname,0) % if user clicked 'cancel', exit script
+                            disp('File not saved');
+                            return
+                        end
+                        print(fullfile(pathname, filename), '-dpdf');
+                        disp("Figure saved as " + filename + " to " + pathname);
     
-                    case 9
-                        
-    
-                    case 0
+                    case 0 % finish edit
                         break
                 end
+                drawnow()
             end
 
         case action == 0 % reset cml view
@@ -843,7 +870,7 @@ function feedback = measure_space(space)
                 % save result to db
                 output = parameters;
                 measured = [measured struct(output)];
-                output{'space'} = py.list(cellstr(space));
+                output{'space'} = strjoin(space, " ");
                 output{'distance'} = result;
                 put_data('fatigue_sample','variability',output);
             else
