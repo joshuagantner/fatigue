@@ -168,7 +168,7 @@ while run_script == 1
             total = length(object_ids);
 
             % itterate & process objects
-            start_time = now;
+            start_time = datetime;
             for i = 1:length(object_ids)
 
                 % get, process & put trial data
@@ -188,7 +188,7 @@ while run_script == 1
 
             % timer output
             disp("  -> Raw Data processed")
-            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+            disp("     runtime: " + string(datetime-start_time));
             close(h)
 
         case action == 3 % calculate mean trials
@@ -196,7 +196,7 @@ while run_script == 1
             sessions = aggregate('fatigue_sample','processed',pipeline);
 
             h = waitbar(0, 'Calculating mean trials...');  % initialize progress bar
-            start_time = now;
+            start_time = datetime;
             for i = 1:length(sessions)
                 session = sessions{i}{'_id'};
 %                                 filter = py.dict(pyargs('identifier',session{'ID'},'day',session{'day'},'block',session{'BN'},'data type','EMG'));
@@ -217,19 +217,19 @@ while run_script == 1
 
             end
             disp("  -> Mean trials calculated")
-            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+            disp("     runtime: " + string(datetime-start_time));
             close(h);  % close progress bar
 
         case action == 4 % measure euclidean distances
             spaces = {["ADM" "APB" "FDI"] ["BIC" "FCR"] ["ADM"] ["APB"] ["FDI"] ["BIC"] ["FCR"]};
-            start_time = now;
+            start_time = datetime;
             for i = 1:length(spaces)
                 space = spaces{i};
                 disp(string(datetime) + " " + strjoin(space,' '))
                 measure_space(space);
             end
             disp("  -> spaces measure")
-            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+            disp("     runtime: " + string(datetime-start_time));
 
         case action == 5 % describe variability
             % get variability by subject & block
@@ -238,7 +238,8 @@ while run_script == 1
                                     '_id', py.dict(pyargs( ...
                                         'identifier', '$identifier', ...
                                         'day', '$day', ...
-                                        'block', '$block' ...
+                                        'block', '$block', ...
+                                        'space', '$space'...
                                     )) ...
                                 )))) ...
                             });
@@ -246,20 +247,22 @@ while run_script == 1
 
             % measure descriptives [ skew, kurtosis ]
             h = waitbar(0, 'Analyzing variability...');  % initialize progress bar
-            start_time = now;
+            start_time = datetime;
             for i = 1:length(data)
-                % Define the subject, day, and block inputs
+                % Define the subject, day, block and space inputs
                 data_in = data{i}{'_id'};
                 identifier_input = data_in{'identifier'};
                 day_input = data_in{'day'};
                 block_input = data_in{'block'};
+                space_input = data_in{'space'};
                 
                 % Define the pipeline
                 pipeline = py.list({ ...
                     py.dict(pyargs('$match', py.dict(pyargs( ...
                         'identifier', identifier_input, ...
                         'day', day_input, ...
-                        'block', block_input ...
+                        'block', block_input, ...
+                        'space', space_input...
                     )))), ...
                     py.dict(pyargs('$group', py.dict(pyargs( ...
                         '_id', py.None, ...
@@ -279,8 +282,15 @@ while run_script == 1
                 skew = skewness(variability);
                 kurt = kurtosis(variability);
                 n = length(variability);
-                se_skew = sqrt(6*n*(n-1)/((n-2)*(n+1)*(n+3)));
-                se_kurt = sqrt(24*n*(n-1)/((n-2)*(n-3)*(n+3)*(n+5)));
+                if n ~= 2 % at n = 2 the se = infinity, which would throw an error
+                    se_skew = sqrt(6*n*(n-1)/((n-2)*(n+1)*(n+3)));
+                    se_kurt = sqrt(24*n*(n-1)/((n-2)*(n-3)*(n+3)*(n+5)));
+                else
+                    se_skew = nan;
+                    se_kurt = nan;
+                end
+
+
                 
                 % put data
                 output = data_in;
@@ -293,7 +303,7 @@ while run_script == 1
             end
             close(h) % close progress bar
             disp("  -> variability explored")
-            disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+            disp("     runtime: " + string(datetime-start_time));
 
         case action == 6 % view model
             % input
