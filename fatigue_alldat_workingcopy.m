@@ -315,7 +315,7 @@ while run_script == 1
             % input
             disp('view model')
             data_type        = input('data type: ','s');
-            ...
+            [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type);
 
             data = aggregate(db_name, collection, pipeline);
             
@@ -346,7 +346,10 @@ while run_script == 1
             if data_type == "variability"
                 dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " ");
                 regressor_info = "regressor: ((t.block-1)*30)+t.trial";
-            elseif data_type == "skill" || data_type == "v_d"
+            elseif data_type == "v_d"
+                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " "); 
+                regressor_info = "regressor: block";
+            elseif data_type == "skill"
                 dependant_info = "dependant:  " + dependant_name;
                 regressor_info = "regressor: block";
             end
@@ -781,7 +784,6 @@ function emg_space = emgSpaceSelector(db_name)
         emg_space = spaces{emg_space};
         
 end
-
 function feedback = measure_space(db_name, space)
         pyModule = py.importlib.import_module('mongodb');
         pyModule = py.importlib.reload(pyModule);
@@ -856,7 +858,6 @@ function feedback = measure_space(db_name, space)
         % return list of measured and unmeasured trials
         feedback = struct('measured', measured, 'missing_leads', missing_leads, 'duration', stop-start);
 end
-
 function feedback = mongoquery2table(query_in)
         % Convert PyMongo query result to MATLAB table
         data = cell(query_in);
@@ -894,8 +895,12 @@ function feedback = mongoquery2table(query_in)
         feedback = cell2table(t, 'VariableNames', fieldnames(s));
 
 end
+function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type)
+    
+    pyModule = py.importlib.import_module('mongodb');
+    pyModule = py.importlib.reload(pyModule);
+    aggregate = pyModule.aggregate;
 
-function [pipeline, collection, dependant_name] = createPipeline(db_name, data_type)
     if data_type == "variability" % only ask for emg space when modeling variability
         emg_space   = emgSpaceSelector(db_name);
     end
@@ -946,6 +951,7 @@ function [pipeline, collection, dependant_name] = createPipeline(db_name, data_t
                 });
             collection     = 'parameters';
             dependant_name = 'skillp';
+            emg_space = null;
 
         case "v_d"
             match_stage = py.dict(pyargs('$match', py.dict(pyargs(...
@@ -954,7 +960,7 @@ function [pipeline, collection, dependant_name] = createPipeline(db_name, data_t
                     'space', emg_space, ...
                     descriptive2plot, py.dict(pyargs('$ne', NaN))...
                 ))));
-            project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 0, 'identifier', 1, 'day', 1, 'block', 1, descriptive2plot, 1))));
+            project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2plot, 1))));
             pipeline = py.list({match_stage, project_stage});
             collection = "describe_variability";
             dependant_name = descriptive2plot;
