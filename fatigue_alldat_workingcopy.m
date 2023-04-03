@@ -18,9 +18,13 @@ run_script = 1;
 %     ["fdi" "apb" "adm" "fcr" "bic"]...
 %     };
 
-%import python functions for mongodb interaction
-if count(py.sys.path, '/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/z functions/Functions Joshua') == 0
-    insert(py.sys.path, int32(0), '/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/z functions/Functions Joshua');
+% import python functions for mongodb interaction
+%   path on windows tower
+functions_path = "C:\Users\joshg\Documents\GitHub\fatigue-matlabfunctions";
+%   path on macbook
+% functions_path = '/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/z functions/Functions Joshua';
+if count(py.sys.path, functions_path) == 0
+    insert(py.sys.path, int32(0), functions_path);
 end
 pyModule = py.importlib.import_module('mongodb');
 pyModule = py.importlib.reload(pyModule);
@@ -49,6 +53,8 @@ operations_list = ...
 fprintf(operations_list);
 
 %% master while loop
+db_name = 'fatigue';
+
 while run_script == 1
 
     % Select Operation
@@ -61,7 +67,7 @@ while run_script == 1
     
             % get unique participant identifiers
             collection = input('collection: ','s');
-            participants = find_unique('fatigue_sample',collection,'identifier');
+            participants = find_unique(db_name,collection,'identifier');
             participants = string(participants);
             db_tableOfContents = array2table(zeros(240,length(participants)));
             db_tableOfContents.Properties.VariableNames = participants;
@@ -76,7 +82,7 @@ while run_script == 1
                 query = py.dict(pyargs('data type','EMG','lead',lead));
             end
             projection = py.dict(pyargs('identifier',1,'day',1,'block',1,'trial',1));
-            data = get_data('fatigue_sample',collection,query, projection, batch_size = int8(10));
+            data = get_data(db_name,collection,query, projection, batch_size = int8(10));
             data = transpose(string(data));
     
             data = strrep(data, "'", '"'); % Replace single quotes with double quotes
@@ -159,7 +165,7 @@ while run_script == 1
 
             % get unique object ids
             query = py.dict(pyargs('data type','EMG'));
-            object_ids = find_unique('fatigue_sample','raw','_id',query);
+            object_ids = find_unique(db_name,'raw','_id',query);
             disp('ids done')
 
             % progress bar
@@ -173,13 +179,13 @@ while run_script == 1
 
                 % get, process & put trial data
                 query = py.dict(pyargs('_id',object_ids{i}));
-                data_in = get_data('fatigue_sample','raw',query);
+                data_in = get_data(db_name,'raw',query);
                 data = double(string(data_in{1}{'data'}));
                 data = proc_std(data, SRATE, freq_h, freq_l, ORDER);
                 data = stnd4time(data, LENGTH);
                 data_in{1}{'data'} = py.list(data);
                 data_in{1}.pop('_id');
-                put_data('fatigue_sample','processed',data_in{1});
+                put_data(db_name,'processed',data_in{1});
 
                 %Update Progress bar
                 counter = counter+1;
@@ -193,7 +199,7 @@ while run_script == 1
 
         case action == 3 % calculate mean trials
             pipeline = py.list({py.dict(pyargs("$group", py.dict(pyargs("_id", py.dict(pyargs("identifier", "$identifier", "day", "$day", "block", "$block","lead","$lead"))))))});
-            sessions = aggregate('fatigue_sample','processed',pipeline);
+            sessions = aggregate(db_name,'processed',pipeline);
 
             h = waitbar(0, 'Calculating mean trials...');  % initialize progress bar
             start_time = datetime;
@@ -203,7 +209,7 @@ while run_script == 1
 %                                 query = py.dict(pyargs('_id','$lead'));
 %                                 pipeline = py.list({py.dict(pyargs("$match",filter,"$group",query))});
 
-                data = get_data('fatigue_sample','processed',session,batch_size=int8(10));
+                data = get_data(db_name,'processed',session,batch_size=int8(10));
                 mean_trial = zeros(1,100000);
                 for j = 1:length(data)
                     mean_trial = mean_trial + double(data{j}{'data'});
@@ -211,7 +217,7 @@ while run_script == 1
                 mean_trial = mean_trial/length(data);
                 
                 output = py.dict(pyargs('identifier',session{'identifier'},'day',session{'day'},'block',session{'block'},'lead',session{'lead'},'mean trial',py.list(mean_trial)));
-                put_data('fatigue_sample','mean',output);
+                put_data(db_name,'mean',output);
 
                 waitbar(i/length(sessions), h, sprintf('Calculating mean trials... %d%%', round(100*i/length(sessions))));  % update progress bar
 
@@ -221,12 +227,12 @@ while run_script == 1
             close(h);  % close progress bar
 
         case action == 4 % measure euclidean distances
-            spaces = {["ADM" "APB" "FDI"] ["BIC" "FCR"] ["ADM"] ["APB"] ["FDI"] ["BIC"] ["FCR"]};
+            spaces = {["ADM" "APB" "FDI" "BIC" "FCR"]}; % {["ADM" "APB" "FDI"] ["BIC" "FCR"] ["ADM"] ["APB"] ["FDI"] ["BIC"] ["FCR"]};
             start_time = datetime;
             for i = 1:length(spaces)
                 space = spaces{i};
                 disp(string(datetime) + " " + strjoin(space,' '))
-                measure_space(space);
+                measure_space(db_name, space);
             end
             disp("  -> spaces measure")
             disp("     runtime: " + string(datetime-start_time));
@@ -243,7 +249,7 @@ while run_script == 1
                                     )) ...
                                 )))) ...
                             });
-            data = aggregate('fatigue_sample', 'variability', pipeline);
+            data = aggregate(db_name, 'variability', pipeline);
 
             % measure descriptives [ skew, kurtosis ]
             h = waitbar(0, 'Analyzing variability...');  % initialize progress bar
@@ -275,7 +281,7 @@ while run_script == 1
                         'distance', py.True ...
                     )))) ...
                 });
-                variability = aggregate('fatigue_sample', 'variability', pipeline);
+                variability = aggregate(db_name, 'variability', pipeline);
 
                 % determine skew & kurtosis
                 variability = double(string(variability{1}{'distance'}));
@@ -298,7 +304,7 @@ while run_script == 1
                 output{'se_skew'} = se_skew;
                 output{'kurtosis'} = kurt;
                 output{'se_kurtosis'} = se_kurt;
-                put_data('fatigue_sample', 'describe_variability', output);
+                put_data(db_name, 'describe_variability', output);
                 waitbar(i/length(data), h, sprintf('Analyzing variability... %d%%', round(100*i/length(data))));  % update progress bar
             end
             close(h) % close progress bar
@@ -310,13 +316,14 @@ while run_script == 1
             disp('view model')
             data_type        = input('data type: ','s');
             if data_type == "variability" % only ask for emg space when modeling variability
-                emg_space   = emgSpaceSelector();
+                emg_space   = emgSpaceSelector(db_name);
             end
             group       = int32(input(' group: '));
             day         = int32(input(' day:   '));
             if data_type == "v_d"
                 disp(' ');
                 descriptive2plot = input('descriptive: ','s');
+                emg_space   = emgSpaceSelector(db_name);
             end
 
             % get members of group from parameters collection
@@ -369,7 +376,7 @@ while run_script == 1
                 case "s_d"
             end
 
-            data = aggregate('fatigue_sample', collection, pipeline);
+            data = aggregate(db_name, collection, pipeline);
             
             % convert mongodb result to matlab table
             t = mongoquery2table(data);
@@ -412,7 +419,7 @@ while run_script == 1
             disp(mdlr)
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
 
-        case action == 7 % comparative variability model
+        case action == 7 % comparative model
             % same code as view model, just twice. 
             %  once for test and base group
             %  and then the additional dummy regressor
@@ -435,14 +442,14 @@ while run_script == 1
             disp(' ')
             disp('choose test group')
             if data_type == "variability" % only ask for emg space when modeling variability
-                test_emg_space   = emgSpaceSelector();
+                test_emg_space   = emgSpaceSelector(db_name);
             end
             test_group       = int32(input(' group: '));
             test_day         = int32(input(' day:   '));
             disp(' ')
             disp('choose base group')
             if data_type == "variability" % only ask for emg space when modeling variability
-                base_emg_space   = emgSpaceSelector();
+                base_emg_space   = emgSpaceSelector(db_name);
             end
             base_group       = int32(input(' group: '));
             base_day         = int32(input(' day:   '));
@@ -532,8 +539,8 @@ while run_script == 1
 
 
             % get data for all group members
-            test_data = aggregate('fatigue_sample', collection, pipeline_test);
-            base_data = aggregate('fatigue_sample', collection, pipeline_base);
+            test_data = aggregate(db_name, collection, pipeline_test);
+            base_data = aggregate(db_name, collection, pipeline_base);
             
             % convert mongodb result to matlab table
             test_table = mongoquery2table(test_data);
@@ -611,7 +618,7 @@ while run_script == 1
                 disp(' ');
                 data_type        = input('data type: ','s');
                 if data_type == "variability" % only ask for emg space when modeling variability
-                    emg_space   = emgSpaceSelector();
+                    emg_space   = emgSpaceSelector(db_name);
                 end
                 group       = int32(input(' group: '));
                 day         = int32(input(' day:   '));
@@ -670,7 +677,7 @@ while run_script == 1
                     case "s_d"
                 end
     
-                data = aggregate('fatigue_sample', collection, pipeline);
+                data = aggregate(db_name, collection, pipeline);
                 
                 % convert mongodb result to matlab table
                 t = mongoquery2table(data);
@@ -802,7 +809,7 @@ while run_script == 1
 end % end of master while loop
 
 %% Functions
-function emg_space = emgSpaceSelector()
+function emg_space = emgSpaceSelector(db_name)
 
         pyModule = py.importlib.import_module('mongodb');
         pyModule = py.importlib.reload(pyModule);
@@ -814,7 +821,7 @@ function emg_space = emgSpaceSelector()
         group_stage_2 = py.dict(pyargs('$group', py.dict(pyargs('_id', py.str('$space'),'count', py.dict(pyargs('$sum', py.int(1)))))));
         sort_stage = py.dict(pyargs('$sort', py.dict(pyargs('_id', py.int(1)))));
         pipeline = py.list({unwind_stage, group_stage_1, group_stage_2, sort_stage});
-        data = aggregate('fatigue_sample','variability',pipeline);
+        data = aggregate(db_name,'variability',pipeline);
         spaces = {};
         for i = 1:length(data)
             space = {string(data{i}{'_id'})};
@@ -834,7 +841,7 @@ function emg_space = emgSpaceSelector()
         
 end
 
-function feedback = measure_space(space)
+function feedback = measure_space(db_name, space)
         pyModule = py.importlib.import_module('mongodb');
         pyModule = py.importlib.reload(pyModule);
         get_data = pyModule.get_data;
@@ -853,7 +860,7 @@ function feedback = measure_space(space)
                                                                    '_id', int32(1)...
                                                                     )))), ...
                           });
-        object_ids = aggregate('fatigue_sample', "processed", pipeline);
+        object_ids = aggregate(db_name, "processed", pipeline);
         disp('ids done')
 
         % itterate object_ids
@@ -866,19 +873,19 @@ function feedback = measure_space(space)
             parameters = object_ids{i}{'_id'};
             query = py.dict(pyargs( "identifier", parameters{"identifier"}, "day", parameters{"day"}, "block", parameters{"block"}, "trial", parameters{"trial"}));
             projection = py.dict(pyargs("lead",1));
-            leads = get_data('fatigue_sample',"processed",query,projection);
+            leads = get_data(db_name,"processed",query,projection);
             leads = cellfun(@(d) strip(string(d{"lead"})), cell(leads), 'UniformOutput', true);
 
             if isempty(setdiff(space, leads))
                 % get trial array
                 query = py.dict(pyargs( "identifier", parameters{"identifier"}, "day", parameters{"day"}, "block", parameters{"block"}, "trial", parameters{"trial"}, "lead", py.dict(pyargs('$in',py.list(cellstr(space))))));
-                data = get_data('fatigue_sample',"processed",query);
+                data = get_data(db_name,"processed",query);
                 data = cellfun(@(d) double(d{"data"}), cell(data), 'UniformOutput', false);
                 data = cell2mat(transpose(data));
 
                 % get mean trial array
                 query = py.dict(pyargs( "identifier", parameters{"identifier"}, "day", parameters{"day"}, "block", parameters{"block"}, "lead", py.dict(pyargs('$in',py.list(cellstr(space))))));
-                mean_trial = get_data('fatigue_sample',"mean",query);
+                mean_trial = get_data(db_name,"mean",query);
                 mean_trial = cellfun(@(d) double(d{"mean trial"}), cell(mean_trial), 'UniformOutput', false);
                 mean_trial = cell2mat(transpose(mean_trial));
 
@@ -890,7 +897,7 @@ function feedback = measure_space(space)
                 measured = [measured struct(output)];
                 output{'space'} = strjoin(space, " ");
                 output{'distance'} = result;
-                put_data('fatigue_sample','variability',output);
+                put_data(db_name,'variability',output);
             else
                 % save missing leads to db
                 output = parameters;
@@ -898,7 +905,7 @@ function feedback = measure_space(space)
                 output{'space'} = strjoin(space, " ");
                 output{'distance'} = "missing leads";
                 output{'missing leads'} = py.list(cellstr(setdiff(space, leads)));
-                put_data('fatigue_sample','variability',output);
+                put_data(db_name,'variability',output);
             end
             waitbar(i/length(object_ids), h, sprintf('Measuring euclidean distances... %d%%', round(100*i/length(object_ids))));  % update progress bar
         end
