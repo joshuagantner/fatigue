@@ -315,66 +315,7 @@ while run_script == 1
             % input
             disp('view model')
             data_type        = input('data type: ','s');
-            if data_type == "variability" % only ask for emg space when modeling variability
-                emg_space   = emgSpaceSelector(db_name);
-            end
-            group       = int32(input(' group: '));
-            day         = int32(input(' day:   '));
-            if data_type == "v_d"
-                disp(' ');
-                descriptive2plot = input('descriptive: ','s');
-                emg_space   = emgSpaceSelector(db_name);
-            end
-
-            % get members of group from parameters collection
-            pipeline = py.list({...
-                py.dict(pyargs('$match',py.dict(pyargs('label',group)))),...
-                py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
-                });
-            members = cell(aggregate('fatigue','parameters',pipeline));
-            members = members{1}{'ID'};
-
-
-            % get data for all group members
-            switch data_type
-                case "variability"
-                    pipeline = py.list({
-                        py.dict(pyargs('$match', py.dict(pyargs(...
-                            'identifier', py.dict(pyargs('$in', members)),...
-                            'day', day,...
-                            'space', emg_space,...
-                            'distance', py.dict(pyargs("$ne", "missing leads"))...
-                            ))))
-                        });
-                    collection     = 'variability';
-                    dependant_name = 'distance';
-
-                case "skill"
-                    pipeline = py.list({
-                        py.dict(pyargs('$match', py.dict(pyargs(...
-                            'ID', py.dict(pyargs('$in', members)),...
-                            'day', day...
-                            )))), ...
-                        py.dict(pyargs('$project', py.dict(pyargs(...
-                            '_id', int32(1), ...
-                            'ID', int32(1), ...
-                            'day', int32(1), ...
-                            'BN', int32(1), ...
-                            'skillp', int32(1) ...
-                            ))))
-                        });
-                    collection     = 'parameters';
-                    dependant_name = 'skillp';
-
-                case "v_d"
-                    match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', members)), 'day', day, descriptive2plot, py.dict(pyargs('$ne', NaN))))));
-                    project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2plot, 1))));
-                    pipeline = py.list({match_stage, project_stage});
-                    collection = "describe_variability";
-                    dependant_name = descriptive2plot;
-
-                case "s_d"
-            end
+            ...
 
             data = aggregate(db_name, collection, pipeline);
             
@@ -952,4 +893,72 @@ function feedback = mongoquery2table(query_in)
         t = table2cell(t);
         feedback = cell2table(t, 'VariableNames', fieldnames(s));
 
+end
+
+function [pipeline, collection, dependant_name] = createPipeline(db_name, data_type)
+    if data_type == "variability" % only ask for emg space when modeling variability
+        emg_space   = emgSpaceSelector(db_name);
+    end
+    group       = int32(input(' group: '));
+    day         = int32(input(' day:   '));
+    if data_type == "v_d"
+        disp(' ');
+        descriptive2plot = input('descriptive: ','s');
+        emg_space   = emgSpaceSelector(db_name);
+    end
+
+    % get members of group from parameters collection
+    pipeline = py.list({...
+        py.dict(pyargs('$match',py.dict(pyargs('label',group)))),...
+        py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
+        });
+    members = cell(aggregate('fatigue','parameters',pipeline));
+    members = members{1}{'ID'};
+
+
+    % get data for all group members
+    switch data_type
+        case "variability"
+            pipeline = py.list({
+                py.dict(pyargs('$match', py.dict(pyargs(...
+                    'identifier', py.dict(pyargs('$in', members)),...
+                    'day', day,...
+                    'space', emg_space,...
+                    'distance', py.dict(pyargs("$ne", "missing leads"))...
+                    ))))
+                });
+            collection     = 'variability';
+            dependant_name = 'distance';
+
+        case "skill"
+            pipeline = py.list({
+                py.dict(pyargs('$match', py.dict(pyargs(...
+                    'ID', py.dict(pyargs('$in', members)),...
+                    'day', day...
+                    )))), ...
+                py.dict(pyargs('$project', py.dict(pyargs(...
+                    '_id', int32(1), ...
+                    'ID', int32(1), ...
+                    'day', int32(1), ...
+                    'BN', int32(1), ...
+                    'skillp', int32(1) ...
+                    ))))
+                });
+            collection     = 'parameters';
+            dependant_name = 'skillp';
+
+        case "v_d"
+            match_stage = py.dict(pyargs('$match', py.dict(pyargs(...
+                    'identifier', py.dict(pyargs('$in', members)), ...
+                    'day', day, ...
+                    'space', emg_space, ...
+                    descriptive2plot, py.dict(pyargs('$ne', NaN))...
+                ))));
+            project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 0, 'identifier', 1, 'day', 1, 'block', 1, descriptive2plot, 1))));
+            pipeline = py.list({match_stage, project_stage});
+            collection = "describe_variability";
+            dependant_name = descriptive2plot;
+
+        case "s_d"
+    end
 end
