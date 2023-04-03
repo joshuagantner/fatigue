@@ -590,9 +590,8 @@ while run_script == 1
             end
 
         case action == 0 % reset cml view
-            fprintf(operations_list);
             clc
-
+            fprintf(operations_list);
         case action == 666 % Case 666: Terminate Script   
             run_script = 0;
             
