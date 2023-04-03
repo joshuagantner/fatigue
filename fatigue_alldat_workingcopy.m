@@ -296,7 +296,12 @@ while run_script == 1
                     se_kurt = nan;
                 end
 
-
+                % determine range
+                max_var = max(variability);
+                min_var = min(variability);
+                range_var = range(variability);
+                mean_var =  mean(variability);
+                median_var = median(variability);
                 
                 % put data
                 output = data_in;
@@ -304,6 +309,11 @@ while run_script == 1
                 output{'se_skew'} = se_skew;
                 output{'kurtosis'} = kurt;
                 output{'se_kurtosis'} = se_kurt;
+                output{'max'} = max_var;
+                output{'min'} = min_var;
+                output{'range'} = range_var;
+                output{'mean'} = mean_var;
+                output{'median'} = median_var;
                 put_data(db_name, 'describe_variability', output);
                 waitbar(i/length(data), h, sprintf('Analyzing variability... %d%%', round(100*i/length(data))));  % update progress bar
             end
