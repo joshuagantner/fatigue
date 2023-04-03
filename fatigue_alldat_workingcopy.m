@@ -316,7 +316,6 @@ while run_script == 1
             disp('view model')
             data_type        = input('data type: ','s');
             [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type);
-
             data = aggregate(db_name, collection, pipeline);
             
             % convert mongodb result to matlab table
@@ -385,114 +384,21 @@ while run_script == 1
             data_type        = input('data type: ','s');
             disp(' ')
             disp('choose test group')
-            if data_type == "variability" % only ask for emg space when modeling variability
-                test_emg_space   = emgSpaceSelector(db_name);
-            end
-            test_group       = int32(input(' group: '));
-            test_day         = int32(input(' day:   '));
+            [pipeline, collection, test_dependant_name, test_emg_space] = createPipeline(db_name, data_type);
+            test_data = aggregate(db_name, collection, pipeline);
+
             disp(' ')
             disp('choose base group')
-            if data_type == "variability" % only ask for emg space when modeling variability
-                base_emg_space   = emgSpaceSelector(db_name);
-            end
-            base_group       = int32(input(' group: '));
-            base_day         = int32(input(' day:   '));
-            if data_type == "v_d"
-                disp(' ');
-                descriptive2analyse = input('descriptive: ','s');
-            end
-            
-            % get members of group from parameters collection
-            % …for test group
-            pipeline = py.list({...
-                py.dict(pyargs('$match',py.dict(pyargs('label',test_group)))),...
-                py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
-                });
-            test_members = cell(aggregate('fatigue','parameters',pipeline));
-            test_members = test_members{1}{'ID'};
-            % …for base group
-            pipeline = py.list({...
-                py.dict(pyargs('$match',py.dict(pyargs('label',base_group)))),...
-                py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
-                });
-            base_members = cell(aggregate('fatigue','parameters',pipeline));
-            base_members = base_members{1}{'ID'};
-
-            % set pipeline & collection for data type
-            switch data_type
-                case 'variability'
-                    pipeline_test = py.list({
-                        py.dict(pyargs('$match', py.dict(pyargs(...
-                            'identifier', py.dict(pyargs('$in', test_members)),...
-                            'day', test_day,...
-                            'space', test_emg_space,...
-                            'distance', py.dict(pyargs("$ne", "missing leads"))...
-                            ))))
-                        });
-                    pipeline_base = py.list({
-                        py.dict(pyargs('$match', py.dict(pyargs(...
-                            'identifier', py.dict(pyargs('$in', base_members)),...
-                            'day', base_day,...
-                            'space', base_emg_space,...
-                            'distance', py.dict(pyargs("$ne", "missing leads"))...
-                            ))))
-                        });
-                    collection     = 'variability';
-                    dependant_name = 'distance';
-
-                case 'skill'
-                    pipeline_test = py.list({
-                        py.dict(pyargs('$match', py.dict(pyargs(...
-                            'ID', py.dict(pyargs('$in', test_members)),...
-                            'day', test_day...
-                            )))), ...
-                        py.dict(pyargs('$project', py.dict(pyargs(...
-                            '_id', int32(1), ...
-                            'ID', int32(1), ...
-                            'day', int32(1), ...
-                            'BN', int32(1), ...
-                            'skillp', int32(1) ...
-                            ))))
-                        });
-                    pipeline_base = py.list({
-                        py.dict(pyargs('$match', py.dict(pyargs(...
-                            'ID', py.dict(pyargs('$in', base_members)),...
-                            'day', base_day...
-                            )))), ...
-                        py.dict(pyargs('$project', py.dict(pyargs(...
-                            '_id', int32(1), ...
-                            'ID', int32(1), ...
-                            'day', int32(1), ...
-                            'BN', int32(1), ...
-                            'skillp', int32(1) ...
-                            ))))
-                        });
-                    collection     = 'parameters';
-                    dependant_name = 'skillp';
-                case 'v_d'                   
-                    match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', test_members)), 'day', test_day, descriptive2analyse, py.dict(pyargs('$ne', NaN))))));
-                    project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2analyse, 1))));
-                    pipeline_test = py.list({match_stage, project_stage});
-                    match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', base_members)), 'day', base_day, descriptive2analyse, py.dict(pyargs('$ne', NaN))))));
-                    pipeline_base = py.list({match_stage, project_stage});
-
-                    collection = "describe_variability";
-                    dependant_name = descriptive2analyse;
-                case 'emg_d'
-            end
-
-
-            % get data for all group members
-            test_data = aggregate(db_name, collection, pipeline_test);
-            base_data = aggregate(db_name, collection, pipeline_base);
+            [pipeline, collection, base_dependant_name, base_emg_space] = createPipeline(db_name, data_type);
+            base_data = aggregate(db_name, collection, pipeline);
             
             % convert mongodb result to matlab table
             test_table = mongoquery2table(test_data);
             base_table = mongoquery2table(base_data);
 
             % get dependant
-            test_dependant = test_table{:, dependant_name};
-            base_dependant = base_table{:, dependant_name};
+            test_dependant = test_table{:, test_dependant_name};
+            base_dependant = base_table{:, base_dependant_name};
             dependant = [test_dependant; base_dependant];
             
             % calculate regressors
@@ -525,11 +431,14 @@ while run_script == 1
             % output
             coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
             if data_type == "variability"
-                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(test_emg_space), " ")+" / "+strjoin(string(test_emg_space), " ");
-                regressor_info = "regressors: ((t.block-1)*30)+t.trial ,  binary,  time*binary";
-            elseif data_type == "skill" || data_type == "v_d"
+                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " ");
+                regressor_info = "regressor: ((t.block-1)*30)+t.trial";
+            elseif data_type == "v_d"
+                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " "); 
+                regressor_info = "regressor: block";
+            elseif data_type == "skill"
                 dependant_info = "dependant:  " + dependant_name;
-                regressor_info = "regressors: block,  binary,  block*binary";
+                regressor_info = "regressor: block";
             end
             disp(' ')
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
@@ -561,66 +470,7 @@ while run_script == 1
                 % input
                 disp(' ');
                 data_type        = input('data type: ','s');
-                if data_type == "variability" % only ask for emg space when modeling variability
-                    emg_space   = emgSpaceSelector(db_name);
-                end
-                group       = int32(input(' group: '));
-                day         = int32(input(' day:   '));
-                if data_type == "v_d"
-                    disp(' ');
-                    descriptive2plot = input('descriptive: ','s');
-                end
-    
-                % get members of group from parameters collection
-                pipeline = py.list({...
-                    py.dict(pyargs('$match',py.dict(pyargs('label',group)))),...
-                    py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
-                    });
-                members = cell(aggregate('fatigue','parameters',pipeline));
-                members = members{1}{'ID'};
-    
-    
-                % get data for all group members
-                switch data_type
-                    case "variability"
-                        pipeline = py.list({
-                            py.dict(pyargs('$match', py.dict(pyargs(...
-                                'identifier', py.dict(pyargs('$in', members)),...
-                                'day', day,...
-                                'space', emg_space,...
-                                'distance', py.dict(pyargs("$ne", "missing leads"))...
-                                ))))
-                            });
-                        collection     = 'variability';
-                        dependant_name = 'distance';
-    
-                    case "skill"
-                        pipeline = py.list({
-                            py.dict(pyargs('$match', py.dict(pyargs(...
-                                'ID', py.dict(pyargs('$in', members)),...
-                                'day', day...
-                                )))), ...
-                            py.dict(pyargs('$project', py.dict(pyargs(...
-                                '_id', int32(1), ...
-                                'ID', int32(1), ...
-                                'day', int32(1), ...
-                                'BN', int32(1), ...
-                                'skillp', int32(1) ...
-                                ))))
-                            });
-                        collection     = 'parameters';
-                        dependant_name = 'skillp';
-    
-                    case "v_d"
-                        match_stage = py.dict(pyargs('$match', py.dict(pyargs('identifier', py.dict(pyargs('$in', members)), 'day', day, descriptive2plot, py.dict(pyargs('$ne', NaN))))));
-                        project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2plot, 1))));
-                        pipeline = py.list({match_stage, project_stage});
-                        collection = "describe_variability";
-                        dependant_name = descriptive2plot;
-    
-                    case "s_d"
-                end
-    
+                [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type);
                 data = aggregate(db_name, collection, pipeline);
                 
                 % convert mongodb result to matlab table
