@@ -771,6 +771,8 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
         group = strip(split(group, ","));
         group = cellfun(@(x) str2num(x), group);
         group = int32(group);
+        group = py.list(group);
+        group = py.dict(pyargs('$in',group));
     else
         disp('invalid group input')
         return
@@ -783,9 +785,8 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
     end
 
     % get members of group from parameters collection
-    % get members of group from parameters collection
     pipeline = py.list({...
-        py.dict(pyargs('$match',py.dict(pyargs('label',py.dict(pyargs('$in',group)))))),...
+        py.dict(pyargs('$match',py.dict(pyargs('label', group)))),...
         py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
         });
     members = cell(aggregate('fatigue','parameters',pipeline));
