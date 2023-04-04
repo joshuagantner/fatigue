@@ -789,8 +789,11 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
         py.dict(pyargs('$match',py.dict(pyargs('label', group)))),...
         py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
         });
-    members = cell(aggregate('fatigue','parameters',pipeline));
-    members = members{1}{'ID'};
+    feedback = cell(aggregate('fatigue','parameters',pipeline));
+    members = py.list();
+    for i = 1:length(feedback)
+        members.extend(feedback{1}{'ID'});
+    end
 
 
     % get data for all group members
