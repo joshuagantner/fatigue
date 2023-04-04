@@ -452,7 +452,7 @@ while run_script == 1
             end
             disp(' ')
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
-            fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
+            %fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
             disp(' ');
             disp(dependant_info);
             disp(regressor_info);
@@ -792,7 +792,7 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
     feedback = cell(aggregate('fatigue','parameters',pipeline));
     members = py.list();
     for i = 1:length(feedback)
-        members.extend(feedback{1}{'ID'});
+        members.extend(feedback{i}{'ID'});
     end
 
 
