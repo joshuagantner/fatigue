@@ -364,7 +364,7 @@ while run_script == 1
             end
             disp(' ')
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––");
-            fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+" Day "+string(day)+"</strong>");
+            fprintf("<strong>Robust Multiple Linear Regression Model"); %fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+" Day "+string(day)+"</strong>");
             disp(' ');
             disp(dependant_info);
             disp(regressor_info);
