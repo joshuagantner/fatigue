@@ -332,6 +332,9 @@ while run_script == 1
             object_ids = find_unique(db_name,'processed','_id'); % find_unique(db_name,'processed','_id',query);
             disp('ids done')
 
+            h = waitbar(0, 'Analyzing EMG...');  % initialize progress bar
+            start_time = datetime;
+
             % itterate & measure emg tracks
             for i = 1:length(object_ids)
                 % get data
@@ -348,22 +351,24 @@ while run_script == 1
                 emg_max = max(emg); % find maximal amplitude
                 emg_rms = rms(emg); % calculate the root mean square
                 % ...find the median power frequency
-                nfft = 2^nextpow2(length(emg_filtered)); % Calculate the power spectral density of the filtered EMG signal
-                [Pxx, f] = pwelch(emg_filtered, hanning(nfft), nfft/2, nfft, SRATE);
-                cp = cumtrapz(f, Pxx); % Calculate the cumulative power spectrum
-                emg_mpf = interp1(cp/max(cp), f, 0.5);
+                 % ...find the median power frequency
+                nfft = 2^nextpow2(length(emg)); % Set the parameters for the PSD calculation
+                win_length = min(nfft, length(emg));
+                overlap_length = round(win_length/2);
+                window = hanning(win_length);
+                [Pxx, f] = pwelch(emg, window, overlap_length, nfft, SRATE); % Calculate the power spectral density of the EMG signal using Welch's method
+                emg_mpf = medfreq(Pxx,f);
 
                 % write descriptives to db
-                add descritpives to data
                 data{'max'} = emg_max;
                 data{'rms'} = emg_rms;
                 data{'mpf'} = emg_mpf;
-                disp(data) % print & break for testing
-                break
                 put_data(db_name, 'describe_emg', data);
+                waitbar(i/length(object_ids), h, sprintf('Analyzing EMG... %d%%', round(100*i/length(object_ids))));  % update progress bar
             end
-
-            % write descriptives to db with all relevant identifiers
+            close(h) % close progress bar
+            disp("  -> emg description completed")
+            disp("     runtime: " + string(datetime-start_time));
 
         case action == 7 % view model
             % input
