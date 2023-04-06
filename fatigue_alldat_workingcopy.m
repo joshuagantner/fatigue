@@ -395,6 +395,7 @@ while run_script == 1
                     regressors = t.block;
 
                 case 'emg_d'
+                    regressors = ((t.block-1)*30)+t.trial;
             end
 
             % fit model
@@ -410,10 +411,13 @@ while run_script == 1
             elseif data_type == "skill"
                 dependant_info = "dependant:  " + dependant_name;
                 regressor_info = "regressor: block";
+            elseif data_type == "emg_d"
+                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " "); 
+                regressor_info = "regressor: ((t.block-1)*30)+t.trial";
             end
             disp(' ')
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––");
-            fprintf("<strong>Robust Multiple Linear Regression Model</strong>"); %fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+" Day "+string(day)+"</strong>");
+            fprintf("<strong>Robust Linear Regression Model</strong>"); %fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+" Day "+string(day)+"</strong>");
             disp(' ');
             disp(dependant_info);
             disp(regressor_info);
@@ -475,6 +479,8 @@ while run_script == 1
                     base_regressors = base_table.block;
 
                 case 'emg_d'
+                    test_regressors = ((test_table.block-1)*30)+test_table.trial;
+                    base_regressors = ((base_table.block-1)*30)+base_table.trial;
             end
 
             % ... add binaries
@@ -498,10 +504,13 @@ while run_script == 1
             elseif data_type == "skill"
                 dependant_info = "dependant:  " + dependant_name;
                 regressor_info = "regressor: block";
+            elseif data_type == "emg_d"
+                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " "); 
+                regressor_info = "regressor: ((t.block-1)*30)+t.trial";
             end
             disp(' ')
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
-            %fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
+            fprintf("<strong>Comparative Robust Linear Regression Model</strong>"); %fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
             disp(' ');
             disp(dependant_info);
             disp(regressor_info);
@@ -550,6 +559,7 @@ while run_script == 1
                         regressors = t.block;
     
                     case 'emg_d'
+                        regressors = ((t.block-1)*30)+t.trial;
                 end
     
                 % fit model
@@ -559,19 +569,13 @@ while run_script == 1
                 intercept   = mdlr.Coefficients{1,1};
                 effect      = mdlr.Coefficients{2,1};
                 switch data_type % calcualte scafold
-                    case 'variability'
+                    case data_type == "variability" || data_type == "emg_d"
                         time_scaffold = transpose(1:120);
                         set(gca,'XLim',[1 120],'XTick',15:30:105);
     
-                    case 'skill'
+                    case data_type == "skill" || data_type == "v_d"
                         time_scaffold = transpose(1:4);
                         set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
-                        
-                    case 'v_d'
-                        time_scaffold = transpose(1:4);
-                        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
-    
-                    case 'emg_d'
                 end
                 reapplied_model = intercept + effect*time_scaffold(:,1);
 
@@ -614,16 +618,13 @@ while run_script == 1
                 switch editing
                     case 1 % reset x
                         switch data_type % calcualte scafold
-                            case 'variability'
+                            case data_type == "variability" || data_type == "emg_d"
+                                time_scaffold = transpose(1:120);
                                 set(gca,'XLim',[1 120],'XTick',15:30:105);
             
-                            case 'skill'
+                            case data_type == "skill" || data_type == "v_d"
+                                time_scaffold = transpose(1:4);
                                 set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
-                                
-                            case 'v_d'
-                                set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
-            
-                            case 'emg_d'
                         end
     
                     case 2 % set y
@@ -809,9 +810,7 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
     pyModule = py.importlib.reload(pyModule);
     aggregate = pyModule.aggregate;
 
-    if data_type == "variability" % only ask for emg space when modeling variability
-        emg_space   = emgSpaceSelector(db_name);
-    end
+    % ask for group
     group       = input(' group: ','s');
     group = strip(group);
     if length(group) == 1 % convert group input to int or list of ints
@@ -826,10 +825,14 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
         disp('invalid group input')
         return
     end
+    % ask for day
     day         = int32(input(' day:   '));
-    if data_type == "v_d"
-        disp(' ');
+    % ask for descriptive
+    if data_type == "v_d" || data_type == "emg_d" 
         descriptive2plot = input('descriptive: ','s');
+    end
+    % ask for emg space
+    if data_type ~= "skill" % do not ask for emg space when modeling skill
         emg_space   = emgSpaceSelector(db_name);
     end
 
@@ -877,7 +880,7 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
             dependant_name = 'skillp';
             emg_space = null;
 
-        case "v_d"
+        case data_type == "v_d" || data_type == "emg_d" % descriptive of variability or emg
             match_stage = py.dict(pyargs('$match', py.dict(pyargs(...
                     'identifier', py.dict(pyargs('$in', members)), ...
                     'day', day, ...
@@ -886,9 +889,11 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
                 ))));
             project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2plot, 1))));
             pipeline = py.list({match_stage, project_stage});
-            collection = "describe_variability";
+            if data_type == "v_d"
+                collection = "describe_variability";
+            else
+                collection = "describe_emg";
+            end
             dependant_name = descriptive2plot;
-
-        case "s_d"
     end
 end
