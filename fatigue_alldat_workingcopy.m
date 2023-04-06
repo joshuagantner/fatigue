@@ -45,10 +45,11 @@ operations_list = ...
     "3 mean trials\n"+...
     "4 measure euclidean distances\n"+...
     "5 describe variability\n"+...
+    "6 describe emg\n"+...
     " \n"+...
-    "6 view model\n" + ...
-    "7 comparative model\n"+...
-    "8 create graphs\n"+...
+    "7 view model\n" + ...
+    "8 comparative model\n"+...
+    "9 create graphs\n"+...
     "\n";
 fprintf(operations_list);
 
@@ -227,7 +228,7 @@ while run_script == 1
             close(h);  % close progress bar
 
         case action == 4 % measure euclidean distances
-            spaces = {["ADM" "APB" "FDI" "BIC" "FCR"]}; % {["ADM" "APB" "FDI"] ["BIC" "FCR"] ["ADM"] ["APB"] ["FDI"] ["BIC"] ["FCR"]};
+            spaces = {["ADM" "APB" "FDI" "BIC" "FCR"] ["ADM" "APB" "FDI"] ["BIC" "FCR"] ["ADM"] ["APB"] ["FDI"] ["BIC"] ["FCR"]};
             start_time = datetime;
             for i = 1:length(spaces)
                 space = spaces{i};
@@ -321,7 +322,50 @@ while run_script == 1
             disp("  -> variability explored")
             disp("     runtime: " + string(datetime-start_time));
 
-        case action == 6 % view model
+        case action == 6 % describe emg
+            % like case 4 euc dists
+            %     • what to do with multidimensional spaces?
+            %     add/avarage/only compare 1D/time and lead as regressors?
+            SRATE = 5000;
+            % get unique object ids                              % to get only emg data when multiple data types in collection 'processed'
+                                                                 % query = py.dict(pyargs('data type','EMG'));
+            object_ids = find_unique(db_name,'processed','_id'); % find_unique(db_name,'processed','_id',query);
+            disp('ids done')
+
+            % itterate & measure emg tracks
+            for i = 1:length(object_ids)
+                % get data
+                query = py.dict(pyargs('_id',object_ids{i}));
+                data = get_data(db_name,'processed',query);
+                data = data{1};
+                emg = data.pop('data');
+                % can I do double directly or must it be via string?
+                emg = double(string(emg));
+                data.pop('_id'); % remove unnecessary data
+                data.pop('data type');
+
+                % calculate descriptives
+                emg_max = max(emg); % find maximal amplitude
+                emg_rms = rms(emg); % calculate the root mean square
+                % ...find the median power frequency
+                nfft = 2^nextpow2(length(emg_filtered)); % Calculate the power spectral density of the filtered EMG signal
+                [Pxx, f] = pwelch(emg_filtered, hanning(nfft), nfft/2, nfft, SRATE);
+                cp = cumtrapz(f, Pxx); % Calculate the cumulative power spectrum
+                emg_mpf = interp1(cp/max(cp), f, 0.5);
+
+                % write descriptives to db
+                add descritpives to data
+                data{'max'} = emg_max;
+                data{'rms'} = emg_rms;
+                data{'mpf'} = emg_mpf;
+                disp(data) % print & break for testing
+                break
+                put_data(db_name, 'describe_emg', data);
+            end
+
+            % write descriptives to db with all relevant identifiers
+
+        case action == 7 % view model
             % input
             disp('view model')
             data_type        = input('data type: ','s');
@@ -372,7 +416,7 @@ while run_script == 1
             disp(mdlr)
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
 
-        case action == 7 % comparative model
+        case action == 8 % comparative model
             % same code as view model, just twice. 
             %  once for test and base group
             %  and then the additional dummy regressor
@@ -461,7 +505,7 @@ while run_script == 1
             disp(mdlr)
             disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
           
-        case action == 8 % create graphs
+        case action == 9 % create graphs
             disp('create graph')
             % initiate figure
             titletext = input('title: ','s');
