@@ -494,7 +494,7 @@ while run_script == 1
             mdlr = fitlm(regressors,dependant,'RobustOpts','on');
             
             % output
-            coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
+            %coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
             if data_type == "variability"
                 dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " ");
                 regressor_info = "regressor: ((t.block-1)*30)+t.trial";
@@ -848,9 +848,9 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
     end
 
 
-    % get data for all group members
-    switch data_type
-        case "variability"
+    % set return values
+    switch true
+        case data_type == "variability"
             pipeline = py.list({
                 py.dict(pyargs('$match', py.dict(pyargs(...
                     'identifier', py.dict(pyargs('$in', members)),...
@@ -862,7 +862,7 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
             collection     = 'variability';
             dependant_name = 'distance';
 
-        case "skill"
+        case data_type == "skill"
             pipeline = py.list({
                 py.dict(pyargs('$match', py.dict(pyargs(...
                     'ID', py.dict(pyargs('$in', members)),...
@@ -884,10 +884,10 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
             match_stage = py.dict(pyargs('$match', py.dict(pyargs(...
                     'identifier', py.dict(pyargs('$in', members)), ...
                     'day', day, ...
-                    'space', emg_space, ...
+                    'lead', emg_space, ...
                     descriptive2plot, py.dict(pyargs('$ne', NaN))...
                 ))));
-            project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, descriptive2plot, 1))));
+            project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, 'trial', 1, descriptive2plot, 1))));
             pipeline = py.list({match_stage, project_stage});
             if data_type == "v_d"
                 collection = "describe_variability";
