@@ -1408,13 +1408,13 @@ switch action
         f = figure();
         f.Position = [300 300 600 600];
         t = tiledlayout(3,3);
-        t.Title.String = "Exploration of Variability");
+        t.Title.String = "Exploration of Variability";
 
         for i = 1:length(operations)
             nexttile()
             operation = operations(i,1);
             subset = var_exploration(:, ["group" "session" "subsession" operation]);
-            plot(subset, )
+            plot(subset)
 
         end
         %% restore calc_variables
