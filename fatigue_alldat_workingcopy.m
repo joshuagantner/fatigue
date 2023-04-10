@@ -51,6 +51,7 @@ operations_list = ...
     "7 view model\n" + ...
     "8 comparative model\n"+...
     "9 create graphs\n"+...
+    "10 correlations\n"+...
     "\n";
 fprintf(operations_list);
 
@@ -655,35 +656,78 @@ while run_script == 1
             disp('determine correlation')
             % get 2 continuous variabes
             % var 1, session 1 & 4
+            disp(' ')
+            disp(' variable 1')
             data_type = setDataType(data_type);
+            var1 = data_type;
             [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type); % returns full day
             data = aggregate(db_name, collection, pipeline);
             t = mongoquery2table(data);
-            if data_type == "skill" % set session column
-                session_column = "BN";
-            else
-                session_column = "block";
+            if data_type == "skill" % rename columns of skill table to match all other data
+                t.Properties.VariableNames = {'identifier', 'day', 'block', 'skillp'};
             end
-            session_1 = t(:,t(:,session_column)==1); % get subtable for session 1
-            session_4 = t(:,t(:,session_column)==4); % get subtable for session 4
+            session_1 = t(t{:,'block'}==1,:); % get subtable for session 1
+            session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
             % compound to session resolution
             if data_type == "variability" || data_type == "emg_d"
-                session_1 = unstack(session_1,session_column,'AggregationFunction',@mean);
-                session_4 = unstack(session_4,session_column,'AggregationFunction',@mean);
+                session_1 = removevars(session_1, 'space');
+                session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
+                session_1 = removevars(session_1, 'GroupCount');
+                session_4 = removevars(session_4, 'space');
+                session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
+                session_4 = removevars(session_4, 'GroupCount');
+                dependant_name = "mean_"+dependant_name;
             end
-            t_scaffold = removevars(session_1, session_column); % create empty table of attributes
-            delta_4_1 = session_4(:,session_column)-session_1(:,session_column);
-            t1 = addvars(t_scaffold, delta_4_1,'NewVariableNames','delta_4_1');
+            t1 = intersect(session_1(:,{'identifier'}), session_4(:,{'identifier'}), 'rows');
+            t1 = addvars(t1, zeros(height(t1),1),'NewVariableNames','delta_4_1');
+             
+            for i = 1:height(t1)
+                id = t1{i,'identifier'};
+                t1{i,'delta_4_1'} = session_4{session_4.identifier==id,dependant_name}-session_1{session_1.identifier==id,dependant_name};
+            end
 
             % var 2, session 1 & 4
+            disp(' ')
+            disp(' variable 2')
+            data_type = setDataType(data_type);
+            var2 = data_type;
+            [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type); % returns full day
+            data = aggregate(db_name, collection, pipeline);
+            t = mongoquery2table(data);
+            if data_type == "skill" % rename columns of skill table to match all other data
+                t.Properties.VariableNames = {'identifier', 'day', 'block', 'skillp'};
+            end
+            session_1 = t(t{:,'block'}==1,:); % get subtable for session 1
+            session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
+            % compound to session resolution
+            if data_type == "variability" || data_type == "emg_d"
+                session_1 = removevars(session_1, 'space');
+                session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
+                session_1 = removevars(session_1, 'GroupCount');
+                session_4 = removevars(session_4, 'space');
+                session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
+                session_4 = removevars(session_4, 'GroupCount');
+                dependant_name = "mean_"+dependant_name;
+            end
+            t2 = intersect(session_1(:,{'identifier'}), session_4(:,{'identifier'}), 'rows');
+            t2 = addvars(t2, zeros(height(t2),1),'NewVariableNames','delta_4_1');
 
-            % if sorting from get_data is consistent, no need for
-            % t_scaffold & co, jus use subtraction vectors
+            for i = 1:height(t2)
+                id = t2{i,'identifier'};
+                t2{i,'delta_4_1'} = session_4{session_4.identifier==id,dependant_name}-session_1{session_1.identifier==id,dependant_name};
+            end
 
-            % sort or itterate by unique attributes
-
+            % find common row of var 1 & 2
+            t3 = intersect(t1(:,{'identifier'}), t2(:,{'identifier'}), 'rows');
+            t3 = addvars(t3, zeros(height(t3),1), zeros(height(t3),1),'NewVariableNames',[string(var1), string(var2)]);
+            for i = 1:height(t3)
+                id = t3{i,'identifier'};
+                t3{i,var1} = t1{t1.identifier==id, "delta_4_1"}; % add var1 to common table
+                t3{i,var2} = t2{t2.identifier==id, "delta_4_1"}; % add var2 to common table
+            end
+            disp(' ')
             % correlate
-            corr(t1(:,'delta_4_1'), t2(:,'delta_4_1'), 'Type', 'Spearman')
+            [r, p] = corr(t3{:,var1}, t3{:,var2}, 'Type', 'Spearman')
 
         case action == 0 % reset cml view
             clc
@@ -917,7 +961,7 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
                 });
             collection     = 'parameters';
             dependant_name = 'skillp';
-            emg_space = null;
+            emg_space = '';
 
         case data_type == "v_d" || data_type == "emg_d" % descriptive of variability or emg
             match_stage = py.dict(pyargs('$match', py.dict(pyargs(...
