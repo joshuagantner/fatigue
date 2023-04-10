@@ -75,6 +75,7 @@ switch action
             case 2 %load parameters
                 [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Fatigue Parameter File (.tsv)');
                 Parameters = dload(fullfile(p,f));
+                Parameters = struct2table(Parameters);
                 disp('  -> Parameters loaded')
 
             case 3
@@ -455,6 +456,7 @@ switch action
         f = figure();
         f.Position = [300 300 600 600];
         t = tiledlayout(3,3);
+
         t.Title.String = ("Exploration of Variability");
 
         for i = 1:length(operations)
