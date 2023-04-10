@@ -670,10 +670,10 @@ while run_script == 1
             session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
             % compound to session resolution
             if data_type == "variability" || data_type == "emg_d"
-                session_1 = removevars(session_1, 'space');
+                % session_1 = removevars(session_1, 'space');
                 session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
                 session_1 = removevars(session_1, 'GroupCount');
-                session_4 = removevars(session_4, 'space');
+                % session_4 = removevars(session_4, 'space');
                 session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
                 session_4 = removevars(session_4, 'GroupCount');
                 dependant_name = "mean_"+dependant_name;
@@ -701,10 +701,10 @@ while run_script == 1
             session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
             % compound to session resolution
             if data_type == "variability" || data_type == "emg_d"
-                session_1 = removevars(session_1, 'space');
+                % session_1 = removevars(session_1, 'space');
                 session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
                 session_1 = removevars(session_1, 'GroupCount');
-                session_4 = removevars(session_4, 'space');
+                % session_4 = removevars(session_4, 'space');
                 session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
                 session_4 = removevars(session_4, 'GroupCount');
                 dependant_name = "mean_"+dependant_name;
@@ -727,7 +727,7 @@ while run_script == 1
             end
             disp(' ')
             % correlate
-            [r, p] = corr(t3{:,var1}, t3{:,var2}, 'Type', 'Spearman')
+            [r, p] = corr(t3{:,var1}, t3{:,var2}, 'Type', 'Pearson')
 
         case action == 0 % reset cml view
             clc
