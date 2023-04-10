@@ -651,6 +651,40 @@ while run_script == 1
                 drawnow()
             end
 
+        case action == 10 % correlate delta 4-1
+            disp('determine correlation')
+            % get 2 continuous variabes
+            % var 1, session 1 & 4
+            data_type = setDataType(data_type);
+            [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type); % returns full day
+            data = aggregate(db_name, collection, pipeline);
+            t = mongoquery2table(data);
+            if data_type == "skill" % set session column
+                session_column = "BN";
+            else
+                session_column = "block";
+            end
+            session_1 = t(:,t(:,session_column)==1); % get subtable for session 1
+            session_4 = t(:,t(:,session_column)==4); % get subtable for session 4
+            % compound to session resolution
+            if data_type == "variability" || data_type == "emg_d"
+                session_1 = unstack(session_1,session_column,'AggregationFunction',@mean);
+                session_4 = unstack(session_4,session_column,'AggregationFunction',@mean);
+            end
+            t_scaffold = removevars(session_1, session_column); % create empty table of attributes
+            delta_4_1 = session_4(:,session_column)-session_1(:,session_column);
+            t1 = addvars(t_scaffold, delta_4_1,'NewVariableNames','delta_4_1');
+
+            % var 2, session 1 & 4
+
+            % if sorting from get_data is consistent, no need for
+            % t_scaffold & co, jus use subtraction vectors
+
+            % sort or itterate by unique attributes
+
+            % correlate
+            corr(t1(:,'delta_4_1'), t2(:,'delta_4_1'), 'Type', 'Spearman')
+
         case action == 0 % reset cml view
             clc
             fprintf(operations_list);
