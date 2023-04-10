@@ -22,7 +22,7 @@ run_script = 1;
 %   path on windows tower
 functions_path = "C:\Users\joshg\Documents\GitHub\fatigue-matlabfunctions";
 %   path on macbook
-% functions_path = '/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/z functions/Functions Joshua';
+%functions_path = '/Users/joshuagantner/science/fatigue/code/functions/Functions Joshua';
 if count(py.sys.path, functions_path) == 0
     insert(py.sys.path, int32(0), functions_path);
 end

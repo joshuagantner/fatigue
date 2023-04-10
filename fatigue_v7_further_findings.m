@@ -232,7 +232,7 @@ switch action
 %         subject_list = unique(Parameters.SubjN);
         
         subject_list = [5	6	8	9   11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
-            % manually excluded: 10, 45
+            % manually excluded: 10 (=F006C), 45 (=F047S)
         change_table = array2table(zeros(80, 6));
         change_table.Properties.VariableNames = {'subject', 'group', 'day', 'variability_slope', 'variability_difference', 'skill_difference'};
 
@@ -368,7 +368,7 @@ switch action
                     nexttile((day-1)*3+group)
                     hold on
     
-                    scatter(description{change_table.day == day & change_table.group == group, var1}, description{change_table.day == day & change_table.group == group, var2})
+                    scatter(description{description.day == day & description.group == group, var1}, description{description.day == day & description.group == group, var2})
                     
                     h = lsline;
     
@@ -378,7 +378,7 @@ switch action
                     
                     hold off
     
-                    [r, p] = corr(description{change_table.day == day & change_table.group == group, var1}, description{change_table.day == day & change_table.group == group, var2},...
+                    [r, p] = corr(description{description.day == day & description.group == group, var1}, description{description.day == day & description.group == group, var2},...
                                     'Type', corr_type,'rows','complete');
                     corr_table{(group-1)*2+day , :} = [group day r p];
                     
