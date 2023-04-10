@@ -32,6 +32,7 @@ get_data = pyModule.get_data;
 find_unique = pyModule.find_unique;
 put_data = pyModule.put_data;
 aggregate = pyModule.aggregate;
+data_type = ""; % set initial datatype to empty string
 
 
 % supress warnings
@@ -373,7 +374,7 @@ while run_script == 1
         case action == 7 % view model
             % input
             disp('view model')
-            data_type        = input('data type: ','s');
+            data_type = setDataType(data_type);
             [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type);
             data = aggregate(db_name, collection, pipeline);
             
@@ -444,7 +445,7 @@ while run_script == 1
 
             % input
             disp('creating comparative model')
-            data_type        = input('data type: ','s');
+            data_type = setDataType(data_type);
             disp(' ')
             disp('choose test group')
             [pipeline, collection, test_dependant_name, test_emg_space] = createPipeline(db_name, data_type);
@@ -537,7 +538,7 @@ while run_script == 1
             while true
                 % input
                 disp(' ');
-                data_type        = input('data type: ','s');
+                data_type = setDataType(data_type);
                 [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type);
                 data = aggregate(db_name, collection, pipeline);
                 
@@ -640,7 +641,8 @@ while run_script == 1
                             disp('File not saved');
                             return
                         end
-                        print(fullfile(pathname, filename), '-dpdf');
+                        print(fullfile(pathname, filename), '-dpdf'); % save as pdf
+                        savefig(f,fullfile(pathname, filename)); % save as matlab figure
                         disp("Figure saved as " + filename + " to " + pathname);
     
                     case 0 % finish edit
@@ -693,6 +695,7 @@ function emg_space = emgSpaceSelector(db_name)
         emg_space = spaces{emg_space};
         
 end
+
 function feedback = measure_space(db_name, space)
         pyModule = py.importlib.import_module('mongodb');
         pyModule = py.importlib.reload(pyModule);
@@ -767,6 +770,7 @@ function feedback = measure_space(db_name, space)
         % return list of measured and unmeasured trials
         feedback = struct('measured', measured, 'missing_leads', missing_leads, 'duration', stop-start);
 end
+
 function feedback = mongoquery2table(query_in)
         % Convert PyMongo query result to MATLAB table
         data = cell(query_in);
@@ -804,6 +808,7 @@ function feedback = mongoquery2table(query_in)
         feedback = cell2table(t, 'VariableNames', fieldnames(s));
 
 end
+
 function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type)
     
     pyModule = py.importlib.import_module('mongodb');
@@ -895,5 +900,12 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
                 collection = "describe_emg";
             end
             dependant_name = descriptive2plot;
+    end
+end
+
+function data_type = setDataType(data_type_in)
+    data_type = input('data type: ','s');
+    if data_type == ""
+        data_type = data_type_in;
     end
 end
