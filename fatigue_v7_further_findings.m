@@ -85,6 +85,7 @@ switch action
             case 2 %load parameters
                 [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Fatigue Parameter File (.tsv)');
                 Parameters = dload(fullfile(p,f));
+                Parameters = struct2table(Parameters);
                 disp('  -> Parameters loaded')
 
             case 3
