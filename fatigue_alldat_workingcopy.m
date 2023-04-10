@@ -1,989 +1,2703 @@
-%% FATIGUE v8
+%% FATIGUE v7
 
+%% setup
 run_script = 1;
+
+% set root directory
 %rootDir    = '/Volumes/smb fatigue'; % mac root
 %rootDir = '\\JOSHUAS-MACBOOK\smb fatigue\database'; % windows root network
 %rootDir = 'F:\database'; %windows root hd over usb
 %rootDir = '\\jmg\home\Drive\fatigue\database'; %windows root nas
-% rootDir = 'D:\Joshua\fatigue\database'; %windows root internal hd
-% distances_to_calc = {...
-%     "adm";...
-%     "fdi";...
-%     "apb";...
-%     "fcr";...
-%     "bic";...
-%     ["fdi" "apb"];...
-%     ["fdi" "apb" "adm"];...
-%     ["fcr" "bic"];...
-%     ["fdi" "apb" "adm" "fcr" "bic"]...
-%     };
+rootDir = 'D:\Joshua\fatigue\database'; %windows root internal hd
 
-% import python functions for mongodb interaction
-%   path on windows tower
-functions_path = "C:\Users\joshg\Documents\GitHub\fatigue-matlabfunctions";
-%   path on macbook
-% functions_path = '/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/z functions/Functions Joshua';
-if count(py.sys.path, functions_path) == 0
-    insert(py.sys.path, int32(0), functions_path);
-end
-pyModule = py.importlib.import_module('mongodb');
-pyModule = py.importlib.reload(pyModule);
-get_data = pyModule.get_data;
-find_unique = pyModule.find_unique;
-put_data = pyModule.put_data;
-aggregate = pyModule.aggregate;
-data_type = ""; % set initial datatype to empty string
+% distances to calculate
+distances_to_calc = {...
+    "adm";...
+    "fdi";...
+    "apb";...
+    "fcr";...
+    "bic";...
+    ["fdi" "apb"];...
+    ["fdi" "apb" "adm"];...
+    ["fcr" "bic"];...
+    ["fdi" "apb" "adm" "fcr" "bic"]...
+    };
 
+% struct for regression models
+lin_reg_models = [];
 
 % supress warnings
 warning('off','MATLAB:table:RowsAddedNewVars')
 
-% print legend to cml
-operations_list = ...
-    " \n"+...
-    "1 table of contents\n"+...
-    "2 filter, rectify & stnd4time\n"+...
-    "3 mean trials\n"+...
-    "4 measure euclidean distances\n"+...
-    "5 describe variability\n"+...
-    "6 describe emg\n"+...
-    " \n"+...
-    "7 view model\n" + ...
-    "8 comparative model\n"+...
-    "9 create graphs\n"+...
-    "10 correlations\n"+...
-    "\n";
+%% print legend to cml
+
+%display available operations
+operations_list = ... "––––––––––––––––––––––––––––––––––––––––––––––––––––\n"+...
+"<strong>Available operations:</strong>\n"+...
+"\n"+...
+"setup\n"+...
+"11  set root directory\n"+...
+"12  load data\n"+...
+"13  create fatigue_alldat\n"+...
+"\n"+...
+"processing\n"+...
+"21  process raw alldat\n"+...
+"22  calculate mean trial\n"+...
+"23  calculate variables\n"+...
+"\n"+...
+"regression analysis\n"+...
+"30  view model\n"+...
+"31  compare 1-day models multiple\n"+...
+"39  compare 1-day models simple\n"+...
+"32  compare 2-day models\n"+...
+"34  plot regression models\n"+...
+"35  reapply model\n"+...
+"\n"+...
+"36  view skill model\n"+...
+"36.2 compare skill models\n"+...
+"37  plot skill model\n"+...
+"38  plot var // learning\n"+...
+"\n"+...
+"41  styling options\n"+...
+"42  empty legend\n"+...
+"43  plot skill measure\n"+...
+"44  ttest\n"+...
+"45  correlation\n"+...
+"\n"+...
+"77  plot var & learning all groups one day\n"+...
+"\n"+...
+"output\n"+...
+"51  save…\n"+...
+"\n"+...
+"\n"+...
+"clear cml & display operations with 0\n"+...
+"terminate script with 666\n"+...
+"clear workspace with 911\n";
+
 fprintf(operations_list);
 
 %% master while loop
-db_name = 'fatigue';
-
 while run_script == 1
+%%    
+%Select Operation
+disp(' ')
+disp('––––––––––––––––––––––––––––––––––––––––––––––––––––')
+action = input('What would you like me to do? ');
+disp(' ')
+%%
 
-    % Select Operation
-    disp(' ')
-    action = input('What would you like me to do? ');
-    disp(' ')
+switch action
+    %% 
+    case 11 % set root directory
+        %%
+        rootDir = uigetdir('','fatigue root directory');
+        disp(' ')
+        disp("  root directory set to '"+rootDir+"'")
+        %% end Case 11: Set root directory
 
-    switch true % master switch
-        case action == 1 % db content table
-    
-            % get unique participant identifiers
-            collection = input('collection: ','s');
-            participants = find_unique(db_name,collection,'identifier');
-            participants = string(participants);
-            db_tableOfContents = array2table(zeros(240,length(participants)));
-            db_tableOfContents.Properties.VariableNames = participants;
-            db_tableOfContents.Properties.RowNames = string(1:240);
-    
-            % get data
-            what_to_process = input(' overview or lead (o/_): ','s');
-            if what_to_process == "o"
-                query = py.dict(pyargs('data type','EMG'));
-            else
-                lead = input('lead: ','s');
-                query = py.dict(pyargs('data type','EMG','lead',lead));
+    case 12 % load data
+        %%
+        disp('1 alldat (w/wo emg data)')
+        disp('2 parameters.csv')
+        disp('3 missing trials list')
+        disp('4 load calc_variables.csv')
+        disp(' ')
+        what_to_load = input('what to load: ');
+
+        switch what_to_load
+            case 1 %load alldat
+                [f,p] = uigetfile(fullfile(rootDir,'*.mat'),'Select the fatigue_alldat');
+
+                time_start = now;
+                fatigue_alldat = load(fullfile(p,f));
+                fatigue_alldat = fatigue_alldat.fatigue_alldat;
+
+                disp('  -> fatigue_alldat loaded')
+                disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+
+            case 2 %load parameters
+                [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Fatigue Parameter File (.tsv)');
+                Parameters = readtable(fullfile(p,f)); %dload(fullfile(p,f));
+                disp('  -> Parameters loaded')
+
+            case 3
+                [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select the Missing Trials List (.tsv)');
+                Missing_Trials = dload(fullfile(p,f));
+
+                missing_trials = [];
+
+                for i = 1:length(Missing_Trials.ID)
+                    trial = [char(Missing_Trials.ID(i)),'.',num2str(Missing_Trials.day(i)),'.',char(Missing_Trials.BN(i)),'.',char(Missing_Trials.trial(i))];
+                    missing_trials = [missing_trials; string(trial)];
+                end
+                disp('  -> Missing Trials loaded')
+
+            case 4
+                [f,p] = uigetfile(fullfile(rootDir,'*.*'),'Select calc_variables (.csv)');
+                calc_variables = readtable(fullfile(p,f));
+                % calc_variables.Properties.VariableNames = ["group" "subject" "day" "session" "trial" "time" transpose(cellfun(@strjoin, distances_to_calc))];
+
+        end
+        %% end Case 12: load data
+
+
+    case 13 % create fatigue_alldat        
+        %%
+        [p] = uigetdir(rootDir,'Select the EMG Cut Trials folder');
+
+        %Setup Progress bar
+        counter = 0;
+        h = waitbar(0,'Processing Cut Trial EMG Data 0%');
+        total = length(Parameters.SessN)*30*5;
+
+        %Create allDat of Procesed Cut Trial EMG Data based on Parameters File
+        fatigue_alldat = [];
+        leads = {'adm' 'apb' 'fdi' 'bic' 'fcr'};
+        LEADS = {'ADM' 'APB' 'FDI' 'BIC' 'FCR'};
+
+        time_start = now;
+        %create alldat
+        for i = 1:length(Parameters.SessN)
+
+            id = Parameters.ID(i);
+            day = Parameters.day(i);
+            block = Parameters.BN(i);
+
+            %Check for missing day or block and skip if true
+            test_str1 = char(strcat(id,'.',num2str(day),'.all.all'));
+            test_str2 = char(strcat(id,'.',num2str(day),'.',num2str(block),'.all'));
+            if sum(contains(missing_trials,test_str1))>0
+                continue
             end
-            projection = py.dict(pyargs('identifier',1,'day',1,'block',1,'trial',1));
-            data = get_data(db_name,collection,query, projection, batch_size = int8(10));
-            data = transpose(string(data));
-    
-            data = strrep(data, "'", '"'); % Replace single quotes with double quotes
-            data = strrep(data, "ObjectId(", ""); % Remove "ObjectId("
-            data = strrep(data, ")", ""); % Remove ")"
-    
-            disp('data fetched - now building table ')
-    
-            for i = 1:length(data)
-                datapoint = jsondecode(data(i));
-                row =   (datapoint.day-1)*120+...
-                        (datapoint.block-1)*30+...
-                         datapoint.trial;
-                column = datapoint.identifier;
-                db_tableOfContents{row,column} = db_tableOfContents{row,column}+1;
+            if sum(contains(missing_trials,test_str2))>0
+                continue
             end
-    
-            % pass table on
-            disp(' ')
-            disp('1 show | 2 save | 3 latex | 4 continue')
-            todo = input('next: ');
-            switch todo
-                case 1
-                    fig = figure;
-                    % create a uitable object and set its position in the figure window
-                    uit = uitable(fig, 'Data', db_tableOfContents{:,:}, 'ColumnName', T.Properties.VariableNames, 'Position', [0 0 1000 500]);
-                    % set the column widths to fit the data
-                    uit.ColumnWidth = {'auto','auto','auto'};
-                case 2
-                    % prompt user to choose a file
-                    [filename, pathname] = uiputfile('*.csv', 'Save File As');
-    
-                    % if user clicked 'cancel', exit script
-                    if isequal(filename,0) || isequal(pathname,0)
-                        disp('File not saved');
-                        return
+
+            folder = strcat(id,'_EMGAnalysis_d',num2str(day));
+
+            for j = 1:30
+
+                % check for missing trial and skip if true
+                test_str3 = char(strcat(id,'.',num2str(day),'.',num2str(block),'.',num2str(j)));
+                if sum(contains(missing_trials,test_str3))>0
+                    continue
+                end
+
+                for k = 1:5
+                    new_line = [];
+                    
+                    l = leads(k);
+                    l = l{1,1};
+                    L = LEADS(k);
+                    L = L{1,1};
+
+                    %Load the Trial File
+                    file = strcat(id,'_EMG_d',num2str(day),'_b',num2str(block),'_t',num2str(j),'.txt');
+                    D = dload(char(fullfile(p,folder,file)));
+
+                    %Add EMG
+                    new_line.raw = D.(L);
+
+                    %Add Parameters
+                    new_line.type = "trial";
+                    new_line.lead = string(l);
+                    new_line.exclude = "";
+                    new_line.trial_number = j;
+
+                    parameter_fields = fields(Parameters);
+                    for m = 1:length(parameter_fields)
+                        new_line.(char(parameter_fields(m))) = Parameters.(char(parameter_fields(m)))(i);
                     end
+
+                    %Add Processed Trial to allDat 'EMG_clean'
+                    fatigue_alldat = [fatigue_alldat new_line];
                     
-                    % Save table to a file in the selected folder
-                    writetable(db_tableOfContents, fullfile(pathname, filename));
-                    disp('Table saved successfully');
-                case 3
-                    % convert to latx
-                    output = table2latex(db_tableOfContents);
-    
-                    % prompt user to choose a file
-                    [filename, pathname] = uiputfile('*.txt', 'Save File As');
-                    
-                    % if user clicked 'cancel', exit script
-                    if isequal(filename,0) || isequal(pathname,0)
-                        disp('File not saved');
-                        return
-                    end
-                    
-                    % create full file path
-                    filepath = fullfile(pathname, filename);
-                    
-                    % open file for writing
-                    fileID = fopen(filepath, 'w');
-                    
-                    % write data to file
-                    for i = 1:length(output)
-                        fprintf(fileID, '%s\n', output{i});
-                    end
-                    
-                    % close file
-                    fclose(fileID);
-                    
-                    disp('Latex saved successfully');
+                    %Update Progress bar
+                    counter = counter+1;
+                    waitbar(counter/total,h,['Processing Cut Trial EMG Data ', num2str(round(counter/total*100)),'%']);
+                end
+
             end
+
+        end %End of Paramtere Iteration
         
-        case action == 2 % process included raw data
-            disp('getting ids…')
-            % processing parameters
-            SRATE = 5000;
-            freq_h = 10;
-            freq_l = 6;
-            ORDER = 4;
-            LENGTH = 100000;
+        fatigue_alldat = table2struct(struct2table(fatigue_alldat),'ToScalar',true);
+        
+        close(h);
+        disp("  -> fatigue_alldat created")
+        disp(strcat("     runtime: ", datestr(now - time_start,'HH:MM:SS')))
+        %% end case 13 create alldat
 
-            % get unique object ids
-            query = py.dict(pyargs('data type','EMG'));
-            object_ids = find_unique(db_name,'raw','_id',query);
-            disp('ids done')
+    case 21 % process raw alldat
+        %%
+        disp('1 mark outliers')
+        disp('2 filter & rectify raw emg')
+        disp('3 standardize length/time')
+        disp(' ')
+        what_to_process = input('what to process: ');
 
-            % progress bar
-            counter = 0;
-            h = waitbar(0,['Processing Raw Data ', num2str(counter*100),'%']);
-            total = length(object_ids);
+        switch what_to_process
+            case 1 % update inclusion status
+                %%
+                [f,p] = uigetfile(fullfile(rootDir,"*.csv"),"Select the status update file","status_update.csv");
+                status_update = table2struct(readtable(fullfile(p,f)),'ToScalar',true);
 
-            % itterate & process objects
-            start_time = datetime;
-            for i = 1:length(object_ids)
-
-                % get, process & put trial data
-                query = py.dict(pyargs('_id',object_ids{i}));
-                data_in = get_data(db_name,'raw',query);
-                data = double(string(data_in{1}{'data'}));
-                data = proc_std(data, SRATE, freq_h, freq_l, ORDER);
-                data = stnd4time(data, LENGTH);
-                data_in{1}{'data'} = py.list(data);
-                data_in{1}.pop('_id');
-                put_data(db_name,'processed',data_in{1});
-
-                %Update Progress bar
-                counter = counter+1;
-                waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
-            end
-
-            % timer output
-            disp("  -> Raw Data processed")
-            disp("     runtime: " + string(datetime-start_time));
-            close(h)
-
-        case action == 3 % calculate mean trials
-            pipeline = py.list({py.dict(pyargs("$group", py.dict(pyargs("_id", py.dict(pyargs("identifier", "$identifier", "day", "$day", "block", "$block","lead","$lead"))))))});
-            sessions = aggregate(db_name,'processed',pipeline);
-
-            h = waitbar(0, 'Calculating mean trials...');  % initialize progress bar
-            start_time = datetime;
-            for i = 1:length(sessions)
-                session = sessions{i}{'_id'};
-%                                 filter = py.dict(pyargs('identifier',session{'ID'},'day',session{'day'},'block',session{'BN'},'data type','EMG'));
-%                                 query = py.dict(pyargs('_id','$lead'));
-%                                 pipeline = py.list({py.dict(pyargs("$match",filter,"$group",query))});
-
-                data = get_data(db_name,'processed',session,batch_size=int8(10));
-                mean_trial = zeros(1,100000);
-                for j = 1:length(data)
-                    mean_trial = mean_trial + double(data{j}{'data'});
+                start_time = now;
+                for i = 1:length(fatigue_alldat.SubjN)
+                    a = string(status_update.status(...
+                        status_update.subjn == fatigue_alldat.SubjN(i)&...
+                        status_update.day   == fatigue_alldat.day(i)&...
+                        status_update.BN    == fatigue_alldat.BN(i)&...
+                        (status_update.trial_number == fatigue_alldat.trial_number(i) | isnan(status_update.trial_number))  &...
+                        status_update.lead  == fatigue_alldat.lead(i)...
+                        ));
+                    if isempty(a)
+                        fatigue_alldat.exclude(i) = "FALSE";
+                    else
+                        fatigue_alldat.exclude(i) = a;
+                    end
                 end
-                mean_trial = mean_trial/length(data);
-                
-                output = py.dict(pyargs('identifier',session{'identifier'},'day',session{'day'},'block',session{'block'},'lead',session{'lead'},'mean trial',py.list(mean_trial)));
-                put_data(db_name,'mean',output);
+                disp("  -> Status updated")
+                disp(" ")
+                disp(strcat("     Total Trials excluded: ",num2str(sum(fatigue_alldat.exclude == "TRUE"))))
+                disp("     compare total to excel to double check correct update ")
+                %% end subcase 1 update inclusion status
 
-                waitbar(i/length(sessions), h, sprintf('Calculating mean trials... %d%%', round(100*i/length(sessions))));  % update progress bar
+            case 2 % process included raw data
+                %%
+                SRATE = 5000;
+                freq_h = 10;
+                freq_l = 6;
+                ORDER = 4;
 
-            end
-            disp("  -> Mean trials calculated")
-            disp("     runtime: " + string(datetime-start_time));
-            close(h);  % close progress bar
+                %Setup Progress bar
+                counter = 0;
+                h = waitbar(0,['Processing Raw Data ', num2str(counter*100),'%']);
+                total = length(fatigue_alldat.SubjN);
 
-        case action == 4 % measure euclidean distances
-            spaces = {["ADM" "APB" "FDI" "BIC" "FCR"] ["ADM" "APB" "FDI"] ["BIC" "FCR"] ["ADM"] ["APB"] ["FDI"] ["BIC"] ["FCR"]};
-            start_time = datetime;
-            for i = 1:length(spaces)
-                space = spaces{i};
-                disp(string(datetime) + " " + strjoin(space,' '))
-                measure_space(db_name, space);
-            end
-            disp("  -> spaces measure")
-            disp("     runtime: " + string(datetime-start_time));
+                start_time = now;
+                for i = 1:length(fatigue_alldat.SubjN)
 
-        case action == 5 % describe variability
-            % get variability by subject & block
-            pipeline = py.list({ ...
-                                py.dict(pyargs('$group', py.dict(pyargs( ...
-                                    '_id', py.dict(pyargs( ...
-                                        'identifier', '$identifier', ...
-                                        'day', '$day', ...
-                                        'block', '$block', ...
-                                        'space', '$space'...
-                                    )) ...
-                                )))) ...
-                            });
-            data = aggregate(db_name, 'variability', pipeline);
+                    if fatigue_alldat.exclude(i) == "TRUE"
+                        fatigue_alldat.proc(i,1) = {{}};
+                    else
+                        a = fatigue_alldat.raw(i);
+                        fatigue_alldat.proc(i,1) = {proc_std(a{1,1}, SRATE, freq_h, freq_l, ORDER)};
+                    end
 
-            % measure descriptives [ skew, kurtosis ]
-            h = waitbar(0, 'Analyzing variability...');  % initialize progress bar
-            start_time = datetime;
-            for i = 1:length(data)
-                % Define the subject, day, block and space inputs
-                data_in = data{i}{'_id'};
-                identifier_input = data_in{'identifier'};
-                day_input = data_in{'day'};
-                block_input = data_in{'block'};
-                space_input = data_in{'space'};
-                
-                % Define the pipeline
-                pipeline = py.list({ ...
-                    py.dict(pyargs('$match', py.dict(pyargs( ...
-                        'identifier', identifier_input, ...
-                        'day', day_input, ...
-                        'block', block_input, ...
-                        'space', space_input...
-                    )))), ...
-                    py.dict(pyargs('$group', py.dict(pyargs( ...
-                        '_id', py.None, ...
-                        'distance', py.dict(pyargs( ...
-                            '$push', '$distance' ...
-                        )) ...
-                    )))), ...
-                    py.dict(pyargs('$project', py.dict(pyargs( ...
-                        '_id', py.False, ...
-                        'distance', py.True ...
-                    )))) ...
-                });
-                variability = aggregate(db_name, 'variability', pipeline);
-
-                % determine skew & kurtosis
-                variability = double(string(variability{1}{'distance'}));
-                skew = skewness(variability);
-                kurt = kurtosis(variability);
-                n = length(variability);
-                if n ~= 2 % at n = 2 the se = infinity, which would throw an error
-                    se_skew = sqrt(6*n*(n-1)/((n-2)*(n+1)*(n+3)));
-                    se_kurt = sqrt(24*n*(n-1)/((n-2)*(n-3)*(n+3)*(n+5)));
-                else
-                    se_skew = nan;
-                    se_kurt = nan;
+                    %Update Progress bar
+                    counter = counter+1;
+                    waitbar(counter/total,h,['Processing Raw Data ', num2str(round(counter/total*100)),'%']);
                 end
+                disp("  -> Raw Data processed")
+                disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+                close(h)
+                %% end subcase 2 process raw data
 
-                % determine range
-                max_var = max(variability);
-                min_var = min(variability);
-                range_var = range(variability);
-                mean_var =  mean(variability);
-                median_var = median(variability);
-                
-                % put data
-                output = data_in;
-                output{'skew'} = skew;
-                output{'se_skew'} = se_skew;
-                output{'kurtosis'} = kurt;
-                output{'se_kurtosis'} = se_kurt;
-                output{'max'} = max_var;
-                output{'min'} = min_var;
-                output{'range'} = range_var;
-                output{'mean'} = mean_var;
-                output{'median'} = median_var;
-                put_data(db_name, 'describe_variability', output);
-                waitbar(i/length(data), h, sprintf('Analyzing variability... %d%%', round(100*i/length(data))));  % update progress bar
-            end
-            close(h) % close progress bar
-            disp("  -> variability explored")
-            disp("     runtime: " + string(datetime-start_time));
+            case 3 % standardize length/time
+                %%
+                LENGTH = 100000;
 
-        case action == 6 % describe emg
-            % like case 4 euc dists
-            %     • what to do with multidimensional spaces?
-            %     add/avarage/only compare 1D/time and lead as regressors?
-            SRATE = 5000;
-            % get unique object ids                              % to get only emg data when multiple data types in collection 'processed'
-                                                                 % query = py.dict(pyargs('data type','EMG'));
-            object_ids = find_unique(db_name,'processed','_id'); % find_unique(db_name,'processed','_id',query);
-            disp('ids done')
+                %Setup Progress bar
+                counter = 0;
+                h = waitbar(0,['Standardising for Time ', num2str(counter*100),'%']);
+                total = length(fatigue_alldat.SubjN);
 
-            h = waitbar(0, 'Analyzing EMG...');  % initialize progress bar
-            start_time = datetime;
+                start_time = now;
+                for i = 1:length(fatigue_alldat.SubjN)
 
-            % itterate & measure emg tracks
-            for i = 1:length(object_ids)
-                % get data
-                query = py.dict(pyargs('_id',object_ids{i}));
-                data = get_data(db_name,'processed',query);
-                data = data{1};
-                emg = data.pop('data');
-                % can I do double directly or must it be via string?
-                emg = double(string(emg));
-                data.pop('_id'); % remove unnecessary data
-                data.pop('data type');
+                    if fatigue_alldat.exclude(i) == "TRUE"
+                        fatigue_alldat.stnd(i,1) = {{}};
+                    else
+                        a = fatigue_alldat.proc(i);
+                        fatigue_alldat.stnd(i,1) = {stnd4time(a{1,1}, LENGTH)};
+                    end
 
-                % calculate descriptives
-                emg_max = max(emg); % find maximal amplitude
-                emg_rms = rms(emg); % calculate the root mean square
-                % ...find the median power frequency
-                 % ...find the median power frequency
-                nfft = 2^nextpow2(length(emg)); % Set the parameters for the PSD calculation
-                win_length = min(nfft, length(emg));
-                overlap_length = round(win_length/2);
-                window = hanning(win_length);
-                [Pxx, f] = pwelch(emg, window, overlap_length, nfft, SRATE); % Calculate the power spectral density of the EMG signal using Welch's method
-                emg_mpf = medfreq(Pxx,f);
-
-                % write descriptives to db
-                data{'max'} = emg_max;
-                data{'rms'} = emg_rms;
-                data{'mpf'} = emg_mpf;
-                put_data(db_name, 'describe_emg', data);
-                waitbar(i/length(object_ids), h, sprintf('Analyzing EMG... %d%%', round(100*i/length(object_ids))));  % update progress bar
-            end
-            close(h) % close progress bar
-            disp("  -> emg description completed")
-            disp("     runtime: " + string(datetime-start_time));
-
-        case action == 7 % view model
-            % input
-            disp('view model')
-            data_type = setDataType(data_type);
-            [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type);
-            data = aggregate(db_name, collection, pipeline);
-            
-            % convert mongodb result to matlab table
-            t = mongoquery2table(data);
-
-            % get dependant
-            dependant = t{:, dependant_name};
-            
-            % calculate regressors
-            switch data_type
-                case 'variability'
-                    regressors = ((t.block-1)*30)+t.trial;
-
-                case 'skill'
-                    regressors = t.BN;
-                    
-                case 'v_d'
-                    regressors = t.block;
-
-                case 'emg_d'
-                    regressors = ((t.block-1)*30)+t.trial;
-            end
-
-            % fit model
-            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
-            
-            % output
-            if data_type == "variability"
-                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " ");
-                regressor_info = "regressor: ((t.block-1)*30)+t.trial";
-            elseif data_type == "v_d"
-                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " "); 
-                regressor_info = "regressor: block";
-            elseif data_type == "skill"
-                dependant_info = "dependant:  " + dependant_name;
-                regressor_info = "regressor: block";
-            elseif data_type == "emg_d"
-                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " "); 
-                regressor_info = "regressor: ((t.block-1)*30)+t.trial";
-            end
-            disp(' ')
-            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––");
-            fprintf("<strong>Robust Linear Regression Model</strong>"); %fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+" Day "+string(day)+"</strong>");
-            disp(' ');
-            disp(dependant_info);
-            disp(regressor_info);
-            disp(' ')
-            disp(mdlr)
-            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
-
-        case action == 8 % comparative model
-            % same code as view model, just twice. 
-            %  once for test and base group
-            %  and then the additional dummy regressor
-            %
-            % Model:
-            %     y =	int +	x1*time +	x2*gX_binary +	x3*gX_binary*session
-            %
-            % Interpretation of Coefficients
-            %
-            % 	             group A  |  group X vs group A
-            %   ––––––––––––––––––––––––––––––––––––––––––––
-            %   intercept |	intercept |	    x2
-            %   time	  |    x1	  |     x3
-            %
-            coefficient_interpretation = table(["intercept"; "x1"], ["x2"; "x3"], ["intercept + x2"; "x1 + x3"],'RowNames',["intercept" "time"]);
-
-            % input
-            disp('creating comparative model')
-            data_type = setDataType(data_type);
-            disp(' ')
-            disp('choose test group')
-            [pipeline, collection, test_dependant_name, test_emg_space] = createPipeline(db_name, data_type);
-            test_data = aggregate(db_name, collection, pipeline);
-
-            disp(' ')
-            disp('choose base group')
-            [pipeline, collection, base_dependant_name, base_emg_space] = createPipeline(db_name, data_type);
-            base_data = aggregate(db_name, collection, pipeline);
-            
-            % convert mongodb result to matlab table
-            test_table = mongoquery2table(test_data);
-            base_table = mongoquery2table(base_data);
-
-            % get dependant
-            test_dependant = test_table{:, test_dependant_name};
-            base_dependant = base_table{:, base_dependant_name};
-            dependant = [test_dependant; base_dependant];
-            
-            % calculate regressors
-            switch data_type
-                case 'variability'
-                    test_regressors = ((test_table.block-1)*30)+test_table.trial;
-                    base_regressors = ((base_table.block-1)*30)+base_table.trial;
-
-                case 'skill'
-                    test_regressors = test_table.BN;
-                    base_regressors = base_table.BN;
-                    
-                case 'v_d'
-                    test_regressors = test_table.block;
-                    base_regressors = base_table.block;
-
-                case 'emg_d'
-                    test_regressors = ((test_table.block-1)*30)+test_table.trial;
-                    base_regressors = ((base_table.block-1)*30)+base_table.trial;
-            end
-
-            % ... add binaries
-            test_binary = [test_regressors ones([height(test_regressors) 1])];
-            base_binary = [base_regressors zeros([height(base_regressors) 1])];
-            % ... add intercept term (time*binary)
-            regressors = [test_binary; base_binary];
-            regressors = [regressors regressors(:,1).*regressors(:,2)];
-
-            % fit model
-            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
-            
-            % output
-            %coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
-            if data_type == "variability"
-                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " ");
-                regressor_info = "regressor: ((t.block-1)*30)+t.trial";
-            elseif data_type == "v_d"
-                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " "); 
-                regressor_info = "regressor: block";
-            elseif data_type == "skill"
-                dependant_info = "dependant:  " + dependant_name;
-                regressor_info = "regressor: block";
-            elseif data_type == "emg_d"
-                dependant_info = "dependant:  " + dependant_name + " " + strjoin(string(emg_space), " "); 
-                regressor_info = "regressor: ((t.block-1)*30)+t.trial";
-            end
-            disp(' ')
-            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
-            fprintf("<strong>Comparative Robust Linear Regression Model</strong>"); %fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
-            disp(' ');
-            disp(dependant_info);
-            disp(regressor_info);
-            disp(' ')
-            disp(coefficient_interpretation)
-            disp(mdlr)
-            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
-          
-        case action == 9 % create graphs
-            disp('create graph')
-            % initiate figure
-            titletext = input('title: ','s');
-            f = figure();
-            drawnow();
-            hold on;
-
-            % set title
-            title(titletext, 'FontSize', 25, 'FontWeight', 'bold');
-            drawnow()
-
-            % plot models
-            ylabeltext = input("y label: ","s");
-            legendcontent = [];
-            while true
-                % input
-                disp(' ');
-                data_type = setDataType(data_type);
-                [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type);
-                data = aggregate(db_name, collection, pipeline);
-                
-                % convert mongodb result to matlab table
-                t = mongoquery2table(data);
-    
-                % get dependant
-                dependant = t{:, dependant_name};
-                
-                % calculate regressors
-                switch data_type
-                    case 'variability'
-                        regressors = ((t.block-1)*30)+t.trial;
-    
-                    case 'skill'
-                        regressors = t.BN;
-                        
-                    case 'v_d'
-                        regressors = t.block;
-    
-                    case 'emg_d'
-                        regressors = ((t.block-1)*30)+t.trial;
+                    %Update Progress bar
+                    counter = counter+1;
+                    waitbar(counter/total,h,['Standardising for Time ', num2str(round(counter/total*100)),'%']);
                 end
-    
-                % fit model
-                mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+                disp("  -> Trials standardized for Time")
+                disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+                close(h)
+                %% end subcase 3 standardize length/time
+        end % end
+        %% case 21 process raw alldat
 
-                % reapply model
-                intercept   = mdlr.Coefficients{1,1};
-                effect      = mdlr.Coefficients{2,1};
-                switch true % calcualte scafold
-                    case data_type == "variability" || data_type == "emg_d"
-                        time_scaffold = transpose(1:120);
-                        set(gca,'XLim',[1 120],'XTick',15:30:105);
-    
-                    case data_type == "skill" || data_type == "v_d"
-                        time_scaffold = transpose(1:4);
-                        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
-                end
-                reapplied_model = intercept + effect*time_scaffold(:,1);
+    case 22 % calculate mean trial
+        %%
+        mean_trials = [];
+        
+        blocks = unique([fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.lead],'rows');
+        blocks = table2struct(cell2table([num2cell(arrayfun(@str2num,blocks(:,1:3))) num2cell(blocks(:,4))],'VariableNames',["subjn" "day" "BN" "lead"]),'ToScalar',true);
+        
+        %Create empty stuct
+        for i = 1:length(blocks.subjn)
 
-                %plot model
-                linewidth = input("linewidth: ");
-                linecolor = input("linecolor: ","s");
-                plotlabel = input("legend label: ","s");
-
-                legendcontent = [legendcontent string(plotlabel)];
-
-                plot(reapplied_model, 'LineWidth', linewidth, 'Color', linecolor);
-                legend(legendcontent);
-
-                set(gca,'box','off');
-                set(findall(gcf,'-property','FontSize'),'FontSize',20);
-                xticklabels(["1", "2", "3", "4"]);
-                xlabel("session");
-                ylabel(ylabeltext);
-                drawnow();
-
-                % continue?
-                action2 = input("continue (y/n): ","s");
-                if action2 == "n"
-                    break
-                end
-            end
-
-            % post creation edits
-            while true
-                listofedits = ...
-                        " \n"+...
-                        "1 reset x\n"+...
-                        "2 set y\n"+...
-                        "9 save\n"+...
-                        "0 end\n"+...
-                        "\n";
-                fprintf(listofedits);
-                editing = input("edit: ");
-    
-                switch editing
-                    case 1 % reset x
-                        switch data_type % calcualte scafold
-                            case data_type == "variability" || data_type == "emg_d"
-                                time_scaffold = transpose(1:120);
-                                set(gca,'XLim',[1 120],'XTick',15:30:105);
+            leads = {'adm' 'apb' 'fdi' 'bic' 'fcr'};
             
-                            case data_type == "skill" || data_type == "v_d"
-                                time_scaffold = transpose(1:4);
-                                set(gca,'XLim',[0.5 4.5],'XTick',1:1:4);
-                        end
-    
-                    case 2 % set y
-                        disp('y lim:')
-                        high = input(' upper: ');
-                        low  = input(' lower: ');
-                        ylim([low high]);
-    
-                    case 9 % save
-                        set(f, 'Renderer', 'painters');
-                        [filename, pathname] = uiputfile('*.pdf', 'Save Graph');
-                        if isequal(filename,0) || isequal(pathname,0) % if user clicked 'cancel', exit script
-                            disp('File not saved');
-                            return
-                        end
-                        print(fullfile(pathname, filename), '-dpdf'); % save as pdf
-                        savefig(f,fullfile(pathname, filename)); % save as matlab figure
-                        disp("Figure saved as " + filename + " to " + pathname);
-    
-                    case 0 % finish edit
-                        break
-                end
-                drawnow()
-            end
-
-        case action == 10 % correlate delta 4-1
-            disp('determine correlation')
-            % get 2 continuous variabes
-            % var 1, session 1 & 4
-            disp(' ')
-            disp(' variable 1')
-            data_type = setDataType(data_type);
-            var1 = data_type;
-            [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type); % returns full day
-            data = aggregate(db_name, collection, pipeline);
-            t = mongoquery2table(data);
-            if data_type == "skill" % rename columns of skill table to match all other data
-                t.Properties.VariableNames = {'identifier', 'day', 'block', 'skillp'};
-            end
-            session_1 = t(t{:,'block'}==1,:); % get subtable for session 1
-            session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
-            % compound to session resolution
-            if data_type == "variability" || data_type == "emg_d"
-                session_1 = removevars(session_1, 'space');
-                session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
-                session_1 = removevars(session_1, 'GroupCount');
-                session_4 = removevars(session_4, 'space');
-                session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
-                session_4 = removevars(session_4, 'GroupCount');
-                dependant_name = "mean_"+dependant_name;
-            end
-            t1 = intersect(session_1(:,{'identifier'}), session_4(:,{'identifier'}), 'rows');
-            t1 = addvars(t1, zeros(height(t1),1),'NewVariableNames','delta_4_1');
-             
-            for i = 1:height(t1)
-                id = t1{i,'identifier'};
-                t1{i,'delta_4_1'} = session_4{session_4.identifier==id,dependant_name}-session_1{session_1.identifier==id,dependant_name};
-            end
-
-            % var 2, session 1 & 4
-            disp(' ')
-            disp(' variable 2')
-            data_type = setDataType(data_type);
-            var2 = data_type;
-            [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type); % returns full day
-            data = aggregate(db_name, collection, pipeline);
-            t = mongoquery2table(data);
-            if data_type == "skill" % rename columns of skill table to match all other data
-                t.Properties.VariableNames = {'identifier', 'day', 'block', 'skillp'};
-            end
-            session_1 = t(t{:,'block'}==1,:); % get subtable for session 1
-            session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
-            % compound to session resolution
-            if data_type == "variability" || data_type == "emg_d"
-                session_1 = removevars(session_1, 'space');
-                session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
-                session_1 = removevars(session_1, 'GroupCount');
-                session_4 = removevars(session_4, 'space');
-                session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
-                session_4 = removevars(session_4, 'GroupCount');
-                dependant_name = "mean_"+dependant_name;
-            end
-            t2 = intersect(session_1(:,{'identifier'}), session_4(:,{'identifier'}), 'rows');
-            t2 = addvars(t2, zeros(height(t2),1),'NewVariableNames','delta_4_1');
-
-            for i = 1:height(t2)
-                id = t2{i,'identifier'};
-                t2{i,'delta_4_1'} = session_4{session_4.identifier==id,dependant_name}-session_1{session_1.identifier==id,dependant_name};
-            end
-
-            % find common row of var 1 & 2
-            t3 = intersect(t1(:,{'identifier'}), t2(:,{'identifier'}), 'rows');
-            t3 = addvars(t3, zeros(height(t3),1), zeros(height(t3),1),'NewVariableNames',[string(var1), string(var2)]);
-            for i = 1:height(t3)
-                id = t3{i,'identifier'};
-                t3{i,var1} = t1{t1.identifier==id, "delta_4_1"}; % add var1 to common table
-                t3{i,var2} = t2{t2.identifier==id, "delta_4_1"}; % add var2 to common table
-            end
-            disp(' ')
-            % correlate
-            [r, p] = corr(t3{:,var1}, t3{:,var2}, 'Type', 'Spearman')
-
-        case action == 0 % reset cml view
-            clc
-            fprintf(operations_list);
-        case action == 666 % Case 666: Terminate Script   
-            run_script = 0;
+            new_line = [];
+            new_line.subjn  = blocks.subjn(i);
+            new_line.day    = blocks.day(i);
+            new_line.BN     = blocks.BN(i);
+            new_line.lead   = blocks.lead(i);
             
-        case action == 911 % Case 911: Clear Workspace
-            clearvars -except action
+            mean_trials = [mean_trials new_line];
 
-    end % end of master switch
-end % end of master while loop
+        end
+        mean_trials = table2struct(struct2table(mean_trials),'ToScalar',true);
+            
+        %Fill struct with means
+        counter = 0;
+        h = waitbar(0,'Calculating mean Trial per Block 0%');
+        total = length(blocks.subjn);
 
-%% Functions
-function emg_space = emgSpaceSelector(db_name)
+        start_time = now;
+        for i = 1:length(blocks.subjn)
+            
+            a = fatigue_alldat.stnd(fatigue_alldat.SubjN  == blocks.subjn(i) &...
+                                    fatigue_alldat.day    == blocks.day(i) &...
+                                    fatigue_alldat.BN     == blocks.BN(i) &...
+                                    fatigue_alldat.lead   == blocks.lead(i) &...
+                                    fatigue_alldat.exclude ~= "TRUE" ...
+                                    );
+                                
+            a = a(~cellfun(@isempty,a));
+            b = length(a);
+            a = cellfun(@transpose,a,'UniformOutput',false);
+            a = cell2mat(a);
+            a = sum(a);
+            a = {transpose(a/b)};
 
-        pyModule = py.importlib.import_module('mongodb');
-        pyModule = py.importlib.reload(pyModule);
-        aggregate = pyModule.aggregate;
+            mean_trials.mean(i,1) = a;
+            
+            %Update Progress bar
+            counter = counter+1;
+            waitbar(counter/total,h,['Calculating mean Trial per Block ', num2str(round(counter/total*100)),'%']);
+        end
+        disp("  -> MeanTrials calculated")
+        disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+        close(h)
+        
+        %% end case 25 create mean trial table
+        
+    case 23 % calculate variables
+        %%
+        start_time = now;
 
-        % get all spaces present in the variability collection
-        unwind_stage = py.dict(pyargs('$unwind', py.str('$space')));
-        group_stage_1 = py.dict(pyargs('$group', py.dict(pyargs('_id', py.str('$_id'),'space', py.dict(pyargs('$addToSet', py.str('$space')))))));
-        group_stage_2 = py.dict(pyargs('$group', py.dict(pyargs('_id', py.str('$space'),'count', py.dict(pyargs('$sum', py.int(1)))))));
-        sort_stage = py.dict(pyargs('$sort', py.dict(pyargs('_id', py.int(1)))));
-        pipeline = py.list({unwind_stage, group_stage_1, group_stage_2, sort_stage});
-        data = aggregate(db_name,'variability',pipeline);
-        spaces = {};
-        for i = 1:length(data)
-            space = {string(data{i}{'_id'})};
-            spaces = [spaces; space];
+      % setup table
+        % get subtable from parameters
+        calc_variables = unique([fatigue_alldat.label fatigue_alldat.SubjN fatigue_alldat.day fatigue_alldat.BN fatigue_alldat.trial_number],'rows');
+        calc_variables = array2table (calc_variables,'VariableNames',["group" "subject" "day" "session" "trial"]);
+        % create unified time column
+        calc_variables_time = calc_variables.trial+(calc_variables.session-1)*30+(calc_variables.day-1)*120;
+        calc_variables_time = array2table(calc_variables_time,'VariableNames',"time");
+        % create columns for calculated variables
+        calc_variables_addon = array2table(zeros([height(calc_variables) length(distances_to_calc)]),"VariableNames",cellfun(@strjoin, distances_to_calc));
+        % combine tables
+        calc_variables = [calc_variables calc_variables_time calc_variables_addon];
+
+      % convert mean trials to table
+        if ~istable(mean_trials)
+            mean_trials = struct2table(mean_trials);
         end
 
+      % convert alldat to table
+        if ~istable(fatigue_alldat)
+        fatigue_alldat = struct2table(fatigue_alldat); 
+        end
+
+      % set up progress bar
+        counter = 0;
+        h = waitbar(0,'Calculating Variables 0%');
+        total = height(calc_variables);
+        
+      % for every row…
+        for i=1:height(calc_variables)
+
+            %   • get mean trial matrix
+            mean_matrix = mean_trials(mean_trials.subjn  == calc_variables.subject(i) &...
+                                      mean_trials.day    == calc_variables.day(i) &...
+                                      mean_trials.BN     == calc_variables.session(i)...
+                                    ,:); % end of mean_matrix getter
+
+            %   • get trial matrix
+            trial_matrix = fatigue_alldat(fatigue_alldat.SubjN        == calc_variables.subject(i) &...
+                                          fatigue_alldat.day          == calc_variables.day(i) &...
+                                          fatigue_alldat.BN           == calc_variables.session(i)&...
+                                          fatigue_alldat.trial_number == calc_variables.trial(i)...
+                                         ,["SubjN" "day" "BN" "trial_number" "lead" "stnd"]); % end of trial_matrix getter
+
+
+            %rearrange matrices
+            mean_matrix     = unstack(mean_matrix,"mean","lead");
+            trial_matrix    = unstack(trial_matrix,"stnd","lead");
+
+            %   • iterate distances to calculate
+            for j=1:length(distances_to_calc)
+                
+                request = distances_to_calc{j};
+
+                check = sum(cellfun(@sum, cellfun(@isnan, mean_matrix{:,request}, 'UniformOutput', false)));
+                if check > 0
+                    calc_variables(i,strjoin(request)) = {nan};
+                    continue
+                end
+
+                request_mean = [mean_matrix{:,request}{:}];
+                request_trial = [trial_matrix{:,request}{:}];
+                
+                if width(request_mean) ~= width(request_trial)
+                    calc_variables(i,strjoin(request)) = {nan};
+                    continue
+                end
+
+                result = Lpq_norm(2,1,request_trial-request_mean);
+
+                calc_variables(i,strjoin(request)) = {result};
+            end
+
+            %Update Progress bar
+            counter = counter+1;
+            waitbar(counter/total,h,['Calculating Variables ', num2str(round(counter/total*100)),'%']);
+        end
+
+        % normalize distances for dimensions
+        for i = 1:length(distances_to_calc)
+            if length(distances_to_calc{i})>1
+                calc_variables.(strjoin(distances_to_calc{i})+" normalized") = calc_variables{:,strjoin(distances_to_calc{i})}/length(distances_to_calc{i});
+            end
+        end
+
+        close(h)
+        disp("  -> Variables calculated")
+        disp(strcat("     runtime: ",datestr(now-start_time,"MM:SS")))
+        %% end case 25 calculate variables
+
+    case 30 % view model
+        %%
+        %% input
+        %  √ emg space
+        %  √ group
+        %  √ multiple or simple
+        %  √ 1- or 2- day
+        %   √ • which day
+        % 
+
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
         disp("  available emg spaces")
         fprintf(' ')
-        for i = 1:length(spaces)
-            fprintf("  "+string(i)+" "+strjoin(spaces{i},' ')+" |")
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
         end
         fprintf('\n')
 
         disp(' ')
-        emg_space = input('emg space:  ');
-        emg_space = spaces{emg_space};
-        
-end
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
 
-function feedback = measure_space(db_name, space)
-        pyModule = py.importlib.import_module('mongodb');
-        pyModule = py.importlib.reload(pyModule);
-        get_data = pyModule.get_data;
-        find_unique = pyModule.find_unique;
-        put_data = pyModule.put_data;
-        aggregate = pyModule.aggregate;
+        % other input
+        group       = input('group:    ');
+        multiple_yn = input('multiple: ','s');
+        days_on_graph      = input('days:     ');
 
-        % get all unique trials in the processed collection
-        disp('getting ids…')
-        pipeline = py.list({py.dict(pyargs("$group",py.dict(pyargs('_id', py.dict(pyargs(...
-                                                                   'identifier', '$identifier', ...
-                                                                   'day', '$day', ...
-                                                                   'block', '$block', ...
-                                                                   'trial', '$trial')) ...
-                       )))),py.dict(pyargs("$project",py.dict(pyargs(...
-                                                                   '_id', int32(1)...
-                                                                    )))), ...
-                          });
-        object_ids = aggregate(db_name, "processed", pipeline);
-        disp('ids done')
-
-        % itterate object_ids
-        measured = [];
-        missing_leads = [];
-        h = waitbar(0, 'Measuring euclidean distances...');  % initialize progress bar
-        start = datetime;
-        for i = 1:length(object_ids)
-            % check if requiered leads exist
-            parameters = object_ids{i}{'_id'};
-            query = py.dict(pyargs( "identifier", parameters{"identifier"}, "day", parameters{"day"}, "block", parameters{"block"}, "trial", parameters{"trial"}));
-            projection = py.dict(pyargs("lead",1));
-            leads = get_data(db_name,"processed",query,projection);
-            leads = cellfun(@(d) strip(string(d{"lead"})), cell(leads), 'UniformOutput', true);
-
-            if isempty(setdiff(space, leads))
-                % get trial array
-                query = py.dict(pyargs( "identifier", parameters{"identifier"}, "day", parameters{"day"}, "block", parameters{"block"}, "trial", parameters{"trial"}, "lead", py.dict(pyargs('$in',py.list(cellstr(space))))));
-                data = get_data(db_name,"processed",query);
-                data = cellfun(@(d) double(d{"data"}), cell(data), 'UniformOutput', false);
-                data = cell2mat(transpose(data));
-
-                % get mean trial array
-                query = py.dict(pyargs( "identifier", parameters{"identifier"}, "day", parameters{"day"}, "block", parameters{"block"}, "lead", py.dict(pyargs('$in',py.list(cellstr(space))))));
-                mean_trial = get_data(db_name,"mean",query);
-                mean_trial = cellfun(@(d) double(d{"mean trial"}), cell(mean_trial), 'UniformOutput', false);
-                mean_trial = cell2mat(transpose(mean_trial));
-
-                % measure distance with Lpq norm
-                result = Lpq_norm(2,1,transpose(data-mean_trial));
-
-                % save result to db
-                output = parameters;
-                measured = [measured struct(output)];
-                output{'space'} = strjoin(space, " ");
-                output{'distance'} = result;
-                put_data(db_name,'variability',output);
-            else
-                % save missing leads to db
-                output = parameters;
-                missing_leads = [missing_leads struct(output)];
-                output{'space'} = strjoin(space, " ");
-                output{'distance'} = "missing leads";
-                output{'missing leads'} = py.list(cellstr(setdiff(space, leads)));
-                put_data(db_name,'variability',output);
-            end
-            waitbar(i/length(object_ids), h, sprintf('Measuring euclidean distances... %d%%', round(100*i/length(object_ids))));  % update progress bar
+        if days_on_graph == 1
+            day     = input('day:      ');
+        else
+            clear day
         end
 
-        stop = datetime;
-        close(h)
-        % return list of measured and unmeasured trials
-        feedback = struct('measured', measured, 'missing_leads', missing_leads, 'duration', stop-start);
-end
-
-function feedback = mongoquery2table(query_in)
-        % Convert PyMongo query result to MATLAB table
-        data = cell(query_in);
-        for i = 1:numel(data)
-            data{i}.pop('_id');
+        % get subset of calc_variables to be tested
+        if days_on_graph == 1
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+        else
+            stencil = (calc_variables.group == group);
         end
-        s = py.list(data);
-        s = cellfun(@struct, cell(s), 'UniformOutput', false);
-        s = [s{:}];
-        t = struct2table(s);
+
+        calc_variables_subset = calc_variables(stencil,:);
+
+        % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+        % get regressors
+        if multiple_yn == "n"
+            regressors_names = "time";
+        elseif days_on_graph == 2
+            regressors_names = ["day" "session" "trial"];
+        else
+            regressors_names = ["session" "trial"];
+        end
+
+        regressors = calc_variables_subset(:, regressors_names);
         
-        % Convert string columns to MATLAB string type, and double columns to double type
-        for col = 1:size(t, 2)
-            try
-                if strcmp(class(t{1, col}{1}), 'py.str')
-                    t.(col) = string(t{:, col});
-                elseif strcmp(class(t{1, col}{1}), 'py.int')
-                    t.(col) = cellfun(@(x) double(int64(x)), t.(col));
-                elseif strcmp(class(t{1, col}{1}), 'py.list')
-                    t.(col) = cellfun(@(x) strjoin(string(x), " "), t{:, col}); % string(t{:, col});
-                end
-            catch ME
-                % Catch indexing error and do nothing
-                if strcmp(ME.identifier, 'MATLAB:cellRefFromNonCell')
-                % Leave column as is
-                else
-                % Re-throw any other errors
-                rethrow(ME)
-                end
-            end
+%       NOT RELEVANT UNLESS COMPARING GROUPS
+%         add binary dummy regressor
+%         binary = array2table(calc_variables_subset.group == test_group & calc_variables_subset.day == test_day, 'VariableNames', "binary");
+%         regressors = [regressors binary];
+% 
+%         % create intercept terms: dummy*regressor
+%         intercep_terms =    table(...
+%                                     regressors{:,"binary"}.*regressors{:,"session"},...
+%                                     regressors{:,"binary"}.*regressors{:,"trial"},...
+%                                     'VariableNames', ["binary*session" "binary*trial"]...
+%                                   ); % end of dummy*regressor creator
+% 
+%         % add intercept terms to regressors
+%         regressors = [regressors intercep_terms];
+
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %%
+        %output
+        if days_on_graph == 2
+            output_heading_days = " Both Days";
+        else
+            output_heading_days = " Day "+string(day);
         end
         
-        % Convert all remaining columns to cell type
-        t = table2cell(t);
-        feedback = cell2table(t, 'VariableNames', fieldnames(s));
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+output_heading_days+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        %disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
 
-end
+    case 302 % compare spaces
+        %%
+        group = input('group: ');
+        day   = input('day:   ');
 
-function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type)
+        spaces = [9 7 8 6 2 3 1 4 5];
+
+        for i = 1:length(spaces)
+            %% input
+            % emg space selector
+            space_index = spaces(i);
+            emg_spaces = calc_variables.Properties.VariableNames;
+            emg_space = emg_spaces{space_index+6};
     
-    pyModule = py.importlib.import_module('mongodb');
-    pyModule = py.importlib.reload(pyModule);
-    aggregate = pyModule.aggregate;
-
-    % ask for group
-    group       = input(' group: ','s');
-    group = strip(group);
-    if length(group) == 1 % convert group input to int or list of ints
-        group = int32(str2num(group));
-    elseif length(group) > 1
-        group = strip(split(group, ","));
-        group = cellfun(@(x) str2num(x), group);
-        group = int32(group);
-        group = py.list(group);
-        group = py.dict(pyargs('$in',group));
-    else
-        disp('invalid group input')
-        return
-    end
-    % ask for day
-    day         = int32(input(' day:   '));
-    % ask for descriptive
-    if data_type == "v_d" || data_type == "emg_d" 
-        descriptive2plot = input('descriptive: ','s');
-    end
-    % ask for emg space
-    if data_type ~= "skill" % do not ask for emg space when modeling skill
-        emg_space   = emgSpaceSelector(db_name);
-    end
-
-    % get members of group from parameters collection
-    pipeline = py.list({...
-        py.dict(pyargs('$match',py.dict(pyargs('label', group)))),...
-        py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID'))))))...
-        });
-    feedback = cell(aggregate('fatigue','parameters',pipeline));
-    members = py.list();
-    for i = 1:length(feedback)
-        members.extend(feedback{i}{'ID'});
-    end
-
-
-    % set return values
-    switch true
-        case data_type == "variability"
-            pipeline = py.list({
-                py.dict(pyargs('$match', py.dict(pyargs(...
-                    'identifier', py.dict(pyargs('$in', members)),...
-                    'day', day,...
-                    'space', emg_space,...
-                    'distance', py.dict(pyargs("$ne", "missing leads"))...
-                    ))))
-                });
-            collection     = 'variability';
-            dependant_name = 'distance';
-
-        case data_type == "skill"
-            pipeline = py.list({
-                py.dict(pyargs('$match', py.dict(pyargs(...
-                    'ID', py.dict(pyargs('$in', members)),...
-                    'day', day...
-                    )))), ...
-                py.dict(pyargs('$project', py.dict(pyargs(...
-                    '_id', int32(1), ...
-                    'ID', int32(1), ...
-                    'day', int32(1), ...
-                    'BN', int32(1), ...
-                    'skillp', int32(1) ...
-                    ))))
-                });
-            collection     = 'parameters';
-            dependant_name = 'skillp';
-            emg_space = '';
-
-        case data_type == "v_d" || data_type == "emg_d" % descriptive of variability or emg
-            match_stage = py.dict(pyargs('$match', py.dict(pyargs(...
-                    'identifier', py.dict(pyargs('$in', members)), ...
-                    'day', day, ...
-                    'lead', emg_space, ...
-                    descriptive2plot, py.dict(pyargs('$ne', NaN))...
-                ))));
-            project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, 'trial', 1, descriptive2plot, 1))));
-            pipeline = py.list({match_stage, project_stage});
-            if data_type == "v_d"
-                collection = "describe_variability";
+            % other input
+            multiple_yn  = 'n'; %input('multiple: ','s');
+            days_on_graph = 1; %input('days:     ');
+    
+            % get subset of calc_variables to be tested
+            if days_on_graph == 1
+                stencil = (calc_variables.group == group & calc_variables.day == day);
             else
-                collection = "describe_emg";
+                stencil = (calc_variables.group == group);
             end
-            dependant_name = descriptive2plot;
-    end
-end
+    
+            calc_variables_subset = calc_variables(stencil,:);
+    
+            % get observed values from calc_variables_subset
+            dependant = calc_variables_subset(:, emg_space);
+            dependant = table2array(dependant);
+    
+            % get regressors
+            if multiple_yn == "n"
+                regressors_names = "time";
+            elseif days_on_graph == 2
+                regressors_names = ["day" "session" "trial"];
+            else
+                regressors_names = ["session" "trial"];
+            end
+    
+            regressors = calc_variables_subset(:, regressors_names);
+            regressors_names = regressors.Properties.VariableNames;
+            regressors = table2array(regressors);
+            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+    
+            %%
+            %output
+            if days_on_graph == 2
+                output_heading_days = " Both Days";
+            else
+                output_heading_days = " Day "+string(day);
+            end
+            
+            disp(' ')
+            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+            fprintf("<strong>Robust Multiple Linear Regression Model | Group "+string(group)+output_heading_days+"</strong>")
+            disp(' ')
+            disp("dependant:  "+emg_space)
+            disp("regressors: " + strjoin(regressors_names+", "))
+            disp(' ')
+            %disp(coefficient_interpretation)
+            disp(mdlr)
+            disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+            %%
+        end
+        %%
 
-function data_type = setDataType(data_type_in)
-    data_type = input('data type: ','s');
-    if data_type == ""
-        data_type = data_type_in;
-    end
+    case 31 % compare 1-day models
+        %
+        % Model
+        %
+        %     y =	int +	x1*session +	x2*trial +	x3*gX_binary +	x4*gX_binary*session +	x5*gX_binary*trial
+        %
+        %
+        % Interpretation of Coefficients
+        %
+        % 	             group A  |  group X vs group A
+        %   ––––––––––––––––––––––––––––––––––––––––––––
+        %   intercept |	intercept |	    x3
+        %   session	  |    x1	  |     x4
+        %   trial	  |    x2	  |     x5
+        %
+
+        %%
+        coefficient_interpretation = table(["intercept"; "x1"; "x2"], ["x3"; "x4"; "x5"], ["intercept + x3"; "x1 + x4"; "x2 + x5"],'RowNames',["intercept" "session" "trial"]);
+
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+
+        % other input
+        disp('base')
+        base_group = input(' • group: ');
+        base_day   = input(' • day:   ');
+        disp('test')
+        test_group = input(' • group: ');
+        test_day   = input(' • day:   ');
+
+        % get subset of calc_variables to be tested
+        calc_variables_subset = calc_variables( ...
+                                    ... get rows according to input
+                                    (calc_variables.group == base_group & calc_variables.day == base_day)| ...for base group
+                                    (calc_variables.group == test_group & calc_variables.day == test_day), ...for test group
+                                    ... get all columns
+                                    :);
+
+        % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+        % get regressors
+        regressors = calc_variables_subset(:, ["session" "trial"]);
+
+        % add binary dummy regressor
+        binary = array2table(calc_variables_subset.group == test_group & calc_variables_subset.day == test_day, 'VariableNames', "binary");
+        regressors = [regressors binary];
+
+        % create intercept terms: dummy*regressor
+        intercep_terms =    table(...
+                                    regressors{:,"binary"}.*regressors{:,"session"},...
+                                    regressors{:,"binary"}.*regressors{:,"trial"},...
+                                    'VariableNames', ["binary*session" "binary*trial"]...
+                                  ); % end of dummy*regressor creator
+
+        % add intercept terms to regressors
+        regressors = [regressors intercep_terms];
+        regressors_names = regressors.Properties.VariableNames;
+
+        regressors = table2array(regressors);
+
+        % fit a robust linear regression model
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %output
+        coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
+
+    case 39 % compare 1-day models simple
+        %
+        % Model
+        %
+        %     y =	int +	x1*time +	x2*gX_binary +	x3*gX_binary*session
+        %
+        %
+        % Interpretation of Coefficients
+        %
+        % 	             group A  |  group X vs group A
+        %   ––––––––––––––––––––––––––––––––––––––––––––
+        %   intercept |	intercept |	    x2
+        %   time	  |    x1	  |     x3
+        %
+
+        %%
+        coefficient_interpretation = table(["intercept"; "x1"], ["x2"; "x3"], ["intercept + x2"; "x1 + x3"],'RowNames',["intercept" "time"]);
+
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+
+        % other input
+        disp('base')
+        base_group = input(' • group: ');
+        base_day   = input(' • day:   ');
+        disp('test')
+        test_group = input(' • group: ');
+        test_day   = input(' • day:   ');
+
+        % get subset of calc_variables to be tested
+        calc_variables_subset = calc_variables( ...
+                                    ... get rows according to input
+                                    (calc_variables.group == base_group & calc_variables.day == base_day)| ...for base group
+                                    (calc_variables.group == test_group & calc_variables.day == test_day), ...for test group
+                                    ... get all columns
+                                    :);
+
+        % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+        % get regressors
+        regressors = calc_variables_subset(:, "time");
+
+        % add binary dummy regressor
+        binary = array2table(calc_variables_subset.group == test_group & calc_variables_subset.day == test_day, 'VariableNames', "binary");
+        regressors = [regressors binary];
+
+        % create intercept terms: dummy*regressor
+        intercep_terms =    table(...
+                                    regressors{:,"binary"}.*regressors{:,"time"},...                                    
+                                    'VariableNames', ["binary*time"]...
+                                  ); % end of dummy*regressor creator
+
+        % add intercept terms to regressors
+        regressors = [regressors intercep_terms];
+        regressors_names = regressors.Properties.VariableNames;
+
+        regressors = table2array(regressors);
+
+        % fit a robust linear regression model
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %output
+        coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
+    
+    case 32 % compare 2-day models
+        %
+        % Model
+        %
+        %     y =	int +	x1*day +	x2*session +	x3*trial +	x4*gX_binary +	x5*gX_binary*day +	x6*gX_binary*session +	x7*gX_binary*trial
+        %
+        %
+        % Interpretation of Coefficients
+        %
+        % 	             group A  |  group X vs group A
+        %   ––––––––––––––––––––––––––––––––––––––––––––
+        %   intercept |	intercept |	    x4
+        %   day	      |    x1	  |     x5
+        %   session	  |    x2	  |     x6
+        %   trial	  |    x3	  |     x7
+        %
+
+        %%
+        coefficient_interpretation = table(["intercept"; "x1"; "x2"; "x3"], ["x4"; "x5"; "x6"; "x7"],'RowNames',["intercept" "day" "session" "trial"]);
+
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("available emg spaces")
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            disp("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars))
+        end
+
+        disp(' ')
+        emg_space = input('emg space:   ')+6;
+        emg_space = emg_spaces{emg_space};
+        base_group = input('base group: ');
+        test_group = input('test group: ');
+
+        % deduce excluded_group
+        if base_group + test_group == 3
+            excluded_group = 3;
+        elseif base_group + test_group == 4
+            excluded_group = 2;
+        else 
+            excluded_group = 1;
+        end
+
+        % get observed values from calc_variables
+        dependant = calc_variables(calc_variables.group ~= excluded_group, emg_space);
+        dependant = table2array(dependant);
+
+        % get regressors
+        regressors = calc_variables(calc_variables.group ~= excluded_group, ["day" "session" "trial"]);
+
+        % add binary dummy regressor
+        binary = array2table(calc_variables{calc_variables.group ~= excluded_group, "group"} == test_group, 'VariableNames', "binary");
+        regressors = [regressors binary];
+        
+        % create intercept terms: dummy*regressor
+        intercep_terms =    table(...
+                                    regressors{:,"binary"}.*regressors{:,"day"},...
+                                    regressors{:,"binary"}.*regressors{:,"session"},...
+                                    regressors{:,"binary"}.*regressors{:,"trial"},...
+                                    'VariableNames', ["binary*day" "binary*session" "binary*trial"]...
+                                  ); % end of dummy*regressor creator
+
+        % add intercept terms to regressors
+        regressors = [regressors intercep_terms];
+
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+
+        % fit a robust linear regression model
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %output
+        coefficient_interpretation.Properties.VariableNames = ["Group "+base_group "Group "+test_group+" vs "+base_group];
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>RMLR - Group "+string(test_group)+" vs "+string(base_group)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
+
+    case 34 % plot regression models
+        %%
+        fprintf("<strong>creating regression plot</strong>\n")
+        %% input
+        % n_days
+        days_on_graph = input('n_days: ');
+
+        if days_on_graph == 1
+            day = input('day:   ');
+        else
+            day = nan;
+        end
+
+        line_width = 2;
+
+        legend_labels = [];
+        legend_labels_plot1 = [];
+        legend_labels_plot2 = [];
+        individual_legends = false;
+
+        y_dimensions = [];
+
+        %% scaffold
+        t = tiledlayout(1,days_on_graph,'TileSpacing','Compact');
+        title(t,'Robust Multiple Linear Regression of Variability')
+
+        % Tile 1 - training sessions
+        if day == 1 || days_on_graph == 2
+            nexttile
+            emptyplot = plot(NaN,NaN,'b','Linewidth',line_width);
+            set(gca,'box','off')
+            set(gca,'XLim',[1 120],'XTick',15:30:105)
+            xticklabels(["T1", "T2", "T3", "T4"])
+            xlabel("session")
+            ylabel("variability")
+        end
+
+        % Tile 2 - control sessions
+        if day == 2 || days_on_graph == 2
+            nexttile
+            emptyplot2 = plot(NaN,NaN,'g','Linewidth',line_width);
+            set(gca,'box','off')
+
+            if days_on_graph == 1
+                set(gca,'XLim',[1 120],'XTick',15:30:105)
+            else
+                set(gca,'XLim',[121 240],'XTick',135:30:225)
+            end
+
+            xticklabels(["C1", "C2", "C3", "C4"])
+            xlabel("session")
+            if day ~= 2
+                ax1 = gca;                   % gca = get current axis
+                ax1.YAxis.Visible = 'off';   % remove y-axis
+            end
+        end
+
+        % Tile 3 - indifferent sessions
+        if day == 3
+            nexttile
+            emptyplot = plot(NaN,NaN,'g','Linewidth',line_width);
+            xlim([121 240])
+            set(gca,'box','off')
+            set(gca,'XLim',[1 120],'XTick',15:30:105)
+            xticklabels(["1", "2", "3", "4"])
+            xlabel("session")
+            ylabel("variability")
+        end
+
+        %% loop plot models
+
+        % show available emg spaces
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp(' ')
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        disp(' ––––––––––––––––––––')
+        plotting = input('  Plot a model? ','s');
+
+        if plotting == 'y'
+            plot_loop_state = 1;
+            plot_counter = 0;
+        end
+        %%
+
+        while plot_loop_state == 1
+
+            plot_counter = plot_counter+1;
+
+            %% generate model to plot
+            %  √ emg space
+            %  √ group
+            %  √ multiple or simple
+            %  √ 1- or 2- day
+            %   √ • which day
+            %
+
+            % emg space selector
+            disp(' ')
+            emg_space   = input('  emg space: ')+6;
+            emg_space = emg_spaces{emg_space};
+
+            % other input
+            group       = input('  group:     ');
+            multiple_yn = input('  multiple:  ','s');
+            days_in_model      = input('  days:      ');
+
+            if days_in_model == 2
+                clear day
+            else %if day == 3
+                day = input('  day:   ');
+            end
+
+            % get subset of calc_variables to be tested
+            if days_in_model == 1
+                stencil = (calc_variables.group == group & calc_variables.day == day);
+            else
+                stencil = (calc_variables.group == group);
+            end
+
+            calc_variables_subset = calc_variables(stencil,:);
+
+            % get observed values from calc_variables_subset
+            dependant = calc_variables_subset(:, emg_space);
+            dependant = table2array(dependant);
+
+            % get regressors
+            if multiple_yn == "n"
+                regressors_names = "time";
+            elseif days_in_model == 2
+                regressors_names = ["day" "session" "trial"];
+            else
+                regressors_names = ["session" "trial"];
+            end
+
+            regressors = calc_variables_subset(:, regressors_names);
+
+            regressors_names = regressors.Properties.VariableNames;
+            regressors = table2array(regressors);
+
+            % create model
+            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+            %% reapply model
+            if multiple_yn == 'n'
+                intercept   = mdlr.Coefficients{1,1};
+                effect      = mdlr.Coefficients{2,1};
+
+                if days_in_model == 2
+                    time_scaffold = 1:240;
+                else
+                    time_scaffold = transpose((1:120)+120*(day-1));
+                end
+
+                reapplied_model = intercept + effect*time_scaffold(:,1);
+
+            elseif days_in_model == 2
+                intercept       = mdlr.Coefficients{1,1};
+                effect_day      = mdlr.Coefficients{2,1};
+                effect_session  = mdlr.Coefficients{3,1};
+                effect_trial    = mdlr.Coefficients{4,1};
+
+                time_scaffold = [...
+                    [ones([120,1]);ones([120,1])*2],... create day column
+                    repmat([ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],[2 1]),... create session column
+                    repmat(transpose(1:30),[8 1])... create trial column
+                    ];
+
+                reapplied_model = intercept + effect_day*time_scaffold(:,1) + effect_session*time_scaffold(:,2) + effect_trial*time_scaffold(:,3);
+            else
+                intercept       = mdlr.Coefficients{1,1};
+                effect_session  = mdlr.Coefficients{2,1};
+                effect_trial    = mdlr.Coefficients{3,1};
+
+                time_scaffold = [...
+                    [ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],... create session column
+                    repmat(transpose(1:30),[4 1])... create trial column
+                    ];
+
+                reapplied_model = intercept + effect_session*time_scaffold(:,1) + effect_trial*time_scaffold(:,2);
+            end
+
+            %% plot reapplied model
+            % asemble legend
+            if multiple_yn == 'y'
+                complexity = 'multiple';
+            else
+                complexity = 'simple';
+            end
+
+            % assemble legend
+            if days_on_graph == 2 
+                if days_in_model == 2
+                    legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+                    legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+                else
+                    if day == 1
+                        legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+                        individual_legends = true;
+                    else
+                        legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+                        individual_legends = true;
+                    end
+                end
+            else
+                if day == 3
+                    legend_labels = [legend_labels "G"+string(group)+"d"+string(day)+" "+emg_space+" "+complexity];
+                else
+                    legend_labels = [legend_labels "G"+string(group)+" "+emg_space+" "+complexity];
+                end
+            end
+
+            % plot to tile
+            if days_on_graph == 1
+                %...in a 1 tile figure
+                nexttile(1)
+                hold on
+                plot(reapplied_model,'Linewidth',line_width)
+                if plot_counter == 1
+                    if day == 1
+                        delete(emptyplot)
+                    else
+                        delete(emptyplot2)
+                    end
+                end
+                legend(legend_labels,'Location','southoutside')
+                hold off
+                drawnow()
+
+            else
+                %...in a 2 tile figure
+
+                if plot_counter == 1
+                    hold on
+                    nexttile(1)
+                    delete(emptyplot)
+                    hold off
+
+                    hold on
+                    nexttile(2)
+                    delete(emptyplot2)
+                    hold off
+                end
+
+                if days_in_model == 2 % plot 2 day model in 2 day figure
+                    nexttile(1)
+                    hold on
+                    plot(reapplied_model,'Linewidth',line_width)
+%                     if plot_counter == 1
+%                         delete(emptyplot)
+%                     end
+                    
+                    if individual_legends
+                        legend(legend_labels_plot1,'Location','southoutside')
+                    end
+                    hold off
+
+                    nexttile(2)
+                    hold on
+                    plot(reapplied_model,'Linewidth',line_width)
+%                     if plot_counter == 1
+%                         delete(emptyplot)
+%                     end
+                    legend(legend_labels_plot2,'Location','southoutside')
+                    hold off
+
+                else % plot 1 day model in 2 day figure
+%                     if plot_counter == 1
+%                         hold on
+%                         nexttile(1)
+%                         delete(emptyplot)
+%                         nexttile(2)
+%                         delete(emptyplot)
+%                         hold off
+%                     end
+
+                    nexttile(day)
+                    hold on
+
+                    if day == 2
+                        reapplied_model = [nan([120 1]); reapplied_model];
+                    end
+
+                    plot(reapplied_model,'Linewidth',line_width)
+
+                    if day == 1 && individual_legends
+                        legend(legend_labels_plot1,'Location','southoutside')
+                    end
+
+                    if day == 2
+                        legend(legend_labels_plot2,'Location','southoutside')
+                    end
+                    hold off
+                end
+
+                drawnow()
+                y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+            end
+
+            %% plot model query
+            disp(' ')
+            disp(' ––––––––––––––––––––')
+            plotting = input('  Plot a model? ','s');
+            if plotting == 'n'
+                plot_loop_state = 0;
+            end
+
+            %% sync y limits in 2 tile figure
+            if days_on_graph == 2
+                y_max = ceil(max(y_dimensions));
+                y_min = floor(min(y_dimensions));
+
+                nexttile(1)
+                ylim([y_min y_max])
+
+                nexttile(2)
+                ylim([y_min y_max])
+
+                drawnow()
+                disp('  y axis synced √')
+            end
+        end
+        drawnow() % redundancy drawnow()
+        %%
+
+    case 35 % reapply model
+        %%
+        %% fit model
+        % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+
+        % other input
+        group       = input('group:    ');
+        multiple_yn = input('multiple: ','s');
+        days_in_model      = input('days:     ');
+
+        if days_in_model == 1
+            day     = input('day:      ');
+        else
+            clear day
+        end
+
+        % get subset of calc_variables to be tested
+        if days_in_model == 1
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+        else
+            stencil = (calc_variables.group == group);
+        end
+
+        calc_variables_subset = calc_variables(stencil,:);
+
+        % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+        % get regressors
+        if multiple_yn == "n"
+            regressors_names = "time";
+        elseif days_in_model == 2
+            regressors_names = ["day" "session" "trial"];
+        else
+            regressors_names = ["session" "trial"];
+        end
+
+        regressors = calc_variables_subset(:, regressors_names);
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %% reapply model
+        if multiple_yn == 'n'
+                intercept   = mdlr.Coefficients{1,1};
+                effect      = mdlr.Coefficients{2,1};
+
+                if days_in_model == 2
+                    time_scaffold = 1:240;
+                else
+                    time_scaffold = transpose((1:120)+120*(day-1));
+                end
+
+                reapplied_model = intercept + effect*time_scaffold(:,1);
+
+            elseif days_in_model == 2
+                intercept       = mdlr.Coefficients{1,1};
+                effect_day      = mdlr.Coefficients{2,1};
+                effect_session  = mdlr.Coefficients{3,1};
+                effect_trial    = mdlr.Coefficients{4,1};
+
+                time_scaffold = [...
+                    [ones([120,1]);ones([120,1])*2],... create day column
+                    repmat([ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],[2 1]),... create session column
+                    repmat(transpose(1:30),[8 1])... create trial column
+                    ];
+
+                reapplied_model = intercept + effect_day*time_scaffold(:,1) + effect_session*time_scaffold(:,2) + effect_trial*time_scaffold(:,3);
+            else
+                intercept       = mdlr.Coefficients{1,1};
+                effect_session  = mdlr.Coefficients{2,1};
+                effect_trial    = mdlr.Coefficients{3,1};
+
+                time_scaffold = [...
+                    [ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],... create session column
+                    repmat(transpose(1:30),[4 1])... create trial column
+                    ];
+
+                reapplied_model = intercept + effect_session*time_scaffold(:,1) + effect_trial*time_scaffold(:,2);
+        end
+
+        disp('reapplied model:')
+        disp('  - start: '+string(reapplied_model(1)))
+        disp('  - end:   '+string(reapplied_model(end)))
+        disp('  - max:   '+string(max(reapplied_model)))
+        disp('  - min:   '+string(min(reapplied_model)))
+        %%
+
+    case 36 % view model for skill
+        %%
+        %input
+        disp(' ')
+        disp(' Regression Model of Skill')
+        disp(' ')
+        group = input('  group:   ');
+        day   = input('  day:     ');
+        disp(' ')
+
+        % get subset of calc_variables to be tested
+        parameters = Parameters; % struct2table(Parameters);
+
+        stencil = (parameters.label == group & parameters.day == day);
+        dependant = table2array(parameters(stencil,'skillp'));
+        regressor = table2array(parameters(stencil,'BN'));
+
+        %plot(regressor, dependant)
+
+        % fit model
+        mdlr = fitlm(regressor,dependant,'RobustOpts','on')
+        plot(mdlr)
+
+        %%
+
+    case 36.2 % comparative skill model
+        %%
+        %
+        % Model
+        %
+        %     y =	int +	x1*time +	x2*gX_binary +	x3*gX_binary*session
+        %
+        %
+        % Interpretation of Coefficients
+        %
+        % 	             group A  |  group X vs group A
+        %   ––––––––––––––––––––––––––––––––––––––––––––
+        %   intercept |	intercept |	    x2
+        %   time	  |    x1	  |     x3
+        %
+
+        %%
+        coefficient_interpretation = table(["intercept"; "x1"], ["x2"; "x3"], ["intercept + x2"; "x1 + x3"],'RowNames',["intercept" "time"]);
+
+%         % emg space selector
+%         emg_spaces = calc_variables.Properties.VariableNames;
+%         non_emg_calc_vars = 6;
+%         disp("  available emg spaces")
+%         fprintf(' ')
+%         for i = 1:length(emg_spaces)-non_emg_calc_vars
+%             fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+%         end
+%         fprintf('\n')
+% 
+%         disp(' ')
+%         emg_space = input('emg space:  ')+6;
+%         emg_space = emg_spaces{emg_space};
+
+        % other input
+        disp('Comparing Skill & Learning')
+        disp('base')
+        base_group = input(' • group: ');
+        base_day   = input(' • day:   ');
+        disp('test')
+        test_group = input(' • group: ');
+        test_day   = input(' • day:   ');
+
+        % get subset of calc_variables to be tested
+        parameters = Parameters; % struct2table(Parameters);
+
+%        stencil = (parameters.label == group & parameters.day == day);
+
+        parameters_subset = parameters( ...
+                                    ... get rows according to input
+                                    (parameters.group == base_group & parameters.day == base_day)| ...for base group
+                                    (parameters.group == test_group & parameters.day == test_day), ...for test group
+                                    ... get all columns
+                                    :);
+
+        % get observed values from calc_variables_subset
+%        dependant = table2array(parameters(stencil,'skillp'));
+
+        dependant = parameters_subset(:, 'skillp');
+        dependant = table2array(dependant);
+
+        % get regressors
+%        regressor = table2array(parameters(stencil,'BN'));
+        
+        regressors = parameters_subset(:, "BN");
+
+        % add binary dummy regressor
+        binary = array2table(parameters_subset.group == test_group & parameters_subset.day == test_day, 'VariableNames', "binary");
+        regressors = [regressors binary];
+
+        % create intercept terms: dummy*regressor
+        intercep_terms =    table(...
+                                    regressors{:,"binary"}.*regressors{:,"BN"},...                                    
+                                    'VariableNames', ["binary*BN"]...
+                                  ); % end of dummy*regressor creator
+
+        % add intercept terms to regressors
+        regressors = [regressors intercep_terms];
+        regressors_names = regressors.Properties.VariableNames;
+
+        regressors = table2array(regressors);
+
+        % fit a robust linear regression model
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %output
+        coefficient_interpretation.Properties.VariableNames = ["G"+base_group+"d"+base_day "G"+test_group+"d"+test_day+" vs G"+base_group+"d"+base_day "G"+test_group+"d"+test_day];
+        disp(' ')
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        fprintf("<strong>RMLR - Group "+string(test_group)+" day "+string(test_day)+" vs Group "+string(base_group)+" day "+string(base_day)+"</strong>")
+        disp(' ')
+        disp("dependant:  "+"skillp") % disp("dependant:  "+emg_space)
+        disp("regressors: " + strjoin(regressors_names+", "))
+        disp(' ')
+        disp(coefficient_interpretation)
+        disp(mdlr)
+        disp("–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
+        %%
+
+    case 37 % plot skill model
+        %%
+        fprintf("<strong>creating regression plot</strong>\n")
+        %% input
+        % n_days
+        days_on_graph = input('n_days: ');
+
+        if days_on_graph == 1
+            day = input('day:   ');
+        else
+            day = nan;
+        end
+
+        line_width = 2;
+
+        legend_labels = [];
+        legend_labels_plot1 = [];
+        legend_labels_plot2 = [];
+        individual_legends = false;
+
+        y_dimensions = [];
+
+        %% scaffold
+        t = tiledlayout(1,days_on_graph,'TileSpacing','Compact');
+        title(t,'Learning Rate')
+
+        % Tile 1 - training sessions
+        if day == 1 || days_on_graph == 2
+            nexttile
+            emptyplot = plot(NaN,NaN,'b','Linewidth',line_width);
+            set(gca,'box','off')
+            set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+            xticklabels(["T1", "T2", "T3", "T4"])
+            xlabel("session")
+            ylabel("skill")
+        end
+
+        % Tile 2 - control sessions
+        if day == 2 || days_on_graph == 2
+            nexttile
+            emptyplot2 = plot(NaN,NaN,'g','Linewidth',line_width); % changed emptyplot2 to emptyplot
+            set(gca,'box','off')
+            set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+            xticklabels(["C1", "C2", "C3", "C4"])
+            xlabel("session")
+            if day ~= 2
+                ax1 = gca;                   % gca = get current axis
+                ax1.YAxis.Visible = 'off';   % remove y-axis
+            end
+        end
+
+        % Tile 3 - indifferent sessions
+        if day == 3
+            nexttile
+            emptyplot = plot(NaN,NaN,'g','Linewidth',line_width);
+            set(gca,'box','off')
+            set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+            xticklabels(["1", "2", "3", "4"])
+            xlabel("session")
+            ylabel("skill")
+        end
+
+        %% loop plot models
+        disp(' ')
+        plotting = input('  Plot a model? ','s');
+
+        if plotting == 'y'
+            plot_loop_state = 1;
+            plot_counter = 0;
+        end
+
+
+        while plot_loop_state == 1
+
+            plot_counter = plot_counter+1;
+
+            %% generate model to plot
+            %input
+            disp(' ')
+            group = input('  group:   ');
+            day   = input('  day:     ');
+            disp(' ')
+
+            
+            % get subset of calc_variables to be tested
+            parameters = Parameters; % struct2table(Parameters);
+
+            stencil = (parameters.label == group & parameters.day == day);
+            dependant = table2array(parameters(stencil,'skillp'));
+            regressor = table2array(parameters(stencil,'BN'));
+
+            % create model
+            mdlr = fitlm(regressor,dependant,'RobustOpts','on');
+
+            %% reapply model
+            intercept   = mdlr.Coefficients{1,1};
+            effect      = mdlr.Coefficients{2,1};
+
+            time_scaffold = 1:4; % transpose(1:4);
+
+            reapplied_model = intercept + effect*time_scaffold; % reapplied_model = intercept + effect*time_scaffold(:,1);
+
+
+            %% plot reapplied model
+            % assemble legend
+            if days_on_graph == 2 
+                if day == 1
+                    legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)];
+                    individual_legends = true;
+                else
+                    legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)];
+                    individual_legends = true;
+                end
+            else
+                if day == 3
+                    legend_labels = [legend_labels "G"+string(group)+"d"+string(day)];
+                else
+                    legend_labels = [legend_labels "G"+string(group)];
+                end
+            end
+
+            % plot to tile
+            if days_on_graph == 1 %...in a 1 tile figure
+                
+                nexttile(1)
+                hold on
+                plot(reapplied_model,'Linewidth',line_width)
+                if plot_counter == 1
+                    if day == 1 || day == 3
+                        delete(emptyplot)
+                    else
+                        delete(emptyplot2)
+                    end
+                end
+                legend(legend_labels,'Location','southoutside')
+                hold off
+                drawnow()
+
+            else %...in a 2 tile figure
+
+                if plot_counter == 1
+                    nexttile(1)
+                    hold on
+                    delete(emptyplot)
+                    hold off
+
+                    nexttile(2)
+                    hold on
+                    delete(emptyplot2)
+                    hold off
+                end
+
+                nexttile(day)
+                hold on
+
+                plot(reapplied_model,'Linewidth',line_width)
+
+                if day == 1 && individual_legends
+                    legend(legend_labels_plot1,'Location','southoutside')
+                end
+
+                if day == 2
+                    legend(legend_labels_plot2,'Location','southoutside')
+                end
+                hold off
+
+                drawnow()
+                y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+            end
+
+            %% plot model query
+            disp(' ')
+            disp(' ––––––––––––––––––––')
+            plotting = input('  Plot a model? ','s');
+            if plotting == 'n'
+                plot_loop_state = 0;
+            end
+
+            %% sync y limits in 2 tile figure
+            if days_on_graph == 2
+                y_max = 0.3; % ceil(max(y_dimensions));
+                y_min = 0; % floor(min(y_dimensions));
+
+                nexttile(1)
+                ylim([y_min y_max])
+
+                nexttile(2)
+                ylim([y_min y_max])
+
+                drawnow()
+                disp('  y axis synced √')
+            end
+        end
+        drawnow() % redundancy drawnow()
+        %%
+
+    case 38 % plot var & learning within group
+        %%
+        fprintf("<strong>creating plot</strong>\n")
+        %% input
+        % n_days
+        days_on_graph = 2;
+
+        % show available emg spaces
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp(' ')
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        % emg space selector
+        disp(' ')
+        emg_space   = input('  emg space: ')+6;
+        emg_space = emg_spaces{emg_space};
+
+        % group to plot
+        group       = input('  group:     ');
+
+        %% scaffold
+        t = tiledlayout(1,days_on_graph,'TileSpacing','Compact');
+
+        switch group
+            case 1
+                title_string = "Non-Fatigued Sham Depo";
+            case 2
+                title_string = "Fatigued Sham Depo";
+            case 3
+                title_string = "Fatigued Real Depo";
+        end
+        
+        title(t,title_string)
+
+        %% plot variability
+
+        legend_array = [];
+        for i = 1:2
+            day = i;
+
+            stencil = calc_variables.group == group & calc_variables.day == day;
+
+            calc_variables_subset = calc_variables(stencil,:);
+
+            % get observed values from calc_variables_subset
+            dependant = calc_variables_subset(:, emg_space);
+            dependant = table2array(dependant);
+
+            % get regressors
+            regressors_names = "time";
+
+            regressors = calc_variables_subset(:, regressors_names);
+
+            regressors_names = regressors.Properties.VariableNames;
+            regressors = table2array(regressors);
+
+            % create model
+            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+            % reapply model
+            intercept   = mdlr.Coefficients{1,1};
+            effect      = mdlr.Coefficients{2,1};
+            time_scaffold = transpose((1:120)+120*(day-1));
+
+            reapplied_model = intercept + effect*time_scaffold;
+
+
+            % plot reapplied model
+            % asemble legend
+            %             if multiple_yn == 'y'
+            %                 complexity = 'multiple';
+            %             else
+            %                 complexity = 'simple';
+            %             end
+            %
+            %             % assemble legend
+            %             if days_on_graph == 2
+            %                 if days_in_model == 2
+            %                     legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                     legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                 else
+            %                     if day == 1
+            %                         legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                         individual_legends = true;
+            %                     else
+            %                         legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                         individual_legends = true;
+            %                     end
+            %                 end
+            %             else
+            %                 if day == 3
+            %                     legend_labels = [legend_labels "G"+string(group)+"d"+string(day)+" "+emg_space+" "+complexity];
+            %                 else
+            %                     legend_labels = [legend_labels "G"+string(group)+" "+emg_space+" "+complexity];
+            %                 end
+            %             end
+
+            % plot to tile
+
+            % plot 1 day model in 2 day figure
+            %                     if plot_counter == 1
+            %                         hold on
+            %                         nexttile(1)
+            %                         delete(emptyplot)
+            %                         nexttile(2)
+            %                         delete(emptyplot)
+            %                         hold off
+            %                     end
+
+            nexttile(1)
+            hold on
+
+            plot(reapplied_model,'Linewidth',line_width)
+
+            set(gca,'box','off')
+            set(gca,'XLim',[1 120],'XTick',15:30:105)
+            xticklabels(["1", "2", "3", "4"])
+            xlabel("session")
+            ylabel("variability")
+
+            legend(["day 1" "day 2"],'Location','southoutside')
+
+            hold off
+
+            drawnow()
+            % y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+
+
+            %% sync y limits in 2 tile figure
+            %             if days_on_graph == 2
+            %                 y_max = ceil(max(y_dimensions));
+            %                 y_min = floor(min(y_dimensions));
+            %
+            %                 nexttile(1)
+            %                 ylim([y_min y_max])
+            %
+            %                 nexttile(2)
+            %                 ylim([y_min y_max])
+            %
+            %                 drawnow()
+            %                 disp('  y axis synced √')
+            %             end
+
+            drawnow() % redundancy drawnow()
+        end
+        %%
+
+        %% plot skill
+        for i = 1:2
+            day = i;
+
+            % get subset of calc_variables to be tested
+            parameters = Parameters; % struct2table(Parameters);
+
+            stencil = (parameters.label == group & parameters.day == day);
+            dependant = table2array(parameters(stencil,'skillp'));
+            regressor = table2array(parameters(stencil,'BN'));
+
+            % create model
+            mdlr = fitlm(regressor,dependant,'RobustOpts','on');
+
+            % reapply model
+            intercept   = mdlr.Coefficients{1,1};
+            effect      = mdlr.Coefficients{2,1};
+
+            time_scaffold = 1:4; % transpose(1:4);
+
+            reapplied_model = intercept + effect*time_scaffold;
+
+
+            % plot reapplied model
+            % asemble legend
+            %             if multiple_yn == 'y'
+            %                 complexity = 'multiple';
+            %             else
+            %                 complexity = 'simple';
+            %             end
+            %
+            %             % assemble legend
+            %             if days_on_graph == 2
+            %                 if days_in_model == 2
+            %                     legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                     legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                 else
+            %                     if day == 1
+            %                         legend_labels_plot1 = [legend_labels_plot1 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                         individual_legends = true;
+            %                     else
+            %                         legend_labels_plot2 = [legend_labels_plot2 "G"+string(group)+" "+emg_space+" "+complexity];
+            %                         individual_legends = true;
+            %                     end
+            %                 end
+            %             else
+            %                 if day == 3
+            %                     legend_labels = [legend_labels "G"+string(group)+"d"+string(day)+" "+emg_space+" "+complexity];
+            %                 else
+            %                     legend_labels = [legend_labels "G"+string(group)+" "+emg_space+" "+complexity];
+            %                 end
+            %             end
+
+            nexttile(2)
+            hold on
+
+            plot(reapplied_model,'Linewidth',line_width)
+
+            set(gca,'box','off')
+            set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+            xticklabels(["1", "2", "3", "4"])
+            xlabel("session")
+            ylabel("skill")
+
+            %                     if day == 1 && individual_legends
+            %                         legend(legend_labels_plot1,'Location','southoutside')
+            %                     end
+            %
+            %                     if day == 2
+            %                         legend(legend_labels_plot2,'Location','southoutside')
+            %                     end
+
+            hold off
+
+            legend(["day 1" "day 2"],'Location','southoutside')
+
+            drawnow()
+            
+            %y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+
+
+            %% sync y limits in 2 tile figure
+            %             if days_on_graph == 2
+            %                 y_max = ceil(max(y_dimensions));
+            %                 y_min = floor(min(y_dimensions));
+            %
+            %                 nexttile(1)
+            %                 ylim([y_min y_max])
+            %
+            %                 nexttile(2)
+            %                 ylim([y_min y_max])
+            %
+            %                 drawnow()
+            %                 disp('  y axis synced √')
+            %             end
+
+            drawnow() % redundancy drawnow()
+        end
+        %%
+
+        %%
+
+    case 41 % styling options
+        %% figure styling options
+        set(findall(gcf,'-property','FontSize'),'FontSize',20);
+        legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','southoutside');
+        %t.Title.String = 'Robust Multiple Regression Models';
+        t.Title.FontSize = 25;
+        t.Title.FontWeight = 'normal';
+        %legend([]);
+        %%
+
+    case 42 % empty legend
+        %%
+        figure(1)
+        hold on
+        emptyplot = plot(NaN,NaN,'Linewidth',line_width);
+        plot(NaN,NaN,'Linewidth',line_width);
+        plot(NaN,NaN,'Linewidth',line_width);
+        plot(NaN,NaN,'Linewidth',line_width);
+        hold off
+        delete(emptyplot)
+        legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"]);
+        set(findall(gcf,'-property','FontSize'),'FontSize',20);
+        legend('Location','bestoutside')
+        %%
+
+    case 43 % plot skill measure
+        %% SKILL
+        % calculate mean skill by group per session from parameters
+        p = Parameters; %struct2table(Parameters);
+        mean_skill_measure = [];
+        for i = 1:3
+            mean_skill_group = zeros([8 1]);
+            for j = 1:2
+                for k=1:4
+                    mean_skill_group(k+((j-1)*4)) = mean(p(p.label == i & p.day == j & p.BN == k,:).skillp,'omitnan');
+                end
+            end
+            mean_skill_measure = [mean_skill_measure mean_skill_group];
+        end
+
+        % create scaffold
+        line_width = 2;
+        t = tiledlayout(1,2,'TileSpacing','Compact');
+        title(t,'Mean Skill Measure')
+
+        % Tile 1 - training sessions
+        nexttile
+        emptyplot = plot(NaN,NaN,'Linewidth',line_width);
+        set(gca,'box','off')
+        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+        xticklabels(["T1", "T2", "T3", "T4"])
+        xlabel("session")
+        ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
+        ylabel("skill measure")
+
+        % Tile 2 - control sessions
+        nexttile
+        emptyplot2 = plot(NaN,NaN,'Linewidth',line_width);
+        set(gca,'box','off')
+        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+        xticklabels(["C1", "C2", "C3", "C4"])
+        xlabel("session")
+        ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
+        ax1 = gca;                   % gca = get current axis
+        ax1.YAxis.Visible = 'off';   % remove y-axis
+
+        % plot skill measure
+        nexttile(1)
+        hold on
+        plot(mean_skill_measure(1:4,:),'Linewidth',line_width)
+        delete(emptyplot)
+        hold off
+
+        nexttile(2)
+        hold on
+        plot(mean_skill_measure(5:8,:),'Linewidth',line_width)
+        delete(emptyplot)
+        %legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','eastoutside');
+        hold off
+
+        set(findall(gcf,'-property','FontSize'),'FontSize',20);
+t.Title.String = 'Mean Skill Measure';
+t.Title.FontSize = 20;
+t.Title.FontWeight = 'normal';
+
+        drawnow()
+
+        %%
+
+    case 432 % plot skill measure
+        %%
+        % calculate mean skill by group per session from parameters
+        p = struct2table(Parameters);
+        mean_skill_measure = [];
+        for i = 1:3
+            mean_skill_group = zeros([8 1]);
+            for j = 1:2
+                for k=1:4
+                    mean_skill_group(k+((j-1)*4)) = mean(p(p.label == i & p.day == j & p.BN == k,:).skillp,'omitnan');
+                end
+            end
+            mean_skill_measure = [mean_skill_measure mean_skill_group];
+        end
+
+        % create scaffold
+        line_width = 2;
+        t = tiledlayout(1,1,'TileSpacing','Compact');
+        title(t,'Mean Skill Measure')
+
+%         % Tile 1 - training sessions
+%         nexttile
+%         emptyplot = plot(NaN,NaN,'Linewidth',line_width);
+%         set(gca,'box','off')
+%         set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+%         xticklabels(["T1", "T2", "T3", "T4"])
+%         xlabel("session")
+%         ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
+%         ylabel("skill measure")
+
+        % Tile 2 - control sessions
+        nexttile
+        emptyplot2 = plot(NaN,NaN,'Linewidth',line_width);
+        set(gca,'box','off')
+        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+        xticklabels(["C1", "C2", "C3", "C4"])
+        xlabel("session")
+        ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
+        ylabel("skill measure")
+        % ax1 = gca;                   % gca = get current axis
+        % ax1.YAxis.Visible = 'off';   % remove y-axis
+
+         % plot skill measure
+%         nexttile(1)
+%         hold on
+%         plot(mean_skill_measure(1:4,:),'Linewidth',line_width)
+%         delete(emptyplot)
+%         hold off
+
+        nexttile(1) %nexttile(2)
+        hold on
+        plot(mean_skill_measure(5:8,:),'Linewidth',line_width)
+        delete(emptyplot)
+        %legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','eastoutside');
+        hold off
+
+        set(findall(gcf,'-property','FontSize'),'FontSize',20);
+t.Title.String = 'Mean Skill Measure';
+t.Title.FontSize = 20;
+t.Title.FontWeight = 'normal';
+
+        drawnow()
+
+        %%
+
+    case 44 % ttest
+        %%
+        %input
+        disp(' ')
+        disp(' T Test')
+        what_to_test = input('  var or skill? ','s');
+        disp(' ')
+        disp(' Sample A')
+        sample_a = zeros([1 3]);
+        sample_a(1) = input('  group:   ');
+        sample_a(2) = input('  day:     ');
+        sample_a(3) = input('  session: ');
+        disp(' ')
+        disp(' Sample B')
+        sample_b = zeros([1 3]);
+        sample_b(1) = input('  group:   ');
+        sample_b(2) = input('  day:     ');
+        sample_b(3) = input('  session: ');
+
+        switch what_to_test
+            case 'var'
+            % emg space selector
+            emg_space = emgSpaceSelector(calc_variables);
+
+            % get subset of calc_variables to be tested
+            stencil = (calc_variables.group == sample_a(1) & calc_variables.day == sample_a(2) & calc_variables.session == sample_a(3));
+            subset_a = table2array(calc_variables(stencil,emg_space));
+
+            stencil = (calc_variables.group == sample_b(1) & calc_variables.day == sample_b(2) & calc_variables.session == sample_b(3));
+            subset_b = table2array(calc_variables(stencil,emg_space));
+
+            % test
+%             if sample_a(1) == sample_b(1)
+%                 kind = 'onesample';
+%             else
+%                 kind = 'independent';
+%             end
+
+            kind = 'independent';
+
+            [t,p] = ttest(subset_a, subset_b, 2, kind);
+
+            case 'skill'
+                % get subset of calc_variables to be tested
+                parameters = Parameters; % struct2table(Parameters);
+
+                stencil = (parameters.label == sample_a(1) & parameters.day == sample_a(2) & parameters.BN == sample_a(3));
+                subset_a = table2array(parameters(stencil,'skillp'));
+
+                stencil = (parameters.label == sample_b(1) & parameters.day == sample_b(2) & parameters.BN == sample_b(3));
+                subset_b = table2array(parameters(stencil,'skillp'));
+
+                % test
+%                 if sample_a(1) == sample_b(1)
+%                     kind = 'onesample';
+%                 else
+%                     kind = 'independent';
+%                 end
+
+                kind = 'independent';
+
+                [t,p] = ttest(subset_a, subset_b, 2, kind);
+
+        end
+        disp(' ')
+        %%
+
+    
+    case 45 % correlation
+        %%
+        emg_space = emgSpaceSelector(calc_variables);
+
+        % 1 | get list of volunteers to itterate
+        % subject_list = unique(Parameters.SubjN);
+    
+        subject_list = [5	6	8	9	11	12	13	14	15	16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31	32	33	34	35	36	37	38	39	40	41	42	43	44];
+            % manually excluded: 10, 45
+        
+
+        % 2 | create list to store intra subject r values
+        correlation_list = nan( length(subject_list), 6);
+        mean_variability_list = nan( length(subject_list), 8);
+
+        for i = 1:length(subject_list)
+            subject = subject_list(i);
+
+        % 3 | get skill and variability values
+            skill       = Parameters.skillp(Parameters.SubjN == subject);
+            variability = calc_variables(calc_variables.subject == subject, ["day", "session", "group" emg_space]);
+
+        % 4 | ¿ Match vector length ? -> calculate variability mean of
+        % block OR stnd4time(skill)
+
+            version = "variability_session_mean";
+            corr_type = 'Spearman'; % 'Pearson', 'Spearman' or 'Kendall'
+            switch version
+
+                case "variability_session_mean"
+                    variability_session_mean = [];
+                    for day = 1:2
+                        for session = 1:4
+                            variability_session_mean = [variability_session_mean; mean( table2array( variability( variability.day == day & variability.session == session, emg_space) ), 'omitnan')];
+                        end
+                    end
+
+                    mean_variability_list(i,:) = transpose(variability_session_mean);
+                
+                    [day1_r, day1_p] = corr( skill(1:4, :), variability_session_mean(1:4, :), 'Type', corr_type );
+                    [day2_r, day2_p] = corr( skill(5:8, :), variability_session_mean(5:8, :), 'Type', corr_type );
+                    correlation_list(i, :) = [unique(variability.group), subject, day1_r, day1_p, day2_r, day2_p];
+
+                case "stnd_skill"
+                    variability_day1 = table2array(variability(variability.day == 1, emg_space));
+                    skill_day1 = stnd4time(skill(1:4,:), length(variability_day1));
+                    variability_day2 = table2array(variability(variability.day == 2, emg_space));
+                    skill_day2 = stnd4time(skill(5:8,:), length(variability_day2));
+                    
+
+                    [day1_r, day1_p] = corr( skill_day1, variability_day1, 'Type', corr_type );
+                    [day2_r, day2_p] = corr( skill_day1, variability_day1, 'Type', corr_type );
+                    correlation_list(i, :) = [unique(variability.group), subject, day1_r, day1_p, day2_r, day2_p];
+            end
+
+        end
+
+        % mean_variability_list
+                
+        correlation_list
+
+        for i = 1:3
+            disp('group '+string(i))
+            corrleation_con = correlation_list(correlation_list(:, 1) == i, :)
+            mean(corrleation_con, "omitnan")
+            std(corrleation_con, "omitnan")
+        end
+
+        % 6 | plot by group ¿only lines or including data points?
+
+        %%
+
+    case 46 % correlate reapplied models
+       
+        %% reapply variability model
+            % fit model
+                % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+
+                % other input
+        group         = input('group:    ');
+        multiple_yn   = "n"; % input('multiple: ','s');
+        days_in_model = 1;   % input('days:     ');
+
+        if days_in_model == 1
+            day     = input('day:      ');
+        else
+            clear day
+        end
+
+                % get subset of calc_variables to be tested
+        if days_in_model == 1
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+        else
+            stencil = (calc_variables.group == group);
+        end
+
+        calc_variables_subset = calc_variables(stencil,:);
+
+                % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+                % get regressors
+        if multiple_yn == "n"
+            regressors_names = "time";
+        elseif days_in_model == 2
+            regressors_names = ["day" "session" "trial"];
+        else
+            regressors_names = ["session" "trial"];
+        end
+
+        regressors = calc_variables_subset(:, regressors_names);
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+
+        mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+        % reapply
+        if multiple_yn == 'n'
+                intercept   = mdlr.Coefficients{1,1};
+                effect      = mdlr.Coefficients{2,1};
+
+                if days_in_model == 2
+                    time_scaffold = 1:240;
+                else
+                    time_scaffold = transpose((1:120)+120*(day-1));
+                end
+
+                reapplied_model_variability = intercept + effect*time_scaffold(:,1);
+
+            elseif days_in_model == 2
+                intercept       = mdlr.Coefficients{1,1};
+                effect_day      = mdlr.Coefficients{2,1};
+                effect_session  = mdlr.Coefficients{3,1};
+                effect_trial    = mdlr.Coefficients{4,1};
+
+                time_scaffold = [...
+                    [ones([120,1]);ones([120,1])*2],... create day column
+                    repmat([ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],[2 1]),... create session column
+                    repmat(transpose(1:30),[8 1])... create trial column
+                    ];
+
+                reapplied_model_variability = intercept + effect_day*time_scaffold(:,1) + effect_session*time_scaffold(:,2) + effect_trial*time_scaffold(:,3);
+            else
+                intercept       = mdlr.Coefficients{1,1};
+                effect_session  = mdlr.Coefficients{2,1};
+                effect_trial    = mdlr.Coefficients{3,1};
+
+                time_scaffold = [...
+                    [ones([30,1]);ones([30,1])*2;ones([30,1])*3;ones([30,1])*4],... create session column
+                    repmat(transpose(1:30),[4 1])... create trial column
+                    ];
+
+                reapplied_model_variability = intercept + effect_session*time_scaffold(:,1) + effect_trial*time_scaffold(:,2);
+        end
+        %% reapply skill model
+        % generate model to plot
+            %input
+%             disp(' ')
+%             group = input('  group:   ');
+%             day   = input('  day:     ');
+%             disp(' ')
+
+            
+            % get subset of calc_variables to be tested
+            parameters = Parameters; % struct2table(Parameters);
+
+            stencil = (parameters.label == group & parameters.day == day);
+            dependant = table2array(parameters(stencil,'skillp'));
+            regressor = table2array(parameters(stencil,'BN'));
+
+            % create model
+            mdlr = fitlm(regressor,dependant,'RobustOpts','on');
+
+            % reapply model
+            intercept   = mdlr.Coefficients{1,1};
+            effect      = mdlr.Coefficients{2,1};
+
+            time_scaffold = transpose(1:3/120:3.99); % 1:4; % transpose(1:4);
+
+            reapplied_model_skill = intercept + effect*time_scaffold; % reapplied_model = intercept + effect*time_scaffold(:,1);
+            
+        %% correlate reapplied models
+        disp('spearman')
+        [r, p] = corr(reapplied_model_skill, reapplied_model_variability, 'Type', 'Spearman' )
+        disp(' ')
+        disp('kendall')
+        [r, p] = corr(reapplied_model_skill, reapplied_model_variability, 'Type', 'Kendall' )
+        disp(' ')
+        disp('pearson')
+        [r, p] = corr(reapplied_model_skill, reapplied_model_variability, 'Type', 'Pearson' )
+        %%
+
+    case 47 % correlation coefficient from intercept
+        %% fit variability model
+            % fit model
+                % emg space selector
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
+
+                % other input
+        group         = input('group:    ');
+        multiple_yn   = "n"; % input('multiple: ','s');
+        days_in_model = 1;   % input('days:     ');
+
+        if days_in_model == 1
+            day     = input('day:      ');
+        else
+            clear day
+        end
+
+                % get subset of calc_variables to be tested
+        if days_in_model == 1
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+        else
+            stencil = (calc_variables.group == group);
+        end
+
+        calc_variables_subset = calc_variables(stencil,:);
+
+                % get observed values from calc_variables_subset
+        dependant = calc_variables_subset(:, emg_space);
+        dependant = table2array(dependant);
+
+                % get regressors
+        if multiple_yn == "n"
+            regressors_names = "time";
+        elseif days_in_model == 2
+            regressors_names = ["day" "session" "trial"];
+        else
+            regressors_names = ["session" "trial"];
+        end
+
+        regressors = calc_variables_subset(:, regressors_names);
+        regressors_names = regressors.Properties.VariableNames;
+        regressors = table2array(regressors);
+
+        mdlr_variability = fitlm(regressors,dependant,'RobustOpts','on');
+
+        %% fit skill model
+        % generate model to plot
+            %input
+%             disp(' ')
+%             group = input('  group:   ');
+%             day   = input('  day:     ');
+%             disp(' ')
+
+            
+            % get subset of calc_variables to be tested
+            parameters = Parameters; % struct2table(Parameters);
+
+            stencil = (parameters.label == group & parameters.day == day);
+            dependant = table2array(parameters(stencil,'skillp'));
+            regressor = table2array(parameters(stencil,'BN'));
+
+            % create model
+            mdlr_skill = fitlm(regressor,dependant,'RobustOpts','on');
+
+        %% calcualte r | https://www.toppr.com/ask/question/find-the-coefficient-of-correlation-from-the-regression-lines-x2y30/
+        effect_skill = mdlr_skill.Coefficients{'x1','Estimate'}
+        effect_variability = mdlr_variability.Coefficients{'x1','Estimate'}
+
+        r2 = effect_skill * (-1/effect_variability)
+        r = sqrt(effect_skill * (-1/effect_variability))
+        %%
+
+    case 48 % correlation coefficient from intercept
+        %%
+
+        emg_space = emgSpaceSelector(calc_variables);
+
+        for group = 1:3
+            for day = 1:2
+
+                %% fit variability model
+                % fit model
+%                 group         = input('group:    ');
+                multiple_yn   = "n"; % input('multiple: ','s');
+                days_in_model = 1;   % input('days:     ');
+        
+%                 if days_in_model == 1
+%                     day     = input('day:      ');
+%                 else
+%                     clear day
+%                 end
+        
+                        % get subset of calc_variables to be tested
+                if days_in_model == 1
+                    stencil = (calc_variables.group == group & calc_variables.day == day);
+                else
+                    stencil = (calc_variables.group == group);
+                end
+        
+                calc_variables_subset = calc_variables(stencil,:);
+        
+                        % get observed values from calc_variables_subset
+                dependant = calc_variables_subset(:, emg_space);
+                dependant = table2array(dependant);
+        
+                        % get regressors
+                if multiple_yn == "n"
+                    regressors_names = "time";
+                elseif days_in_model == 2
+                    regressors_names = ["day" "session" "trial"];
+                else
+                    regressors_names = ["session" "trial"];
+                end
+        
+                regressors = calc_variables_subset(:, regressors_names);
+                regressors_names = regressors.Properties.VariableNames;
+                regressors = table2array(regressors);
+        
+                mdlr_variability = fitlm(regressors,dependant,'RobustOpts','on');
+        
+                %% fit skill model
+                % generate model to plot
+                    %input
+        %             disp(' ')
+        %             group = input('  group:   ');
+        %             day   = input('  day:     ');
+        %             disp(' ')
+        
+                    
+                    % get subset of calc_variables to be tested
+                    parameters = Parameters; % struct2table(Parameters);
+        
+                    stencil = (parameters.label == group & parameters.day == day);
+                    dependant = table2array(parameters(stencil,'skillp'));
+                    regressor = table2array(parameters(stencil,'BN'));
+        
+                    % create model
+                    mdlr_skill = fitlm(regressor,dependant,'RobustOpts','on');
+        
+                %% calcualte r | https://www.toppr.com/ask/question/find-the-coefficient-of-correlation-from-the-regression-lines-x2y30/
+                
+                disp('group ' + string(group) + ' day ' + string(day))
+                effect_skill = mdlr_skill.Coefficients{'x1','Estimate'}
+                effect_variability = mdlr_variability.Coefficients{'x1','Estimate'}
+        
+                r2 = effect_skill * (-1/effect_variability)
+                r = sqrt(effect_skill * (-1/effect_variability))
+                
+
+            end
+        end
+        %%
+
+    case 77 % plot var & learning all groups one day
+        
+        %%
+        day = input('day: ');
+        emg_spaces = emgSpaceSelector(calc_variables);
+
+        f = figure;
+        line_width = 5;
+        colororder([0 0 1; 1 0 0; 1 0.9 0])
+        y_dimensions = [];       
+        t = tiledlayout(1,2); % t = tiledlayout(1,2,'TileSpacing','Compact');
+
+        % VARIABILITY
+        for group = 1:3
+            % get subset of calc_variables to be tested
+            stencil = (calc_variables.group == group & calc_variables.day == day);
+            calc_variables_subset = calc_variables(stencil,:);
+
+            % get observed values from calc_variables_subset
+            dependant = calc_variables_subset(:, emg_space);
+            dependant = table2array(dependant);
+
+            % get regressors
+            if multiple_yn == "n"
+                regressors_names = "time";
+            elseif days_in_model == 2
+                regressors_names = ["day" "session" "trial"];
+            else
+                regressors_names = ["session" "trial"];
+            end
+
+            regressors = calc_variables_subset(:, regressors_names);
+
+            regressors_names = regressors.Properties.VariableNames;
+            regressors = table2array(regressors);
+
+            % create model
+            mdlr = fitlm(regressors,dependant,'RobustOpts','on');
+
+            %% reapply model
+                intercept   = mdlr.Coefficients{1,1};
+                effect      = mdlr.Coefficients{2,1};
+
+                    time_scaffold = transpose((1:120)+120*(day-1));
+
+                reapplied_model = intercept + effect*time_scaffold(:,1);
+
+
+            %% plot reapplied model
+                nexttile(1)
+                hold on
+                plot(reapplied_model,'Linewidth',line_width)
+                if plot_counter == 1
+                    if day == 1
+                        delete(emptyplot)
+                    else
+                        delete(emptyplot2)
+                    end
+                end
+                hold off
+                drawnow()
+                y_dimensions = [y_dimensions max(reapplied_model) min(reapplied_model)];
+
+        end
+        %
+        
+        % SKILL
+        % calculate mean skill by group per session from parameters
+        p = Parameters; %struct2table(Parameters);
+        mean_skill_measure = [];
+        for i = 1:3
+            mean_skill_group = zeros([8 1]);
+            for j = 1:2
+                for k=1:4
+                    mean_skill_group(k+((j-1)*4)) = mean(p(p.label == i & p.day == j & p.BN == k,:).skillp,'omitnan');
+                end
+            end
+            mean_skill_measure = [mean_skill_measure mean_skill_group];
+        end
+
+        nexttile(2)
+        if day == 1
+            plot(mean_skill_measure(1:4,:),'Linewidth',line_width)
+        else
+            plot(mean_skill_measure(5:8,:),'Linewidth',line_width)
+        end
+
+
+        % figure styling options
+        f.Position = [300 300 900 400];
+        set(findall(gcf,'-property','FontSize'),'FontSize',20);
+
+        nexttile(1)
+        set(gca,'box','off')
+        set(gca,'XLim',[1 120],'XTick',15:30:105)
+        xticklabels(["T1", "T2", "T3", "T4"])
+        xlabel("session")
+        ylabel("variability")
+        % y_max = ceil(max(y_dimensions));
+        % y_min = floor(min(y_dimensions));
+        ylim([15 35]) % ylim([y_min y_max])
+        ax = gca;
+        ax.XAxis.LineWidth = 3.5;
+        ax.YAxis.LineWidth = 2.5;
+
+        nexttile(2)
+        set(gca,'box','off')
+        set(gca,'XLim',[0.5 4.5],'XTick',1:1:4)
+        xlabel("session")
+        ylim([min(min(mean_skill_measure)) max(max(mean_skill_measure))])
+        ylabel("skill measure")
+        ax = gca;
+        ax.XAxis.LineWidth = 3.5;
+        ax.YAxis.LineWidth = 2.5;
+
+        if day == 1
+            nexttile(1)
+            xticklabels(["T1", "T2", "T3", "T4"])
+            nexttile(2)
+            xticklabels(["T1", "T2", "T3", "T4"])
+        else
+            nexttile(1)
+            xticklabels(["C1", "C2", "C3", "C4"])
+            nexttile(2)
+            xticklabels(["C1", "C2", "C3", "C4"])
+        end
+
+%        legend(["Non-Fatigued shamDePo","Fatigued shamDePo","Fatigued realDePo"],'Location','southoutside');
+
+        %%
+
+    case 51 % save
+        %%
+        disp('1 alldat as struct')
+        disp('2 alldat as table')
+        disp('3 calc_variables table')
+        disp(' ')
+        what_to_save = input('save: ');
+
+        switch what_to_save
+            case 1
+                if istable(fatigue_alldat)
+                    fatigue_alldat = table2struct(fatigue_alldat,"ToScalar",true);
+                end
+
+                [file, path] = uiputfile(fullfile(rootDir,'*.mat'));
+
+                time_start = now;
+                save(fullfile(path,file),'-struct','fatigue_alldat','-v7.3');
+
+                disp('  -> fatigue_alldat saved')
+                disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+
+            case 2
+                if isstruct(fatigue_alldat)
+                    fatigue_alldat = struct2table(fatigue_alldat,"ToScalar",true);
+                end
+
+                [f,p] = uiputfile(fullfile(rootDir,'*.csv'),'save alldat table');
+                time_start = now;
+                writetable(fatigue_alldat,[p,f]);
+                disp(['   -> ',f,' saved to ',p]);
+                disp(strcat("     runtime ", datestr(now - time_start,'HH:MM:SS')))
+
+            case 3
+                [f,p] = uiputfile(fullfile(rootDir,'*.csv'),'save calc_variables table');
+                writetable(calc_variables,[p,f]);
+                disp(['   -> ',f,' saved to ',p]);
+        end
+        %% end case 51 save
+
+    case 0 % reset cml view
+        %%
+        clc
+        fprintf(operations_list);
+        %% end of case 0
+    
+    case 666 %%Case 666: Terminate Script   
+        run_script = 0;
+        
+    case 911 %Case 911: Clear Workspace
+        clearvars -except action fatigue_alldat mean_trials Missing_Trials Parameters rootDir run_script status_update calc_variables lin_reg_models distances_to_calc
+
+end % end of master switch
+end % end of master while loop
+
+function emg_space = emgSpaceSelector(calc_variables)
+        emg_spaces = calc_variables.Properties.VariableNames;
+        non_emg_calc_vars = 6;
+        disp("  available emg spaces")
+        fprintf(' ')
+        for i = 1:length(emg_spaces)-non_emg_calc_vars
+            fprintf("  "+string(i)+" "+emg_spaces(i+non_emg_calc_vars)+" |")
+        end
+        fprintf('\n')
+
+        disp(' ')
+        emg_space = input('emg space:  ')+6;
+        emg_space = emg_spaces{emg_space};
 end
