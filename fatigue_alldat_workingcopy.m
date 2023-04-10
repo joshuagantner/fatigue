@@ -568,7 +568,7 @@ while run_script == 1
                 % reapply model
                 intercept   = mdlr.Coefficients{1,1};
                 effect      = mdlr.Coefficients{2,1};
-                switch data_type % calcualte scafold
+                switch true % calcualte scafold
                     case data_type == "variability" || data_type == "emg_d"
                         time_scaffold = transpose(1:120);
                         set(gca,'XLim',[1 120],'XTick',15:30:105);
