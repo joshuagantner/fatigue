@@ -668,20 +668,17 @@ while run_script == 1
                 t.Properties.VariableNames = {'identifier', 'day', 'block', 'skillp'};
             end
 
-            % percentile cutt-off
-            switch true
-                case data_type == "variability"
-                    
-        
-                case data_type == "v_d" 
-
-
-                case data_type == "emg_d"
-                    
+            % percentile cutoff
+            if data_type == "variability" || data_type == "emg_d"
+                cutoff = input('cutoff: ');
+                stencil = t.(dependant_name)<=prctile(t.(dependant_name),cutoff);
+                t = t(stencil,:);
             end
 
-            session_1 = t(t{:,'block'}==1,:); % get subtable for session 1
-            session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
+            % get subtable
+            session_1 = t(t{:,'block'}==1,:); % session 1
+            session_4 = t(t{:,'block'}==4,:); % session 4
+
             % compound to session resolution
             if data_type == "variability" || data_type == "emg_d"
                 % session_1 = removevars(session_1, 'space');
@@ -711,8 +708,18 @@ while run_script == 1
             if data_type == "skill" % rename columns of skill table to match all other data
                 t.Properties.VariableNames = {'identifier', 'day', 'block', 'skillp'};
             end
-            session_1 = t(t{:,'block'}==1,:); % get subtable for session 1
-            session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
+
+            % percentile cutoff
+            if data_type == "variability" || data_type == "emg_d"
+                cutoff = input('cutoff: ');
+                stencil = t.(dependant_name)<=prctile(t.(dependant_name),cutoff);
+                t = t(stencil,:);
+            end
+
+            % get subtable
+            session_1 = t(t{:,'block'}==1,:); % session 1
+            session_4 = t(t{:,'block'}==4,:); % session 4
+
             % compound to session resolution
             if data_type == "variability" || data_type == "emg_d"
                 % session_1 = removevars(session_1, 'space');
@@ -741,11 +748,12 @@ while run_script == 1
             end
             disp(' ')
             % correlate
-            [r, p] = corr(t3{:,var1}, t3{:,var2}, 'Type', 'Pearson')
+            [r, p] = corr(t3{:,var1}, t3{:,var2}, 'Type', 'Spearman')
 
         case action == 0 % reset cml view
             clc
             fprintf(operations_list);
+            
         case action == 666 % Case 666: Terminate Script   
             run_script = 0;
             
