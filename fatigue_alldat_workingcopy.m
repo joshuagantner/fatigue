@@ -667,6 +667,19 @@ while run_script == 1
             if data_type == "skill" % rename columns of skill table to match all other data
                 t.Properties.VariableNames = {'identifier', 'day', 'block', 'skillp'};
             end
+
+            % percentile cutt-off
+            switch true
+                case data_type == "variability"
+                    
+        
+                case data_type == "v_d" 
+
+
+                case data_type == "emg_d"
+                    
+            end
+
             session_1 = t(t{:,'block'}==1,:); % get subtable for session 1
             session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
             % compound to session resolution
