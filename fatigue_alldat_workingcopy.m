@@ -592,7 +592,8 @@ while run_script == 1
                 legend(legendcontent);
 
                 set(gca,'box','off');
-                set(findall(gcf,'-property','FontSize'),'FontSize',20);
+                set(findall(gcf,'-property','FontSize'),'FontSize',36);
+                set(findall(gcf,'-property','LineWidth'),'LineWidth',6);
                 xticklabels(["1", "2", "3", "4"]);
                 xlabel("session");
                 ylabel(ylabeltext);
