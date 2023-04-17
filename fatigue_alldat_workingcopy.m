@@ -683,10 +683,10 @@ while run_script == 1
             session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
             % compound to session resolution
             if data_type == "variability" || data_type == "emg_d"
-                session_1 = removevars(session_1, 'space');
+                % session_1 = removevars(session_1, 'space');
                 session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
                 session_1 = removevars(session_1, 'GroupCount');
-                session_4 = removevars(session_4, 'space');
+                % session_4 = removevars(session_4, 'space');
                 session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
                 session_4 = removevars(session_4, 'GroupCount');
                 dependant_name = "mean_"+dependant_name;
@@ -714,10 +714,10 @@ while run_script == 1
             session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
             % compound to session resolution
             if data_type == "variability" || data_type == "emg_d"
-                session_1 = removevars(session_1, 'space');
+                % session_1 = removevars(session_1, 'space');
                 session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
                 session_1 = removevars(session_1, 'GroupCount');
-                session_4 = removevars(session_4, 'space');
+                % session_4 = removevars(session_4, 'space');
                 session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
                 session_4 = removevars(session_4, 'GroupCount');
                 dependant_name = "mean_"+dependant_name;
@@ -740,7 +740,7 @@ while run_script == 1
             end
             disp(' ')
             % correlate
-            [r, p] = corr(t3{:,var1}, t3{:,var2}, 'Type', 'Spearman')
+            [r, p] = corr(t3{:,var1}, t3{:,var2}, 'Type', 'Pearson')
 
         case action == 0 % reset cml view
             clc
@@ -976,20 +976,28 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
             dependant_name = 'skillp';
             emg_space = '';
 
-        case data_type == "v_d" || data_type == "emg_d" % descriptive of variability or emg
+        case data_type == "v_d" % descriptive of variability or emg
+            match_stage = py.dict(pyargs('$match', py.dict(pyargs(...
+                    'identifier', py.dict(pyargs('$in', members)), ...
+                    'day', day, ...
+                    'space', emg_space, ...
+                    descriptive2plot, py.dict(pyargs('$ne', NaN))...
+                ))));
+            project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', int32(1), 'identifier', int32(1), 'day', int32(1), 'block', int32(1), descriptive2plot, int32(1)))));
+            pipeline = py.list({match_stage, project_stage});
+            collection = "describe_variability";
+            dependant_name = descriptive2plot;
+
+        case data_type == "emg_d" % descriptive of variability or emg
             match_stage = py.dict(pyargs('$match', py.dict(pyargs(...
                     'identifier', py.dict(pyargs('$in', members)), ...
                     'day', day, ...
                     'lead', emg_space, ...
                     descriptive2plot, py.dict(pyargs('$ne', NaN))...
                 ))));
-            project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', 1, 'identifier', 1, 'day', 1, 'block', 1, 'trial', 1, descriptive2plot, 1))));
+            project_stage = py.dict(pyargs('$project', py.dict(pyargs('_id', int32(1), 'identifier', int32(1), 'day', int32(1), 'block', int32(1), 'trial', int32(1), descriptive2plot, int32(1)))));
             pipeline = py.list({match_stage, project_stage});
-            if data_type == "v_d"
-                collection = "describe_variability";
-            else
-                collection = "describe_emg";
-            end
+            collection = "describe_emg";
             dependant_name = descriptive2plot;
     end
 end
