@@ -52,6 +52,7 @@ operations_list = ...
     "8 comparative model\n"+...
     "9 create graphs\n"+...
     "10 correlations\n"+...
+    "12 violins\n"+...
     "\n";
 fprintf(operations_list);
 
@@ -727,6 +728,29 @@ while run_script == 1
             disp(' ')
             % correlate
             [r, p] = corr(t3{:,dependant_name_1},t3{:,dependant_name_2},'Type','Spearman','rows','complete')
+
+        case action == 12 % violin charts
+            % get data
+            data_type = 'variability';
+            [pipeline, collection, dependant_name, emg_space] = createPipeline('fatigue', data_type);
+            data = aggregate(db_name, collection, pipeline);
+            t = mongoquery2table(data);
+            
+            data = {};
+            data{1} = t{t.block==1,"distance"};
+            data{2} = t{t.block==2,"distance"};
+            data{3} = t{t.block==3,"distance"};
+            data{4} = t{t.block==4,"distance"};
+            
+            % Imagine how your plot will look!
+            style = {};
+            style{1}  = 0.7; % How wide should the boxes be? (between 0.5 and 1)
+            style{2}  = 1.5; % How thick will the lines be on the box and the violin?
+            style{3}  = 'k'; % What color should the outlines be?
+            style{4}  = repelem([0.5,0.5,0.5],4,1);
+            
+            % plot
+            violin_chart(data, style)
 
         case action == 0 % reset cml view
             clc
