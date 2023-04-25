@@ -593,7 +593,8 @@ while run_script == 1
                 legend(legendcontent);
 
                 set(gca,'box','off');
-                set(findall(gcf,'-property','FontSize'),'FontSize',20);
+                set(findall(gcf,'-property','FontSize'),'FontSize',36);
+                set(findall(gcf,'-property','LineWidth'),'LineWidth',6);
                 xticklabels(["1", "2", "3", "4"]);
                 xlabel("session");
                 ylabel(ylabeltext);
@@ -668,36 +669,20 @@ while run_script == 1
                 t.Properties.VariableNames = {'identifier', 'day', 'block', 'skillp'};
             end
 
-            % percentile cutt-off
-            switch true
-                case data_type == "variability"
-                    
-        
-                case data_type == "v_d" 
-
-
-                case data_type == "emg_d"
-                    
+            % percentile cutoff
+            if data_type == "variability" || data_type == "emg_d"
+                cutoff = input('cutoff: ');
+                stencil = t.(dependant_name)<=prctile(t.(dependant_name),cutoff);
+                t = t(stencil,:);
             end
 
-            session_1 = t(t{:,'block'}==1,:); % get subtable for session 1
-            session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
+            t_var1 = t;
+
             % compound to session resolution
             if data_type == "variability" || data_type == "emg_d"
-                % session_1 = removevars(session_1, 'space');
-                session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
-                session_1 = removevars(session_1, 'GroupCount');
-                % session_4 = removevars(session_4, 'space');
-                session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
-                session_4 = removevars(session_4, 'GroupCount');
-                dependant_name = "mean_"+dependant_name;
-            end
-            t1 = intersect(session_1(:,{'identifier'}), session_4(:,{'identifier'}), 'rows');
-            t1 = addvars(t1, zeros(height(t1),1),'NewVariableNames','delta_4_1');
-             
-            for i = 1:height(t1)
-                id = t1{i,'identifier'};
-                t1{i,'delta_4_1'} = session_4{session_4.identifier==id,dependant_name}-session_1{session_1.identifier==id,dependant_name};
+                t_var1 = varfun(@mean, t_var1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
+                t_var1 = removevars(t_var1, 'GroupCount');
+                dependant_name_1 = "mean_"+dependant_name;
             end
 
             % var 2, session 1 & 4
@@ -711,37 +696,36 @@ while run_script == 1
             if data_type == "skill" % rename columns of skill table to match all other data
                 t.Properties.VariableNames = {'identifier', 'day', 'block', 'skillp'};
             end
-            session_1 = t(t{:,'block'}==1,:); % get subtable for session 1
-            session_4 = t(t{:,'block'}==4,:); % get subtable for session 4
+
+            % percentile cutoff
+            if data_type == "variability" || data_type == "emg_d"
+                cutoff = input('cutoff: ');
+                stencil = t.(dependant_name)<=prctile(t.(dependant_name),cutoff);
+                t = t(stencil,:);
+            end
+
+            t_var2 = t;
+
             % compound to session resolution
             if data_type == "variability" || data_type == "emg_d"
-                % session_1 = removevars(session_1, 'space');
-                session_1 = varfun(@mean, session_1, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
-                session_1 = removevars(session_1, 'GroupCount');
-                % session_4 = removevars(session_4, 'space');
-                session_4 = varfun(@mean, session_4, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
-                session_4 = removevars(session_4, 'GroupCount');
-                dependant_name = "mean_"+dependant_name;
-            end
-            t2 = intersect(session_1(:,{'identifier'}), session_4(:,{'identifier'}), 'rows');
-            t2 = addvars(t2, zeros(height(t2),1),'NewVariableNames','delta_4_1');
-
-            for i = 1:height(t2)
-                id = t2{i,'identifier'};
-                t2{i,'delta_4_1'} = session_4{session_4.identifier==id,dependant_name}-session_1{session_1.identifier==id,dependant_name};
+                t_var2 = varfun(@mean, t_var2, 'GroupingVariables', {'identifier', 'day', 'block'}, 'InputVariables', dependant_name);
+                t_var2 = removevars(t_var2, 'GroupCount');
+                dependant_name_2 = "mean_"+dependant_name;
             end
 
-            % find common row of var 1 & 2
-            t3 = intersect(t1(:,{'identifier'}), t2(:,{'identifier'}), 'rows');
-            t3 = addvars(t3, zeros(height(t3),1), zeros(height(t3),1),'NewVariableNames',[string(var1), string(var2)]);
+            % combine variables 1 & 2
+            t3 = intersect(t_var1(:,{'identifier','day','block'}), t_var2(:,{'identifier','day','block'}), 'rows');
+            t3 = addvars(t3, zeros(height(t3),1), zeros(height(t3),1),'NewVariableNames',[string(dependant_name_1), string(dependant_name_2)]);
             for i = 1:height(t3)
-                id = t3{i,'identifier'};
-                t3{i,var1} = t1{t1.identifier==id, "delta_4_1"}; % add var1 to common table
-                t3{i,var2} = t2{t2.identifier==id, "delta_4_1"}; % add var2 to common table
+                id    = t3{i,'identifier'};
+                day   = t3{i,'day'};
+                block = t3{i,'block'};
+                t3{i,dependant_name_1} = t_var1{t_var1.identifier==id & t_var1.day==day & t_var1.block==block, dependant_name_1}; % add var1 to common table
+                t3{i,dependant_name_2} = t_var2{t_var1.identifier==id & t_var1.day==day & t_var1.block==block, dependant_name_2}; % add var2 to common table
             end
             disp(' ')
             % correlate
-            [r, p] = corr(t3{:,var1}, t3{:,var2}, 'Type', 'Pearson')
+            [r, p] = corr(t3{:,dependant_name_1},t3{:,dependant_name_2},'Type','Spearman','rows','complete')
 
         case action == 12 % violin charts
             % get data
@@ -769,6 +753,7 @@ while run_script == 1
         case action == 0 % reset cml view
             clc
             fprintf(operations_list);
+            
         case action == 666 % Case 666: Terminate Script   
             run_script = 0;
             
