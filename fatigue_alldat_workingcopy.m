@@ -653,7 +653,7 @@ while run_script == 1
                 drawnow()
             end
 
-        case action == 10 % correlate delta 4-1
+        case action == 10 % correlate 
             disp('determine correlation')
             % get 2 continuous variabes
             % var 1, session 1 & 4
@@ -675,6 +675,7 @@ while run_script == 1
                 t = t(stencil,:);
             end
 
+            dependant_name_1 = dependant_name;
             t_var1 = t;
 
             % compound to session resolution
@@ -703,6 +704,7 @@ while run_script == 1
                 t = t(stencil,:);
             end
 
+            dependant_name_2 = dependant_name;
             t_var2 = t;
 
             % compound to session resolution
