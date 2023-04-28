@@ -613,6 +613,7 @@ while run_script == 1
                         " \n"+...
                         "1 reset x\n"+...
                         "2 set y\n"+...
+                        "7 style for printing y\n"+...
                         "9 save\n"+...
                         "0 end\n"+...
                         "\n";
@@ -636,6 +637,9 @@ while run_script == 1
                         high = input(' upper: ');
                         low  = input(' lower: ');
                         ylim([low high]);
+
+                    case 7 % style for print
+                        
     
                     case 9 % save
                         set(f, 'Renderer', 'painters');
@@ -750,7 +754,7 @@ while run_script == 1
             style{4}  = repelem([0.5,0.5,0.5],4,1);
             
             % plot
-            violin_chart(data, style)
+            violin_chart(data, style);
 
         case action == 0 % reset cml view
             clc
