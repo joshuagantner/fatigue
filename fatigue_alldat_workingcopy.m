@@ -1,22 +1,8 @@
-%% FATIGUE v8
+%% FATIGUE v9
 
-run_script = 1;
-%rootDir    = '/Volumes/smb fatigue'; % mac root
-%rootDir = '\\JOSHUAS-MACBOOK\smb fatigue\database'; % windows root network
-%rootDir = 'F:\database'; %windows root hd over usb
-%rootDir = '\\jmg\home\Drive\fatigue\database'; %windows root nas
-% rootDir = 'D:\Joshua\fatigue\database'; %windows root internal hd
-% distances_to_calc = {...
-%     "adm";...
-%     "fdi";...
-%     "apb";...
-%     "fcr";...
-%     "bic";...
-%     ["fdi" "apb"];...
-%     ["fdi" "apb" "adm"];...
-%     ["fcr" "bic"];...
-%     ["fdi" "apb" "adm" "fcr" "bic"]...
-%     };
+%% setup
+% configuration
+db_name = 'fatigue';
 
 % import python functions for mongodb interaction
 %   path on windows tower
@@ -57,9 +43,8 @@ operations_list = ...
 fprintf(operations_list);
 
 %% master while loop
-db_name = 'fatigue';
 
-while run_script == 1
+while true
 
     % Select Operation
     disp(' ')
@@ -613,7 +598,6 @@ while run_script == 1
                         " \n"+...
                         "1 reset x\n"+...
                         "2 set y\n"+...
-                        "7 style for printing y\n"+...
                         "9 save\n"+...
                         "0 end\n"+...
                         "\n";
@@ -637,9 +621,6 @@ while run_script == 1
                         high = input(' upper: ');
                         low  = input(' lower: ');
                         ylim([low high]);
-
-                    case 7 % style for print
-                        
     
                     case 9 % save
                         set(f, 'Renderer', 'painters');
@@ -754,14 +735,14 @@ while run_script == 1
             style{4}  = repelem([0.5,0.5,0.5],4,1);
             
             % plot
-            violin_chart(data, style);
+            violin_chart(data, style)
 
         case action == 0 % reset cml view
             clc
             fprintf(operations_list);
             
         case action == 666 % Case 666: Terminate Script   
-            run_script = 0;
+            break
             
         case action == 911 % Case 911: Clear Workspace
             clearvars -except action
