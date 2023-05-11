@@ -371,7 +371,7 @@ while true
             % save table to file
             [f,p] = uiputfile('*.csv','save table for stats analysis');
             writetable(t,fullfile(p,f))
-            
+
         case action == 71 % view model
             % input
             disp('view model')
@@ -959,6 +959,7 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
         case data_type == "variability"
             pipeline = py.list({
                 py.dict(pyargs('$match', py.dict(pyargs(...
+                    'group', int32(1),...
                     'identifier', py.dict(pyargs('$in', members)),...
                     'day', day,...
                     'space', emg_space,...
