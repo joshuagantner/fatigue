@@ -382,12 +382,18 @@ while true
                                 ))...
                 });
             collection     = 'variability';
-
+            % get distances
             data = aggregate(db_name, collection, pipeline);
-            
             % convert mongodb result to matlab table
             t = mongoquery2table(data);
 
+            % add group info to distances
+            pipeline = py.list({...
+                py.dict(pyargs('$group',py.dict(pyargs('_id', '$label', 'ID', py.dict(pyargs('$addToSet', '$ID')))))),...
+                py.dict(pyargs('$project',py.dict(pyargs('ID',int32(1),'label',int32(1)))))...
+                });
+            feedback = cell(aggregate('fatigue','parameters',pipeline));
+            
             % save table to file
             [f,p] = uiputfile('*.csv','save table for stats analysis');
             writetable(t,fullfile(p,f))
