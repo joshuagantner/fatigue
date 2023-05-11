@@ -34,7 +34,9 @@ operations_list = ...
     "5 describe variability\n"+...
     "6 describe emg\n"+...
     " \n"+...
-    "7 view model\n" + ...
+    "7 create table\n" + ...
+    " \n"+...
+    "71 view model\n" + ...
     "8 comparative model\n"+...
     "9 create graphs\n"+...
     "10 correlations\n"+...
@@ -917,7 +919,7 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
     aggregate = pyModule.aggregate;
 
     % ask for group
-    group       = input(' group: ','s');
+    group = input(' group: ','s');
     group = strip(group);
     if length(group) == 1 % convert group input to int or list of ints
         group = int32(str2num(group));
@@ -932,7 +934,20 @@ function [pipeline, collection, dependant_name, emg_space] = createPipeline(db_n
         return
     end
     % ask for day
-    day         = int32(input(' day:   '));
+    day = input(' day:   ','s');
+    day = strip(day);
+    if length(day) == 1 % convert group input to int or list of ints
+        day = int32(str2num(day));
+    elseif length(day) > 1
+        day = strip(split(day, ","));
+        day = cellfun(@(x) str2num(x), day);
+        day = int32(day);
+        day = py.list(day);
+        day = py.dict(pyargs('$in',day));
+    else
+        disp('invalid day input')
+        return
+    end
     % ask for descriptive
     if data_type == "v_d" || data_type == "emg_d" 
         descriptive2plot = input('descriptive: ','s');
