@@ -358,7 +358,21 @@ while true
             disp("  -> emg description completed")
             disp("     runtime: " + string(datetime-start_time));
 
-        case action == 7 % view model
+        case action == 7 % create table
+            % input
+            disp('view model')
+            data_type = setDataType(data_type);
+            [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type);
+            data = aggregate(db_name, collection, pipeline);
+            
+            % convert mongodb result to matlab table
+            t = mongoquery2table(data);
+
+            % save table to file
+            [f,p] = uiputfile('*.csv','save table for stats analysis');
+            writetable(t,fullfile(p,f))
+            
+        case action == 71 % view model
             % input
             disp('view model')
             data_type = setDataType(data_type);
