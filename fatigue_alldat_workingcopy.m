@@ -403,6 +403,18 @@ while true
             for i = 1:height(t)
                 t{i,'group'} = group_index(t{i,"identifier"});
             end
+
+            % set variability format
+            disp('Which mixed effect model is this data for?')
+            disp(' (1) distance ~ group * day * daily + (1 + daily | identifier)')
+            disp(' (2) Δ ~ group * day + (1 | subject)')
+            disp(' ')
+            model_choice = input(' model: ');
+
+            % for delta model, simplify table to deltas
+            if model_choice == 2
+                t = pivot(t,"Rows",{'group','identifier','day','block'},"DataVariable","distance","Method","median");
+            end
             
             % save table to file
             [f,p] = uiputfile('*.csv','save table for stats analysis');
