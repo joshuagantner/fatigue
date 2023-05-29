@@ -388,6 +388,7 @@ while true
             t = mongoquery2table(data);
 
             % set variability format
+            disp(' ')
             disp('Which mixed effect model is this data for?')
             disp(' (1) distance ~ group * day * daily + (1 + daily | identifier)')
             disp(' (2) Δ ~ group * day + (1 | subject)')
@@ -396,6 +397,10 @@ while true
 
             % for delta model, simplify table to deltas
             if model_choice == 2
+                cutoff = input('cutoff: ');
+                stencil = t.(dependant_name)<=prctile(t.(dependant_name),cutoff);
+                t = t(stencil,:);
+                
                 t = pivot(t,"Rows",{'identifier','day','block'},"DataVariable","distance","Method","median");
                 t_delta = unique(t(:,["identifier", "day"]));
                 t_delta = addvars(t_delta,zeros([height(t_delta),1]),NewVariableNames=['delta']);
