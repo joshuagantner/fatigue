@@ -387,6 +387,29 @@ while true
             % convert mongodb result to matlab table
             t = mongoquery2table(data);
 
+            % set variability format
+            disp('Which mixed effect model is this data for?')
+            disp(' (1) distance ~ group * day * daily + (1 + daily | identifier)')
+            disp(' (2) Δ ~ group * day + (1 | subject)')
+            disp(' ')
+            model_choice = input(' model: ');
+
+            % for delta model, simplify table to deltas
+            if model_choice == 2
+                t = pivot(t,"Rows",{'identifier','day','block'},"DataVariable","distance","Method","median");
+                t_delta = unique(t(:,["identifier", "day"]));
+                t_delta = addvars(t_delta,zeros([height(t_delta),1]),NewVariableNames=['delta']);
+
+                for i = 1:height(t_delta)
+                    identifier = t_delta{i,"identifier"};
+                    day = t_delta{i,"day"};
+                    session1 = t{t.identifier==identifier & t.day==day & t.block==1,"median_distance"};
+                    session4 = t{t.identifier==identifier & t.day==day & t.block==4,"median_distance"};
+                    t_delta{i,"delta"} = session4-session1;
+                end
+                t = t_delta;
+            end
+
             % get group info
             pipeline = py.list({...
                 py.dict(pyargs('$project',py.dict(pyargs('_id',int32(0),'ID',int32(1),'label',int32(1)))))...
@@ -402,18 +425,6 @@ while true
             t.group = zeros(height(t),1);
             for i = 1:height(t)
                 t{i,'group'} = group_index(t{i,"identifier"});
-            end
-
-            % set variability format
-            disp('Which mixed effect model is this data for?')
-            disp(' (1) distance ~ group * day * daily + (1 + daily | identifier)')
-            disp(' (2) Δ ~ group * day + (1 | subject)')
-            disp(' ')
-            model_choice = input(' model: ');
-
-            % for delta model, simplify table to deltas
-            if model_choice == 2
-                t = pivot(t,"Rows",{'group','identifier','day','block'},"DataVariable","distance","Method","median");
             end
             
             % save table to file
