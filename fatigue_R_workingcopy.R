@@ -1,48 +1,31 @@
-# set working directory, load the lme4 package and toggle verbosity
+# set working directory, load packages and toggle verbosity
 getwd()
 dir()
 rm(list = ls())
-#setwd('/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/0 v9/playground')
+setwd('/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/0 v9')
 library(lme4)
-library(lmerTest)
+library(robustlmm)
 v_toggle = 0;
 
 # read in data from table
-D <- read.csv("/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/0 v9/table_space5_deltas_cutoff98.csv")
+D <- read.csv("table_space5.csv")
 D$group <- as.factor(D$group)
 D$day <- as.factor(D$day)
 D$identifier <- as.factor(D$identifier)
 
-# 1. build full model
-modelFull <- lmer(delta ~ group*day + (1|identifier), data=D, REML=F)
+# ad a continuous variable for trials completed within a day. this serves as indicator for time passing/progression of training.
+D$training <- (D$block-1)*30+D$trial
+D$training <- D$training*(1/120)*4 # scaled to 1 session = +1, thereby a day with 4 sessions of 30 trials starts at 1/30 and ends at 4
+
+# fit the full robust model determining the effect of group*day*training on distance
+modelFull <- rlmer(distance~group*day*training+(1+training|identifier), data=D, verbose=v_toggle)
 summary(modelFull)
 
-# 2. anova for group effect
-model0<-lmer(delta ~ day + (1|identifier), data=D, REML=F)
-modelW<-lmer(delta ~ group*day + (1|identifier), data=D, REML=F)
-r2<-anova(model0,modelW)
-r2
+# determine the satterthwaite approximation of degrees of freedom
+m <- lmer(distance~group*day*training+(1+training|identifier), data=D)
+dfs <- data.frame(coef(summary(m)))$df
 
-# 3. anova for change over time 
-# 3a  control group
-Di<-subset(D,D$group==1)
-Di$day <- as.numeric(Di$day)
-Di$day <- Di$day-1
-model0<-lmer(delta ~ 1 + (1|identifier), data=Di, REML=F)
-modelW<-lmer(delta ~ day + (1|identifier), data=Di, REML=F)
-r3a<-anova(model0,modelW)
-r3a
-
-# 3b  FSD group
-Di<-subset(D,D$group==2)
-model0<-lmer(delta ~ 1 + (1|identifier), data=Di, REML=F)
-modelW<-lmer(delta ~ day + (1|identifier), data=Di, REML=F)
-r3b<-anova(model0,modelW)
-r3b
-
-# 3c  FRD group
-Di<-subset(D,D$group==3)
-model0<-lmer(delta ~ 1 + (1|identifier), data=Di, REML=F)
-modelW<-lmer(delta ~ day + (1|identifier), data=Di, REML=F)
-r3c<-anova(model0,modelW)
-r3c
+# calculate p-values for the fixed effects of the robust model
+coefs <- coef(summary(modelFull))
+p.values <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
+p.values
