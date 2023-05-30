@@ -14,7 +14,7 @@ library(robustlmm)
 # fit models
 model_0 <- as.formula("distance~day*daily+(1+daily|identifier)")
 model_W <- as.formula("distance~group*day*daily+(1+daily|identifier)")
-v_toggle = 0;
+v_toggle = 1;
 
 # 1. robust models
 r0_r <- rlmer(model_0, data = calc_variables, verbose = v_toggle)
