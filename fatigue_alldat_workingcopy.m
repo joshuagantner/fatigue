@@ -463,7 +463,7 @@ while true
             % add group info to distances
             t.group = zeros(height(t),1);
             for i = 1:height(t)
-                t{i,'group'} = group_index(t{i,"identifier"});
+                t{i,'group'} = group_index(t{i,"ID"});
             end
             
             % save table to file
