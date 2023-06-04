@@ -437,6 +437,39 @@ while true
             [f,p] = uiputfile('*.csv','save table for stats analysis');
             writetable(t,fullfile(p,f))
             
+        case action == 72 % create table | skill
+            % input
+            disp('creaete table | skill')
+            data_type = setDataType(data_type);
+            [pipeline, collection, dependant_name, emg_space] = createPipeline(db_name, data_type);
+
+            % fetch data
+            data = aggregate(db_name, collection, pipeline);
+            
+            % convert mongodb result to matlab table
+            t = mongoquery2table(data);
+
+            % get group info
+            pipeline = py.list({...
+                py.dict(pyargs('$project',py.dict(pyargs('_id',int32(0),'ID',int32(1),'label',int32(1)))))...
+                });
+            feedback = cell(aggregate('fatigue','parameters',pipeline));
+            ID = cellfun(@(x) string(x{'ID'}), feedback, 'UniformOutput', false);
+            label = cellfun(@(x) double(x{'label'}), feedback, 'UniformOutput', false);
+            feedback_table = table(string(ID'), cell2mat(label'), 'VariableNames', {'ID', 'label'});
+            group_index = unique(feedback_table);
+            group_index = containers.Map(group_index.ID, group_index.label);
+
+            % add group info to distances
+            t.group = zeros(height(t),1);
+            for i = 1:height(t)
+                t{i,'group'} = group_index(t{i,"identifier"});
+            end
+            
+            % save table to file
+            [f,p] = uiputfile('*.csv','save table for stats analysis');
+            writetable(t,fullfile(p,f))
+
         case action == 71 % view model
             % input
             disp('view model')
