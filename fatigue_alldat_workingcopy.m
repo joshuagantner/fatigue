@@ -387,7 +387,7 @@ while true
             % convert mongodb result to matlab table
             t = mongoquery2table(data);
 
-            % set variability format
+            % set variability format to match intended model
             disp(' ')
             disp('Which mixed effect model is this data for?')
             disp(' (1) distance ~ group * day * daily + (1 + daily | identifier)')
@@ -395,12 +395,13 @@ while true
             disp(' ')
             model_choice = input(' model: ');
 
+            % apply a percentile cutoff to the distance
+            cutoff = input('cutoff: ');
+            stencil = t.distance <= prctile(t.distance, cutoff);
+            t = t(stencil,:);
+
             % for delta model, simplify table to deltas
             if model_choice == 2
-                cutoff = input('cutoff: ');
-                stencil = t.(dependant_name)<=prctile(t.(dependant_name),cutoff);
-                t = t(stencil,:);
-                
                 t = pivot(t,"Rows",{'identifier','day','block'},"DataVariable","distance","Method","median");
                 t_delta = unique(t(:,["identifier", "day"]));
                 t_delta = addvars(t_delta,zeros([height(t_delta),1]),NewVariableNames=['delta']);
