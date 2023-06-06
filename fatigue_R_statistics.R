@@ -97,7 +97,9 @@ for (i in 1:nrow(Dvs)) {
                       D$block==row_values$BN)
   Dvs[i,'variability'] <- median(distances)
 }
-# correlations
+Dvs <- na.omit(Dvs)
+
+# correlations variability // skill
 correlations <- data.frame(
   group = c(1,1,2,2,3,3),
   day = c(1,2,1,2,1,2),
@@ -107,8 +109,37 @@ correlations <- data.frame(
 for (i in 1:3) { # group level
   for (j in 1:2) { # day level
     Dvs_ij <- subset(Dvs, group == i & day == j)
-    Dvs_ij <- na.omit(Dvs_ij)
     foo <- cor.test(Dvs_ij$skillp, Dvs_ij$variability,method = "spearman")
+    correlations[correlations$group==i & correlations$day == j, ]$r <- foo$estimate
+    correlations[correlations$group==i & correlations$day == j, ]$p <- foo$p.value
+  }
+}
+correlations
+
+# correlations variability change // learning
+Ddelta <- Dvs %>% #create delta table
+  arrange(ID, day) %>%
+  group_by(ID) %>%
+  mutate(
+    delta_skillp = skillp - lag(skillp),
+    delta_variability = variability - lag(variability)
+  ) %>%
+  ungroup()
+Ddelta <- Ddelta %>%
+  select(ID, day, BN, delta_skillp = delta_skillp, group, delta_variability = delta_variability)
+Ddelta <- na.omit(Ddelta)
+
+correlations_delta <- data.frame(
+  group = c(1,1,2,2,3,3),
+  day = c(1,2,1,2,1,2),
+  r = c(NaN,NaN,NaN,NaN,NaN,NaN),
+  p = c(NaN,NaN,NaN,NaN,NaN,NaN)
+)
+
+for (i in 1:3) { # group level
+  for (j in 1:2) { # day level
+    Ddelta_ij <- subset(Ddelta, group == i & day == j)
+    foo <- cor.test(Ddelta_ij$delta_skillp, Ddelta_ij$delta_variability,method = "pearson")
     correlations[correlations$group==i & correlations$day == j, ]$r <- foo$estimate
     correlations[correlations$group==i & correlations$day == j, ]$p <- foo$p.value
   }
@@ -139,25 +170,3 @@ DshapeR$identifier <- as.factor(DshapeR$identifier)
 modelShapeR <- lmer(range~group + day*block+(1|identifier), data = DshapeR) # fit model
 tableShapeR <- coef(summary(modelShapeR))
 tableShapeR
-
-# 9. MAXIMUM EMG AMPLITUDE
-# load data
-Dmax <- read.csv("table_maxemgamp_APB.csv")
-# mark categorical as factor
-Dmax$group <- as.factor(Dmax$group)
-#Dmax$trial <- Dmax$trial/30
-Dmax$time <- (Dmax$block-1)*30+Dmax$trial
-# fit model
-modelMaxamp <- rlmer(max~group*block*trial + (1+trial|identifier), data = Dmax, verbose = v_toggle)
-summary(modelMaxamp)
-
-ggplot(data = Dmax, aes(x=(block-1)*1+trial, y=max, group=group, color=group)) +
-  geom_point()
-
-# rmANOVA
-model <- aov(max ~ block * trial * group + Error(identifier/(block * trial)), data = Dmax)
-summary(model)
-
-# simple rmANOVA
-model <- aov(max ~ time * group + Error(identifier/(time)), data = Dmax)
-summary(model)
