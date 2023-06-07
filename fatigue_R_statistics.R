@@ -167,16 +167,11 @@ tableShapeR
 # 9. RELEVANT VARIABILITY FOR LEARNING
 # Create a vector of filenames
 filenames <- c(
-  "table_spaceFDId1.csv",
-  "table_spaceFDId2.csv",
-  "table_spaceAPBd1.csv",
-  "table_spaceAPBd2.csv",
-  "table_spaceADMd1.csv",
-  "table_spaceADMd2.csv",
-  "table_spaceIntrinsicd1.csv", 
-  "table_spaceIntrinsicd2.csv", 
-  "table_spaceExtrinsicd1.csv",
-  "table_spaceExtrinsicd2.csv")
+  "table_spaceFDI.csv",
+  "table_spaceAPB.csv",
+  "table_spaceADM.csv",
+  "table_spaceIntrinsic.csv", 
+  "table_spaceExtrinsic.csv")
 
 # Create an empty data frame to store the results
 r2 <- data.frame(subspace = character(),
@@ -193,7 +188,7 @@ for (filename in filenames) {
   Dspace$training <- Dspace$training * (1 / 120) * 1
   
   # Fit the model
-  model <- lmer(distance ~ group * training + (1 | identifier), data = Dspace, REML = FALSE)
+  model <- lmer(distance ~ group * day * training + (1 + training | identifier), data = Dspace, REML = FALSE)
   
   # Calculate R-squared and add it to the data frame
   cR2 <- r.squaredGLMM(model)[, "R2c"]
