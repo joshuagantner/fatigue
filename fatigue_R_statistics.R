@@ -171,12 +171,8 @@ Dspace$group <- as.factor(Dspace$group)
 Dspace$identifier <- as.factor(Dspace$identifier)
 Dspace$training <- (Dspace$block-1)*30+Dspace$trial
 Dspace$training <- Dspace$training*(1/120)*1
-modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
-dfs <- data.frame(coef(summary(m)))$df
-coefs <- coef(summary(modelSpace))
-pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
-tableFDI <- cbind(coefs,data.frame(pvalues))
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
+tableFDI <- coef(summary(m))
 tableFDI
 
 # apb
@@ -185,12 +181,8 @@ Dspace$group <- as.factor(Dspace$group)
 Dspace$identifier <- as.factor(Dspace$identifier)
 Dspace$training <- (Dspace$block-1)*30+Dspace$trial
 Dspace$training <- Dspace$training*(1/120)*1
-modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
-dfs <- data.frame(coef(summary(m)))$df
-coefs <- coef(summary(modelSpace))
-pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
-tableAPB <- cbind(coefs,data.frame(pvalues))
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
+tableAPB <- coef(summary(m))
 tableAPB
 
 # adm
@@ -199,12 +191,8 @@ Dspace$group <- as.factor(Dspace$group)
 Dspace$identifier <- as.factor(Dspace$identifier)
 Dspace$training <- (Dspace$block-1)*30+Dspace$trial
 Dspace$training <- Dspace$training*(1/120)*1
-modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
-dfs <- data.frame(coef(summary(m)))$df
-coefs <- coef(summary(modelSpace))
-pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
-tableADM <- cbind(coefs,data.frame(pvalues))
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
+tableADM <- coef(summary(m))
 tableADM
 
 # intrinsic
@@ -213,12 +201,8 @@ Dspace$group <- as.factor(Dspace$group)
 Dspace$identifier <- as.factor(Dspace$identifier)
 Dspace$training <- (Dspace$block-1)*30+Dspace$trial
 Dspace$training <- Dspace$training*(1/120)*1
-modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
-dfs <- data.frame(coef(summary(m)))$df
-coefs <- coef(summary(modelSpace))
-pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
-tableIntrinsic <- cbind(coefs,data.frame(pvalues))
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
+tableIntrinsic <- coef(summary(m))
 tableIntrinsic
 
 # extrinsic
@@ -227,10 +211,6 @@ Dspace$group <- as.factor(Dspace$group)
 Dspace$identifier <- as.factor(Dspace$identifier)
 Dspace$training <- (Dspace$block-1)*30+Dspace$trial
 Dspace$training <- Dspace$training*(1/120)*1
-modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
-dfs <- data.frame(coef(summary(m)))$df
-coefs <- coef(summary(modelSpace))
-pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
-tableExtrinsic <- cbind(coefs,data.frame(pvalues))
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
+tableExtrinsic <- coef(summary(m))
 tableExtrinsic
