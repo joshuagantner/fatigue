@@ -136,3 +136,22 @@ plotSkillD2 <- ggplot(table_long, aes(x=time, y=value, group=group, color=group)
   guides(color = guide_legend(title = NULL)) +
   mytheme
 ggsave("plotSkillD2.png", plot = plotSkillD2, width = 6, height = 5, units = "cm", dpi = 300)
+
+# training day | fatigued collective
+skillD1f <- data.frame(
+  time = c(0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4),
+  CON = c(-0.02358741,	0.004983495,	0.0335544,	0.062125305,	0.09069621,	0.119267115,	0.14783802,	0.176408925,	0.20497983),
+  fatigued = c(-0.0064518,	0.005355385,	0.01716257,	0.028969755,	0.04077694,	0.052584125,	0.06439131,	0.076198495,	0.08800568)
+)
+# Reshape data to long format
+table_long <- gather(skillD1f, key = "group", value = "value", -time)
+# plot
+plotSkillD1f <- ggplot(table_long, aes(x=time, y=value, group=group, color=group)) +
+  geom_line(linewidth = line_width) +
+  ylim(-0.03,0.4)+
+  labs(x = "session", y = "skill") +
+  scale_x_continuous(breaks = c(0.5, 1.5, 2.5, 3.5), labels = c(1, 2, 3, 4))+
+  ##ggtitle("training day") +
+  guides(color = guide_legend(title = NULL)) +
+  mytheme
+ggsave("plotSkillD1f.png", plot = plotSkillD1f, width = 6, height = 5, units = "cm", dpi = 300)

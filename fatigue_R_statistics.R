@@ -79,6 +79,13 @@ modelSkillD1 <- lmer(skillp~group*BN+(1|ID), data=DskillD1)
 tableSkillD1 <- coef(summary(modelSkillD1))
 tableSkillD1
 
+# fit training-day-model fatigued collective
+DskillD1 <- subset(Dskill,Dskill$day==1)
+DskillD1 <- DskillD1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))
+modelSkillD1f <- lmer(skillp~fatigued*BN+(1|ID), data=DskillD1)
+tableSkillD1f <- coef(summary(modelSkillD1f))
+tableSkillD1f
+
 # fit control-day-model
 DskillD2 <- subset(Dskill,Dskill$day==2)
 modelSkillD2 <- lmer(skillp~group*BN+(1|ID), data=DskillD2)
@@ -110,36 +117,6 @@ for (i in 1:3) { # group level
   for (j in 1:2) { # day level
     Dvs_ij <- subset(Dvs, group == i & day == j)
     foo <- cor.test(Dvs_ij$skillp, Dvs_ij$variability,method = "spearman")
-    correlations[correlations$group==i & correlations$day == j, ]$r <- foo$estimate
-    correlations[correlations$group==i & correlations$day == j, ]$p <- foo$p.value
-  }
-}
-correlations
-
-# correlations variability change // learning
-Ddelta <- Dvs %>% #create delta table
-  arrange(ID, day) %>%
-  group_by(ID) %>%
-  mutate(
-    delta_skillp = skillp - lag(skillp),
-    delta_variability = variability - lag(variability)
-  ) %>%
-  ungroup()
-Ddelta <- Ddelta %>%
-  select(ID, day, BN, delta_skillp = delta_skillp, group, delta_variability = delta_variability)
-Ddelta <- na.omit(Ddelta)
-
-correlations_delta <- data.frame(
-  group = c(1,1,2,2,3,3),
-  day = c(1,2,1,2,1,2),
-  r = c(NaN,NaN,NaN,NaN,NaN,NaN),
-  p = c(NaN,NaN,NaN,NaN,NaN,NaN)
-)
-
-for (i in 1:3) { # group level
-  for (j in 1:2) { # day level
-    Ddelta_ij <- subset(Ddelta, group == i & day == j)
-    foo <- cor.test(Ddelta_ij$delta_skillp, Ddelta_ij$delta_variability,method = "pearson")
     correlations[correlations$group==i & correlations$day == j, ]$r <- foo$estimate
     correlations[correlations$group==i & correlations$day == j, ]$p <- foo$p.value
   }
