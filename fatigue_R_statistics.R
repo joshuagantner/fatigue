@@ -10,6 +10,7 @@ setwd('/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichU
 # load packages
 library(lmerTest)
 library(robustlmm)
+library(MuMIn)
 library(dplyr)
 v_toggle = 0 # toggle verbosity
 
@@ -164,53 +165,38 @@ tableShapeR
 
 
 # 9. RELEVANT VARIABILITY FOR LEARNING
-# FIT MODELS | read comments for 2. & 3. for detailed explanation
-# fdi
-Dspace <- read.csv("table_spaceFDI.csv")
-Dspace$group <- as.factor(Dspace$group)
-Dspace$identifier <- as.factor(Dspace$identifier)
-Dspace$training <- (Dspace$block-1)*30+Dspace$trial
-Dspace$training <- Dspace$training*(1/120)*1
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
-tableFDI <- coef(summary(m))
-tableFDI
+# Create a vector of filenames
+filenames <- c(
+  "table_spaceFDId1.csv",
+  "table_spaceFDId2.csv",
+  "table_spaceAPBd1.csv",
+  "table_spaceAPBd2.csv",
+  "table_spaceADMd1.csv",
+  "table_spaceADMd2.csv",
+  "table_spaceIntrinsicd1.csv", 
+  "table_spaceIntrinsicd2.csv", 
+  "table_spaceExtrinsicd1.csv",
+  "table_spaceExtrinsicd2.csv")
 
-# apb
-Dspace <- read.csv("table_spaceAPB.csv")
-Dspace$group <- as.factor(Dspace$group)
-Dspace$identifier <- as.factor(Dspace$identifier)
-Dspace$training <- (Dspace$block-1)*30+Dspace$trial
-Dspace$training <- Dspace$training*(1/120)*1
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
-tableAPB <- coef(summary(m))
-tableAPB
+# Create an empty data frame to store the results
+r2 <- data.frame(subspace = character(),
+                 cR2 = numeric(),
+                 stringsAsFactors = FALSE)
 
-# adm
-Dspace <- read.csv("table_spaceADM.csv")
-Dspace$group <- as.factor(Dspace$group)
-Dspace$identifier <- as.factor(Dspace$identifier)
-Dspace$training <- (Dspace$block-1)*30+Dspace$trial
-Dspace$training <- Dspace$training*(1/120)*1
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
-tableADM <- coef(summary(m))
-tableADM
-
-# intrinsic
-Dspace <- read.csv("table_spaceIntrinsic.csv")
-Dspace$group <- as.factor(Dspace$group)
-Dspace$identifier <- as.factor(Dspace$identifier)
-Dspace$training <- (Dspace$block-1)*30+Dspace$trial
-Dspace$training <- Dspace$training*(1/120)*1
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
-tableIntrinsic <- coef(summary(m))
-tableIntrinsic
-
-# extrinsic
-Dspace <- read.csv("table_spaceExtrinsic.csv")
-Dspace$group <- as.factor(Dspace$group)
-Dspace$identifier <- as.factor(Dspace$identifier)
-Dspace$training <- (Dspace$block-1)*30+Dspace$trial
-Dspace$training <- Dspace$training*(1/120)*1
-m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace)
-tableExtrinsic <- coef(summary(m))
-tableExtrinsic
+# Loop through the filenames
+for (filename in filenames) {
+  # Read the CSV file
+  Dspace <- read.csv(filename)
+  Dspace$group <- as.factor(Dspace$group)
+  Dspace$identifier <- as.factor(Dspace$identifier)
+  Dspace$training <- (Dspace$block - 1) * 30 + Dspace$trial
+  Dspace$training <- Dspace$training * (1 / 120) * 1
+  
+  # Fit the model
+  model <- lmer(distance ~ group * training + (1 | identifier), data = Dspace, REML = FALSE)
+  
+  # Calculate R-squared and add it to the data frame
+  cR2 <- r.squaredGLMM(model)[, "R2c"]
+  r2 <- rbind(r2, data.frame(subspace = filename, cR2 = cR2))
+}
+r2
