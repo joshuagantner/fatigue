@@ -167,19 +167,16 @@ tableShapeR
 # 9. RELEVANT VARIABILITY FOR LEARNING
 # Create a vector of filenames
 filenames <- c(
-  "table_spaceFDId1.csv",
-  "table_spaceFDId2.csv",
-  "table_spaceAPBd1.csv",
-  "table_spaceAPBd2.csv",
-  "table_spaceADMd1.csv",
-  "table_spaceADMd2.csv",
-  "table_spaceIntrinsicd1.csv", 
-  "table_spaceIntrinsicd2.csv", 
-  "table_spaceExtrinsicd1.csv",
-  "table_spaceExtrinsicd2.csv")
+  "table_spaceFDI.csv",
+  "table_spaceAPB.csv",
+  "table_spaceADM.csv",
+  "table_spaceIntrinsic.csv", 
+  "table_spaceExtrinsic.csv")
 
 # Create an empty data frame to store the results
 r2 <- data.frame(subspace = character(),
+                 group = numeric(),
+                 day = numeric(),
                  cR2 = numeric(),
                  stringsAsFactors = FALSE)
 
@@ -192,11 +189,13 @@ for (filename in filenames) {
   Dspace$training <- (Dspace$block - 1) * 30 + Dspace$trial
   Dspace$training <- Dspace$training * (1 / 120) * 1
   
-  # Fit the model
-  model <- lmer(distance ~ group * training + (1 | identifier), data = Dspace, REML = FALSE)
-  
-  # Calculate R-squared and add it to the data frame
-  cR2 <- r.squaredGLMM(model)[, "R2c"]
-  r2 <- rbind(r2, data.frame(subspace = filename, cR2 = cR2))
+  for (group in 1:3)
+    for (day in 1:2)
+      # Fit the model
+      model <- lmer(distance ~ training + (1 | identifier), data = Dspace[Dspace$group == group & Dspace$day == day, ], REML = FALSE)
+      
+      # Calculate R-squared and add it to the data frame
+      cR2 <- r.squaredGLMM(model)[, "R2c"]
+      r2 <- rbind(r2, data.frame(subspace = filename, cR2 = cR2))
 }
 r2
