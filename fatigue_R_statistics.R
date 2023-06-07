@@ -2,6 +2,8 @@
 # Author: Joshua Gantner
 # eMail:  josh.gantner@gmail.com
 
+
+
 # 0. SETUP
 # set working directory
 setwd('/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/0 v9')
@@ -10,6 +12,8 @@ library(lmerTest)
 library(robustlmm)
 library(dplyr)
 v_toggle = 0 # toggle verbosity
+
+
 
 # 1. LOAD VARIABILITY DATA
 # read in data from csv table, as created by matlab data processing script
@@ -25,6 +29,7 @@ D$training <- (D$block-1)*30+D$trial
 D$training <- D$training*(1/120)*1 # scale to 1 day = +1
 #D <- subset(D,D$distance<quantile(D$distance, c(.94)))
 
+
 # 3. FIT 2-DAY-MODEL
 modelFull <- rlmer(distance~group*day*training+(1+training|identifier), data=D, verbose=v_toggle)
 # determine the satterthwaite approximation of degrees of freedom
@@ -35,6 +40,7 @@ coefs <- coef(summary(modelFull))
 pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableFull <- cbind(coefs,data.frame(pvalues))
 tableFull
+
 
 # 4. FIT TRAINING DAY FATIGUED COLLECTIVE MODEL
 Dd1 <- subset(D,D$day==1)
@@ -49,6 +55,7 @@ pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableD1 <- cbind(coefs,data.frame(pvalues))
 tableD1
 
+
 # 5. FIT CONTROL DAY MODEL
 Dd2 <- subset(D,D$day==2)
 modelD2 <- rlmer(distance~group*training+(1|identifier), data=Dd2, verbose=v_toggle)
@@ -60,6 +67,8 @@ coefs <- coef(summary(modelD2))
 pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableD2 <- cbind(coefs,data.frame(pvalues))
 tableD2
+
+
 
 # 6. MODEL SKILL DATA
 # read in data from csv table, as created by matlab data processing script
@@ -92,6 +101,8 @@ modelSkillD2 <- lmer(skillp~group*BN+(1|ID), data=DskillD2)
 tableSkillD2 <- coef(summary(modelSkillD2))
 tableSkillD2
 
+
+
 # 7. CORRELATION OF VARIABILITY AND LEARNING
 # create combined variability-skill table
 Dvs <- Dskill
@@ -123,8 +134,10 @@ for (i in 1:3) { # group level
 }
 correlations
 
+
+
 # 8. SHAPE OF VARIABILITY
-# kurtosis
+# fit kurtosis
 DshapeK <- read.csv("table_kurtosis_space5.csv") # load data
 DshapeK$group <- as.factor(DshapeK$group) # mark categorical as factor
 DshapeK$identifier <- as.factor(DshapeK$identifier)
@@ -132,7 +145,7 @@ modelShapeK <- lmer(kurtosis~group + day*block+(1|identifier), data = DshapeK) #
 tableShapeK <- coef(summary(modelShapeK))
 tableShapeK
 
-# skew
+# fit skew
 DshapeS <- read.csv("table_skew_space5.csv") # load data
 DshapeS$group <- as.factor(DshapeS$group) # mark categorical as factor
 DshapeS$identifier <- as.factor(DshapeS$identifier)
@@ -140,10 +153,84 @@ modelShapeS <- lmer(skew~group + day*block+(1|identifier), data = DshapeS) # fit
 tableShapeS <- coef(summary(modelShapeS))
 tableShapeS
 
-# range
+# fit range
 DshapeR <- read.csv("table_range_space5.csv") # load data
 DshapeR$group <- as.factor(DshapeR$group) # mark categorical as factor
 DshapeR$identifier <- as.factor(DshapeR$identifier)
 modelShapeR <- lmer(range~group + day*block+(1|identifier), data = DshapeR) # fit model
 tableShapeR <- coef(summary(modelShapeR))
 tableShapeR
+
+
+
+# 9. RELEVANT VARIABILITY FOR LEARNING
+# FIT MODELS | read comments for 2. & 3. for detailed explanation
+# fdi
+Dspace <- read.csv("table_spaceFDI.csv")
+Dspace$group <- as.factor(Dspace$group)
+Dspace$identifier <- as.factor(Dspace$identifier)
+Dspace$training <- (Dspace$block-1)*30+Dspace$trial
+Dspace$training <- Dspace$training*(1/120)*1
+modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
+dfs <- data.frame(coef(summary(m)))$df
+coefs <- coef(summary(modelSpace))
+pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
+tableFDI <- cbind(coefs,data.frame(pvalues))
+tableFDI
+
+# apb
+Dspace <- read.csv("table_spaceAPB.csv")
+Dspace$group <- as.factor(Dspace$group)
+Dspace$identifier <- as.factor(Dspace$identifier)
+Dspace$training <- (Dspace$block-1)*30+Dspace$trial
+Dspace$training <- Dspace$training*(1/120)*1
+modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
+dfs <- data.frame(coef(summary(m)))$df
+coefs <- coef(summary(modelSpace))
+pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
+tableAPB <- cbind(coefs,data.frame(pvalues))
+tableAPB
+
+# adm
+Dspace <- read.csv("table_spaceADM.csv")
+Dspace$group <- as.factor(Dspace$group)
+Dspace$identifier <- as.factor(Dspace$identifier)
+Dspace$training <- (Dspace$block-1)*30+Dspace$trial
+Dspace$training <- Dspace$training*(1/120)*1
+modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
+dfs <- data.frame(coef(summary(m)))$df
+coefs <- coef(summary(modelSpace))
+pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
+tableADM <- cbind(coefs,data.frame(pvalues))
+tableADM
+
+# intrinsic
+Dspace <- read.csv("table_spaceIntrinsic.csv")
+Dspace$group <- as.factor(Dspace$group)
+Dspace$identifier <- as.factor(Dspace$identifier)
+Dspace$training <- (Dspace$block-1)*30+Dspace$trial
+Dspace$training <- Dspace$training*(1/120)*1
+modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
+dfs <- data.frame(coef(summary(m)))$df
+coefs <- coef(summary(modelSpace))
+pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
+tableIntrinsic <- cbind(coefs,data.frame(pvalues))
+tableIntrinsic
+
+# extrinsic
+Dspace <- read.csv("table_spaceExtrinsic.csv")
+Dspace$group <- as.factor(Dspace$group)
+Dspace$identifier <- as.factor(Dspace$identifier)
+Dspace$training <- (Dspace$block-1)*30+Dspace$trial
+Dspace$training <- Dspace$training*(1/120)*1
+modelSpace <- rlmer(distance~group*day*training+(1+training|identifier), data=Dspace, verbose=v_toggle)
+m <- lmer(distance~group*day*training+(1+training|identifier), data=Dspace) # determine the satterthwaite approximation of degrees of freedom
+dfs <- data.frame(coef(summary(m)))$df
+coefs <- coef(summary(modelSpace))
+pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE) # calculate p-values for the fixed effects of the robust model
+tableExtrinsic <- cbind(coefs,data.frame(pvalues))
+tableExtrinsic
