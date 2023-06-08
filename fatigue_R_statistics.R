@@ -102,6 +102,13 @@ modelSkillD2 <- lmer(skillp~group*BN+(1|ID), data=DskillD2)
 tableSkillD2 <- coef(summary(modelSkillD2))
 tableSkillD2
 
+# fit control-day-model with FSD (group2) as baseline
+DskillD2 <- subset(Dskill,Dskill$day==2)
+DskillD2$group <- factor(DskillD2$group, levels = c(2, 1, 3))
+modelSkillD2 <- lmer(skillp~group*BN+(1|ID), data=DskillD2)
+tableSkillD2 <- coef(summary(modelSkillD2))
+tableSkillD2
+
 
 
 # 7. CORRELATION OF VARIABILITY AND LEARNING
@@ -195,3 +202,22 @@ for (filename in filenames) {
   r2 <- rbind(r2, data.frame(subspace = filename, cR2 = cR2))
 }
 r2
+
+
+
+# 10. MAXIMUM EMG AMPLITUDE
+# load data
+Dmax <- read.csv("table_maxemgamp_FDI.csv")
+Dmax$group <- as.factor(Dmax$group)
+Dmax$time <- ((Dmax$block-1)*30+Dmax$trial)/30
+Dmax <- Dmax %>% mutate(fatigued = ifelse(group == 1, 0, 1))
+# simple Model robust
+modelMaxamp <- rlmer(max~fatigued*time + (1|identifier), data = Dmax[Dmax$day==1, ], verbose = v_toggle)
+# determine the satterthwaite approximation of degrees of freedom
+m <- lmer(max~fatigued*time + (1|identifier), data = Dmax[Dmax$day==1, ])
+dfs <- data.frame(coef(summary(m)))$df
+# calculate p-values for the fixed effects of the robust model
+coefs <- coef(summary(modelMaxamp))
+pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
+tableMaxamp <- cbind(coefs,data.frame(pvalues))
+tableMaxamp

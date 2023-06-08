@@ -4,6 +4,8 @@
 # Author: Joshua Gantner
 # eMail:  josh.gantner@gmail.com
 
+
+
 # 0. SETUP
 # set working directory
 setwd('/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/0 v9')
@@ -19,7 +21,9 @@ mytheme <- theme(legend.position = "bottom",
                  legend.text = element_text(size=8))
 line_width = 1
 
-# 1. PLOT 2-DAY MODEL
+
+
+# 1. PLOT 2-DAY VARIABILITY MODEL
 # modelFull
 tableFull <- data.frame(
   time = c(0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9),
@@ -56,7 +60,9 @@ plotFullD2 <- ggplot(table_long_d2, aes(x=time, y=value, group=group, color=grou
   mytheme
 ggsave("plotFullD2.png", plot = plotFullD2, width = 6, height = 5, units = "cm", dpi = 300)
 
-# 2. PLOT 1-DAY MODELS
+
+
+# 2. PLOT 1-DAY VARIABILITY MODELS
 # training day
 tableD1 <- data.frame(
   time = c(0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4),
@@ -95,6 +101,8 @@ plotSingleD2 <- ggplot(table_long, aes(x=time, y=value, group=group, color=group
   guides(color = guide_legend(title = NULL)) +
   mytheme
 ggsave("plotSingleD2.png", plot = plotSingleD2, width = 6, height = 5, units = "cm", dpi = 300)
+
+
 
 # 3. PLOT SKILL
 # training day
@@ -155,3 +163,61 @@ plotSkillD1f <- ggplot(table_long, aes(x=time, y=value, group=group, color=group
   guides(color = guide_legend(title = NULL)) +
   mytheme
 ggsave("plotSkillD1f.png", plot = plotSkillD1f, width = 6, height = 5, units = "cm", dpi = 300)
+
+# skill measure as elife2019 | data, not modeled
+Dskill <- read.csv("table_skill.csv")
+Dskill <- Dskill %>% mutate(group = case_when(
+  group == 1 ~ "CON",
+  group == 2 ~ "FSD",
+  group == 3 ~ "FRD",
+  TRUE ~ as.character(group)
+))
+Dskill$group <- as.factor(Dskill$group)
+summary_Dskill <- na.omit(Dskill) %>%
+  group_by(group, day, BN) %>%
+  summarize(mean = mean(skillp),
+            sd = sd(skillp))
+# training day
+foo <- summary_Dskill[summary_Dskill$day==1, ]
+plotSkillPD1 <- ggplot(foo, aes(x=BN, y=mean, group=group, color=group)) +
+  geom_line(linewidth = line_width) +
+  #geom_point()+
+  #geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,position=position_dodge(0.05))+
+  ylim(0,0.4)+
+  labs(x = "session", y = "skill") +
+  #scale_x_continuous(breaks = c(1, 2, 3, 4), labels = c(1, 2, 3, 4))+
+  guides(color = guide_legend(title = NULL)) +
+  mytheme
+ggsave("plotSkillPD1.png", plot = plotSkillPD1, width = 6, height = 5, units = "cm", dpi = 300)
+# control day
+plotSkillPD2 <- ggplot(summary_Dskill[summary_Dskill$day==2, ], aes(x=BN, y=mean, group=group, color=group)) +
+  geom_line(linewidth = line_width) +
+  #geom_point()+
+  #geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,position=position_dodge(0.05))+
+  ylim(0,0.4)+
+  labs(x = "session", y = "skill") +
+  #scale_x_continuous(breaks = c(1, 2, 3, 4), labels = c(1, 2, 3, 4))+
+  guides(color = guide_legend(title = NULL)) +
+  mytheme
+ggsave("plotSkillPD2.png", plot = plotSkillPD2, width = 6, height = 5, units = "cm", dpi = 300)
+
+
+
+# 4. PLOT EMG DESCRIPTIVES
+maxampD1 <- data.frame(
+  time = c(0, 1, 2, 3, 4),
+  CON = c(0.180129693, 0.165682820, 0.151235947, 0.136789074, 0.122342201),
+  FSD = c(0.170605085, 0.165917880, 0.161230675, 0.156543470, 0.151856265)
+)
+# Reshape data to long format
+table_long <- gather(maxampD1, key = "group", value = "value", -time)
+# plot
+plotMaxampD1 <- ggplot(table_long, aes(x=time, y=value, group=group, color=group)) +
+  geom_line(linewidth = line_width) +
+  ylim(-0.03,0.4)+
+  labs(x = "session", y = "max emg amplitude") +
+  scale_x_continuous(breaks = c(0.5, 1.5, 2.5, 3.5), labels = c(1, 2, 3, 4))+
+  ##ggtitle("training day") +
+  guides(color = guide_legend(title = NULL)) +
+  mytheme
+ggsave("plotMaxampD1.png", plot = plotMaxampD1, width = 6, height = 5, units = "cm", dpi = 300)
