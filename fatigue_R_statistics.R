@@ -1,15 +1,14 @@
----
-project:  Peripheral fatigues detrimental effect on motor training - underlying mechanisms
-script: statistics
-Author: Joshua Gantner
-eMail:  josh.gantner@gmail.com 
----
+# project: Peripheral fatigues detrimental effect on motor training - underlying mechanisms
+# script: statistics
+# Author: Joshua Gantner
+# eMail:  josh.gantner@gmail.com 
+
 
 
 # 0. SETUP
-<!-- set working directory -->
+##### set working directory -->
 setwd('/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/0 v9')
-<!-- load packages -->
+##### load packages -->
 library(lmerTest)
 library(robustlmm)
 library(MuMIn)
@@ -19,26 +18,26 @@ v_toggle = 0 # toggle verbosity
 
 # 1. MODEL VARIABILITY
 ## load data
-<!-- read in data from csv table, as created by matlab data processing script -->
+##### read in data from csv table, as created by matlab data processing script -->
 D <- read.csv("table_space5.csv")
 
 ## preprocess
-<!-- mark categorical variables -->
+##### mark categorical variables -->
 D$group <- as.factor(D$group)
 D$identifier <- as.factor(D$identifier)
-<!-- ad a continuous variable for trials completed within a day to serves as indicator for time passing/progression of training -->
+##### ad a continuous variable for trials completed within a day to serves as indicator for time passing/progression of training -->
 D$training <- (D$block-1)*30+D$trial
 D$training <- D$training*(1/120)*1 # scale to 1 day = +1
- <!--D <- subset(D,D$distance<quantile(D$distance, c(.94))) -->
+##### D <- subset(D,D$distance<quantile(D$distance, c(.94))) -->
 
 
 ## fit models
 ### 2-day
 modelFull <- rlmer(distance~group*day*training+(1+training|identifier), data=D, verbose=v_toggle)
-<!-- satterthwaite approximation of degrees of freedom -->
+##### satterthwaite approximation of degrees of freedom -->
 m <- lmer(distance~group*day*training+(1+training|identifier), data=D)
 dfs <- data.frame(coef(summary(m)))$df
-<!-- p-values for fixed effects -->
+##### p-values for fixed effects -->
 coefs <- coef(summary(modelFull))
 pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableFull <- cbind(coefs,data.frame(pvalues))
@@ -47,12 +46,13 @@ tableFull
 
 ### trainig day - fatigued collective
 Dd1 <- subset(D,D$day==1)
-Dd1 <- Dd1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))
-modelD1 <- rlmer(distance~fatigued*training+(1|identifier), data=Dd1, verbose=v_toggle)
-<!-- satterthwaite approximation of degrees of freedom -->
-m <- lmer(distance~fatigued*training+(1|identifier), data=Dd1)
+##### Dd1 <- Dd1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))
+##### modelD1 <- rlmer(distance~fatigued*training+(1|identifier), data=Dd1, verbose=v_toggle)
+modelD1 <- rlmer(distance~group*training+(1|identifier), data=Dd1, verbose=v_toggle)
+##### satterthwaite approximation of degrees of freedom -->
+m <- lmer(distance~group*training+(1|identifier), data=Dd1)
 dfs <- data.frame(coef(summary(m)))$df
-<!-- p-values for the fixed -->
+##### p-values for the fixed -->
 coefs <- coef(summary(modelD1))
 pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableD1 <- cbind(coefs,data.frame(pvalues))
@@ -62,10 +62,10 @@ tableD1
 ### control day
 Dd2 <- subset(D,D$day==2)
 modelD2 <- rlmer(distance~group*training+(1|identifier), data=Dd2, verbose=v_toggle)
-<!-- satterthwaite approximation of degrees of freedom -->
+##### satterthwaite approximation of degrees of freedom -->
 m <- lmer(distance~group*training+(1|identifier), data=Dd2)
 dfs <- data.frame(coef(summary(m)))$df
-<!-- p-values for the fixed effects -->
+##### p-values for the fixed effects -->
 coefs <- coef(summary(modelD2))
 pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableD2 <- cbind(coefs,data.frame(pvalues))
@@ -75,13 +75,13 @@ tableD2
 
 # 2. MODEL SKILL
 ## load data
-<!-- read in data from csv table, as created by matlab data processing script -->
+##### read in data from csv table, as created by matlab data processing script -->
 Dskill <- read.csv("table_skill.csv")
-<!-- mark categorical variables-->
+##### mark categorical variables-->
 Dskill$group <- as.factor(Dskill$group)
 Dskill$ID <- as.factor(Dskill$ID)
 
-## fot models
+## fit models
 ### 2-day
 modelSkill <- lmer(skillp~group*day*BN+(1|ID), data=Dskill)
 tableSkill <- coef(summary(modelSkill))
@@ -146,6 +146,26 @@ for (i in 1:3) { # group level
 }
 correlations
 
+## correlate variability // skill for combined fatigue
+correlations <- data.frame(
+  fatigued = c(0,0,1,1),
+  day = c(1,2,1,2),
+  r = c(NaN,NaN,NaN,NaN),
+  p = c(NaN,NaN,NaN,NaN)
+)
+
+Dvs <- Dvs %>% mutate(fatigued = ifelse(group == 1, 0, 1))
+
+for (i in 0:1) { # fatigued level
+  for (j in 1:2) { # day level
+    Dvs_ij <- subset(Dvs, fatigued == i & day == j)
+    foo <- cor.test(Dvs_ij$skillp, Dvs_ij$variability,method = "spearman")
+    correlations[correlations$fatigued==i & correlations$day == j, ]$r <- foo$estimate
+    correlations[correlations$fatigued==i & correlations$day == j, ]$p <- foo$p.value
+  }
+}
+correlations
+
 
 
 # 4. SHAPE of VARIABILITY
@@ -153,7 +173,7 @@ correlations
 DshapeK <- read.csv("table_kurtosis_space5.csv") # load data
 DshapeK$group <- as.factor(DshapeK$group) # mark categorical as factor
 DshapeK$identifier <- as.factor(DshapeK$identifier)
-modelShapeK <- lmer(kurtosis~group + day*block+(1|identifier), data = DshapeK) # fit model
+modelShapeK <- lmer(kurtosis~group*day*block+(1|identifier), data = DshapeK) # fit model
 tableShapeK <- coef(summary(modelShapeK))
 tableShapeK
 
@@ -161,7 +181,7 @@ tableShapeK
 DshapeS <- read.csv("table_skew_space5.csv") # load data
 DshapeS$group <- as.factor(DshapeS$group) # mark categorical as factor
 DshapeS$identifier <- as.factor(DshapeS$identifier)
-modelShapeS <- lmer(skew~group + day*block+(1|identifier), data = DshapeS) # fit model
+modelShapeS <- lmer(skew~group*day*block+(1|identifier), data = DshapeS) # fit model
 tableShapeS <- coef(summary(modelShapeS))
 tableShapeS
 
@@ -169,7 +189,7 @@ tableShapeS
 DshapeR <- read.csv("table_range_space5.csv") # load data
 DshapeR$group <- as.factor(DshapeR$group) # mark categorical as factor
 DshapeR$identifier <- as.factor(DshapeR$identifier)
-modelShapeR <- lmer(range~group + day*block+(1|identifier), data = DshapeR) # fit model
+modelShapeR <- lmer(range~group*day*block+(1|identifier), data = DshapeR) # fit model
 tableShapeR <- coef(summary(modelShapeR))
 tableShapeR
 
@@ -184,7 +204,7 @@ filenames <- c(
   "table_spaceIntrinsic.csv", 
   "table_spaceExtrinsic.csv")
 
-<!-- Create an empty data frame to store the results -->
+##### Create an empty data frame to store the results -->
 r2 <- data.frame(subspace = character(),
                  cR2 = numeric(),
                  stringsAsFactors = FALSE)
@@ -218,10 +238,10 @@ Dmax <- Dmax %>% mutate(fatigued = ifelse(group == 1, 0, 1))
 
 ## fit model
 modelMaxamp <- rlmer(max~fatigued*time + (1|identifier), data = Dmax[Dmax$day==1, ], verbose = v_toggle)
-<!-- satterthwaite approximation of degrees of freedom -->
+##### satterthwaite approximation of degrees of freedom -->
 m <- lmer(max~fatigued*time + (1|identifier), data = Dmax[Dmax$day==1, ])
 dfs <- data.frame(coef(summary(m)))$df
-<!-- calculate p-values for the fixed effects of the robust model -->
+##### calculate p-values for the fixed effects of the robust model -->
 coefs <- coef(summary(modelMaxamp))
 pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableMaxamp <- cbind(coefs,data.frame(pvalues))
