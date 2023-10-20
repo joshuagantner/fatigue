@@ -46,11 +46,12 @@ tableFull
 
 ### trainig day - fatigued collective
 Dd1 <- subset(D,D$day==1)
-##### Dd1 <- Dd1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))
-##### modelD1 <- rlmer(distance~fatigued*training+(1|identifier), data=Dd1, verbose=v_toggle)
-modelD1 <- rlmer(distance~group*training+(1|identifier), data=Dd1, verbose=v_toggle)
-##### satterthwaite approximation of degrees of freedom -->
-m <- lmer(distance~group*training+(1|identifier), data=Dd1)
+Dd1 <- Dd1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))
+##### model_formula <- "distance ~ group * training + (1 | identifier)"
+model_formula <- "distance ~ fatigued * training + (1 | identifier)"
+modelD1 <- rlmer(model_formula, data = Dd1, verbose = v_toggle)
+##### satterthwaite approximation of degrees of freedom
+m <- lmer(model_formula, data=Dd1)
 dfs <- data.frame(coef(summary(m)))$df
 ##### p-values for the fixed -->
 coefs <- coef(summary(modelD1))
@@ -58,6 +59,93 @@ pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableD1 <- cbind(coefs,data.frame(pvalues))
 tableD1
 
+# PLOTING DATA POINTS & SE
+
+## load packages - in case of missing package, install with 'install.packages("packagename")' -->
+library(ggplot2)
+library(tidyr)
+library(ggthemes)
+library(gridExtra)
+## set theme
+##### preferred themes: theme_classic(), theme_stata(), theme_hc() -->
+theme_set(theme_classic())
+mytheme <- theme(legend.position = "bottom", 
+                 legend.margin = margin(-8, 1, 1, 1),
+                 legend.key.size = unit(0.2, 'cm'), 
+                 legend.text = element_text(size=8))
+line_width = 1
+
+# ploting actual distance
+ggplot(Dd1 %>% filter(fatigued == "0"), aes(x = training, y = distance, group = identifier, color = identifier)) +
+  geom_point(size = 0.2, alpha = 1, show.legend = FALSE) +
+  geom_smooth(method = "lm") +
+  ylim(8, 45) +
+  # scale_y_log10() +
+  # facet_wrap(~ fatigued, ncol = 2) +
+  scale_color_manual(values = grayscale_palette) +
+  labs(x = "Training", y = "Predicted Value") +
+  mytheme
+  
+# ploting predicted distance colored by fatigue state
+Dd1$predicted <- predict(modelD1, newdata = Dd1)
+ggplot(Dd1, aes(x = training, y = predicted, group = identifier, color=fatigued)) +
+  geom_point(size = 0.8, alpha = 0.33) +
+  ylim(8,42)
+  
+# ploting predicted distance colored by indentifier
+grayscale_palette <- gray.colors(28)
+
+ggplot(Dd1 %>% filter(fatigued == "0"), aes(x = training, y = predicted, group = identifier, color = identifier)) +
+  geom_point(size = 0.2, alpha = 0.33, show.legend = FALSE) +
+  ylim(8, 45) +
+  # scale_y_log10() +
+  # facet_wrap(~ fatigued, ncol = 2) +
+  scale_color_manual(values = grayscale_palette) +
+  labs(x = "Training", y = "Predicted Value") +
+  mytheme
+  
+intercepts <- c(
+  coefs["(Intercept)", "Estimate"], 
+  coefs["(Intercept)", "Estimate"] + coefs["fatigued", "Estimate"]
+)
+  
+slopes <- c(
+  coefs["training", "Estimate"], 
+  coefs["training", "Estimate"] + coefs["fatigued:training", "Estimate"]
+)
+
+<!-- Dd1$time <- (Dd1$block-1)*30+Dd1$trial -->
+
+ggplot(Dd1, aes(x = training, y = distance, group = fatigued, color=fatigued)) +
+  #geom_point() +
+  stat_summary(geom = "point", fun = mean, aes(y = distance), size = 0.5, position = position_dodge(width = 0.2)) +
+  geom_abline(intercept = intercepts, slope = slopes) +
+  ylim(10,42)+
+  labs(x = "session", y = "variability") +
+  #scale_x_continuous(breaks = c(0.5, 1.5, 2.5, 3.5), labels = c(1, 2, 3, 4)) +
+  #ggtitle("training day") +
+  guides(color = guide_legend(title = NULL)) +
+  mytheme
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
 ### control day
 Dd2 <- subset(D,D$day==2)
