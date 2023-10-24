@@ -1,9 +1,8 @@
-# project: Peripheral fatigues detrimental effect on motor training - underlying mechanisms
-# script: statistics
-# Author: Joshua Gantner
-# eMail:  josh.gantner@gmail.com 
-
-
+# header
+## project: Peripheral fatigues detrimental effect on motor training - underlying mechanisms
+## script: statistics
+## Author: Joshua Gantner
+## eMail:  josh.gantner@gmail.com 
 
 # 0. SETUP
 ##### set working directory -->
@@ -32,18 +31,6 @@ D$training <- D$training*(1/120)*1 # scale to 1 day = +1
 
 
 ## fit models
-### 2-day
-modelFull <- rlmer(distance~group*day*training+(1+training|identifier), data=D, verbose=v_toggle)
-##### satterthwaite approximation of degrees of freedom -->
-m <- lmer(distance~group*day*training+(1+training|identifier), data=D)
-dfs <- data.frame(coef(summary(m)))$df
-##### p-values for fixed effects -->
-coefs <- coef(summary(modelFull))
-pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
-tableFull <- cbind(coefs,data.frame(pvalues))
-tableFull
-
-
 ### trainig day - fatigued collective
 Dd1 <- subset(D,D$day==1)
 Dd1 <- Dd1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))
@@ -65,7 +52,7 @@ tableD1
 library(ggplot2)
 library(tidyr)
 library(ggthemes)
-library(gridExtra)
+library(patchwork)
 ## set theme
 ##### preferred themes: theme_classic(), theme_stata(), theme_hc() -->
 theme_set(theme_classic())
@@ -74,78 +61,80 @@ mytheme <- theme(legend.position = "bottom",
                  legend.key.size = unit(0.2, 'cm'), 
                  legend.text = element_text(size=8))
 line_width = 1
-
-# ploting actual distance
-ggplot(Dd1 %>% filter(fatigued == "0"), aes(x = training, y = distance, group = identifier, color = identifier)) +
-  geom_point(size = 0.2, alpha = 1, show.legend = FALSE) +
-  geom_smooth(method = "lm") +
-  ylim(8, 45) +
-  # scale_y_log10() +
-  # facet_wrap(~ fatigued, ncol = 2) +
-  scale_color_manual(values = grayscale_palette) +
-  labs(x = "Training", y = "Predicted Value") +
-  mytheme
-  
-# ploting predicted distance colored by fatigue state
-Dd1$predicted <- predict(modelD1, newdata = Dd1)
-ggplot(Dd1, aes(x = training, y = predicted, group = identifier, color=fatigued)) +
-  geom_point(size = 0.8, alpha = 0.33) +
-  ylim(8,42)
-  
-# ploting predicted distance colored by indentifier
+var_limits = c(5, 54)  # c(8, 45)
 grayscale_palette <- gray.colors(28)
 
-ggplot(Dd1 %>% filter(fatigued == "0"), aes(x = training, y = predicted, group = identifier, color = identifier)) +
-  geom_point(size = 0.2, alpha = 0.33, show.legend = FALSE) +
-  ylim(8, 45) +
-  # scale_y_log10() +
-  # facet_wrap(~ fatigued, ncol = 2) +
+## predicted distance
+Dd1$predicted = predict(modelD1, newdata = Dd1)
+
+# plot predictions by participants and fixed effects
+## plot: control training
+ # read fixed effect intercept, slope, and SE from model
+intercept <- coefs["(Intercept)", "Estimate"]
+slope <- coefs["training", "Estimate"]
+se <- coefs["training", "Std. Error"]
+
+ # create data frame for fixed effects line
+fixed_effects_nonf <- data.frame(
+  x = c(0, 1),               # X values for the line
+  y = intercept + slope * c(0, 1),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 1) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 1) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+)
+
+ # create plot
+p_var_pred_nonf <- ggplot() +
+  geom_point(data = Dd1 %>% filter(fatigued == "0"), aes(x = training, y = predicted, group = identifier, color = identifier), size = 0.2, alpha = 0.33, show.legend = FALSE) +
   scale_color_manual(values = grayscale_palette) +
-  labs(x = "Training", y = "Predicted Value") +
-  mytheme
-  
-intercepts <- c(
-  coefs["(Intercept)", "Estimate"], 
-  coefs["(Intercept)", "Estimate"] + coefs["fatigued", "Estimate"]
-)
-  
-slopes <- c(
-  coefs["training", "Estimate"], 
-  coefs["training", "Estimate"] + coefs["fatigued:training", "Estimate"]
+  ylim(var_limits) +
+  labs(x = "Training", y = "Predicted Variability") +
+  mytheme +
+  geom_line(data = fixed_effects_nonf, aes(x = x, y = y), color = 'red') +  # Plot fixed effects line
+  geom_ribbon(data = fixed_effects_nonf, aes(x = x, ymin = ymin, ymax = ymax), fill = "red", alpha = 0.5)  # Plot fixed effects SE
+
+p_var_pred_nonf # print graph to R Studio viewer
+
+## plot: fatigued collective training
+ # read fixed effect intercept, slope, and SE from model
+intercept <- coefs["(Intercept)", "Estimate"] + coefs["fatigued", "Estimate"]
+slope <- coefs["training", "Estimate"] + coefs["fatigued:training", "Estimate"]
+se <- coefs["fatigued:training", "Std. Error"]
+
+ # create data frame for fixed effects line
+fixed_effects_fati <- data.frame(
+  x = c(0, 1),               # X values for the line
+  y = intercept + slope * c(0, 1),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 1) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 1) + 1.96 * se   # Upper bound (for a 95% confidence interval)
 )
 
-<!-- Dd1$time <- (Dd1$block-1)*30+Dd1$trial -->
+ # create plot
+p_var_pred_fati <- ggplot() +
+  geom_point(data = Dd1 %>% filter(fatigued == "1"), aes(x = training, y = predicted, group = identifier, color = identifier), size = 0.2, alpha = 0.33, show.legend = FALSE) +
+  scale_color_manual(values = grayscale_palette) +
+  ylim(var_limits) +
+  labs(x = "Training", y = "Predicted Variability") +
+  mytheme +
+  geom_line(data = fixed_effects_fati, aes(x = x, y = y), color = 'blue') +  # Plot fixed effects line
+  geom_ribbon(data = fixed_effects_fati, aes(x = x, ymin = ymin, ymax = ymax), fill = 'blue', alpha = 0.5)  # Plot fixed effects SE
 
-ggplot(Dd1, aes(x = training, y = distance, group = fatigued, color=fatigued)) +
-  #geom_point() +
-  stat_summary(geom = "point", fun = mean, aes(y = distance), size = 0.5, position = position_dodge(width = 0.2)) +
-  geom_abline(intercept = intercepts, slope = slopes) +
-  ylim(10,42)+
-  labs(x = "session", y = "variability") +
-  #scale_x_continuous(breaks = c(0.5, 1.5, 2.5, 3.5), labels = c(1, 2, 3, 4)) +
-  #ggtitle("training day") +
-  guides(color = guide_legend(title = NULL)) +
-  mytheme
+p_var_pred_fati # print graph to R Studio viewer
   
+## plot: fixed effects training
+p_fe_training <- ggplot()+
+  ylim(var_limits) +
+  labs(x = "Training", y = "Predicted Variability") +
+  mytheme +
+  geom_line(data = fixed_effects_nonf, aes(x = x, y = y), color = 'red') +  # Plot fixed effects line
+  geom_ribbon(data = fixed_effects_nonf, aes(x = x, ymin = ymin, ymax = ymax), fill = "red", alpha = 0.5)+  # Plot fixed effects SE
+  geom_line(data = fixed_effects_fati, aes(x = x, y = y), color = 'blue') +  # Plot fixed effects line
+  geom_ribbon(data = fixed_effects_fati, aes(x = x, ymin = ymin, ymax = ymax), fill = 'blue', alpha = 0.5)  # Plot fixed effects SE
   
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+p_fe_training
+
+## Arrange the plots
+p_var_training <- p_var_pred_nonf + p_fe_training + p_var_pred_fati
+ggsave("p_var_training.png", plot = p_var_training, width = 6*3, height = 5, units = "cm", dpi = 300)
 
 ### control day
 Dd2 <- subset(D,D$day==2)
