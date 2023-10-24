@@ -1,198 +1,319 @@
 # header
-## project: Peripheral fatigues detrimental effect on motor training - underlying mechanisms
-## script: statistics
-## Author: Joshua Gantner
-## eMail:  josh.gantner@gmail.com 
+ # project: Peripheral fatigues detrimental effect on motor training - underlying mechanisms
+ # script: statistics
+ # Author: Joshua Gantner
+ # eMail:  josh.gantner@gmail.com 
 
 # 0. SETUP
-##### set working directory -->
+ # set working directory
 setwd('/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/0 v9')
-##### load packages -->
+
+ # load packages
 library(lmerTest)
 library(robustlmm)
 library(MuMIn)
 library(dplyr)
-v_toggle = 0 # toggle verbosity
-
-
-# 1. MODEL VARIABILITY
-## load data
-##### read in data from csv table, as created by matlab data processing script -->
-D <- read.csv("table_space5.csv")
-
-## preprocess
-##### mark categorical variables -->
-D$group <- as.factor(D$group)
-D$identifier <- as.factor(D$identifier)
-##### ad a continuous variable for trials completed within a day to serves as indicator for time passing/progression of training -->
-D$training <- (D$block-1)*30+D$trial
-D$training <- D$training*(1/120)*1 # scale to 1 day = +1
-##### D <- subset(D,D$distance<quantile(D$distance, c(.94))) -->
-
-
-## fit models
-### trainig day - fatigued collective
-Dd1 <- subset(D,D$day==1)
-Dd1 <- Dd1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))
-##### model_formula <- "distance ~ group * training + (1 | identifier)"
-model_formula <- "distance ~ fatigued * training + (1 | identifier)"
-modelD1 <- rlmer(model_formula, data = Dd1, verbose = v_toggle)
-##### satterthwaite approximation of degrees of freedom
-m <- lmer(model_formula, data=Dd1)
-dfs <- data.frame(coef(summary(m)))$df
-##### p-values for the fixed -->
-coefs <- coef(summary(modelD1))
-pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
-tableD1 <- cbind(coefs,data.frame(pvalues))
-tableD1
-
-# PLOTING DATA POINTS & SE
-
-## load packages - in case of missing package, install with 'install.packages("packagename")' -->
 library(ggplot2)
 library(tidyr)
 library(ggthemes)
 library(patchwork)
-## set theme
-##### preferred themes: theme_classic(), theme_stata(), theme_hc() -->
+
+ # set parameters
+v_toggle = 0 # toggle verbosity
+
+ # set theme for plots
 theme_set(theme_classic())
 mytheme <- theme(legend.position = "bottom", 
                  legend.margin = margin(-8, 1, 1, 1),
                  legend.key.size = unit(0.2, 'cm'), 
                  legend.text = element_text(size=8))
 line_width = 1
-var_limits = c(5, 54)  # c(8, 45)
-grayscale_palette <- gray.colors(28)
+y_limits_d1 = c(8, 45)
+y_limits_d2 = c(14, 36)
+y_limits_skill = c(-0.03,0.4)
+x_values = c(0, 0.125, 0.375, 0.625, 0.875, 1)
 
-## predicted distance
-Dd1$predicted = predict(modelD1, newdata = Dd1)
+# 1. MODEL VARIABILITY
+## load data
+ # read in data from csv table, as created by matlab data processing script
+D <- read.csv("table_space5.csv")
 
-# plot predictions by participants and fixed effects
-## plot: control training
- # read fixed effect intercept, slope, and SE from model
+## preprocess
+ # mark categorical variables
+D$group <- as.factor(D$group)
+D$identifier <- as.factor(D$identifier)
+
+ # ad a continuous variable for trials completed within a day to serves as indicator for time passing/progression of training
+D$training <- (D$block-1)*30+D$trial
+D$training <- D$training*(1/120)*1 # scale to 1 day = +1
+
+## fit models
+### trainig day
+#### modeling
+ # create day 1 subset
+Dd1 <- subset(D,D$day==1)
+Dd1 <- Dd1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))    # add binary fatigue identifier
+
+ # define model - (1) for modeling all 3 groups, (2) for modeling fatigued as one
+ # model_formula <- "distance ~ group * training + (1 | identifier)" # (1)
+model_formula <- "distance ~ fatigued * training + (1 | identifier)" # (2)
+
+ # fit robust model
+modelD1 <- rlmer(model_formula, data = Dd1, verbose = v_toggle)
+
+ # satterthwaite approximation of degrees of freedom
+m <- lmer(model_formula, data=Dd1)
+dfs <- data.frame(coef(summary(m)))$df
+
+ # caclulate p-values
+coefs <- coef(summary(modelD1))
+pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
+tableD1 <- cbind(coefs,data.frame(pvalues))
+tableD1 # print model summary to console
+
+#### plotting
+ # predict fixed effects for controls
 intercept <- coefs["(Intercept)", "Estimate"]
 slope <- coefs["training", "Estimate"]
 se <- coefs["training", "Std. Error"]
-
- # create data frame for fixed effects line
 fixed_effects_nonf <- data.frame(
-  x = c(0, 1),               # X values for the line
-  y = intercept + slope * c(0, 1),  # Corresponding Y values for the line
-  ymin = intercept + slope * c(0, 1) - 1.96 * se,  # Lower bound
-  ymax = intercept + slope * c(0, 1) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+  x = c(0, 0.125, 0.375, 0.625, 0.875, 1),               # X values for the line
+  y = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) + 1.96 * se   # Upper bound (for a 95% confidence interval)
 )
 
- # create plot
-p_var_pred_nonf <- ggplot() +
-  geom_point(data = Dd1 %>% filter(fatigued == "0"), aes(x = training, y = predicted, group = identifier, color = identifier), size = 0.2, alpha = 0.33, show.legend = FALSE) +
-  scale_color_manual(values = grayscale_palette) +
-  ylim(var_limits) +
-  labs(x = "Training", y = "Predicted Variability") +
-  mytheme +
-  geom_line(data = fixed_effects_nonf, aes(x = x, y = y), color = 'red') +  # Plot fixed effects line
-  geom_ribbon(data = fixed_effects_nonf, aes(x = x, ymin = ymin, ymax = ymax), fill = "red", alpha = 0.5)  # Plot fixed effects SE
-
-p_var_pred_nonf # print graph to R Studio viewer
-
-## plot: fatigued collective training
- # read fixed effect intercept, slope, and SE from model
+ # predict fixed effects for fatigued collective
 intercept <- coefs["(Intercept)", "Estimate"] + coefs["fatigued", "Estimate"]
 slope <- coefs["training", "Estimate"] + coefs["fatigued:training", "Estimate"]
 se <- coefs["fatigued:training", "Std. Error"]
-
- # create data frame for fixed effects line
 fixed_effects_fati <- data.frame(
-  x = c(0, 1),               # X values for the line
-  y = intercept + slope * c(0, 1),  # Corresponding Y values for the line
-  ymin = intercept + slope * c(0, 1) - 1.96 * se,  # Lower bound
-  ymax = intercept + slope * c(0, 1) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+  x = c(0, 0.125, 0.375, 0.625, 0.875, 1),               # X values for the line
+  y = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) + 1.96 * se   # Upper bound (for a 95% confidence interval)
 )
-
- # create plot
-p_var_pred_fati <- ggplot() +
-  geom_point(data = Dd1 %>% filter(fatigued == "1"), aes(x = training, y = predicted, group = identifier, color = identifier), size = 0.2, alpha = 0.33, show.legend = FALSE) +
-  scale_color_manual(values = grayscale_palette) +
-  ylim(var_limits) +
-  labs(x = "Training", y = "Predicted Variability") +
-  mytheme +
-  geom_line(data = fixed_effects_fati, aes(x = x, y = y), color = 'blue') +  # Plot fixed effects line
-  geom_ribbon(data = fixed_effects_fati, aes(x = x, ymin = ymin, ymax = ymax), fill = 'blue', alpha = 0.5)  # Plot fixed effects SE
-
-p_var_pred_fati # print graph to R Studio viewer
   
-## plot: fixed effects training
+ # create ggplot
 p_fe_training <- ggplot()+
-  ylim(var_limits) +
-  labs(x = "Training", y = "Predicted Variability") +
+  ylim(y_limits_d1) +
+  labs(x = "session", y = "variability") +
+  scale_x_continuous(breaks = c(0.125, 0.375, 0.625, 0.875), labels = c(0, 0.5, 1.5, 2.5, 3.5, 4))+
   mytheme +
-  geom_line(data = fixed_effects_nonf, aes(x = x, y = y), color = 'red') +  # Plot fixed effects line
-  geom_ribbon(data = fixed_effects_nonf, aes(x = x, ymin = ymin, ymax = ymax), fill = "red", alpha = 0.5)+  # Plot fixed effects SE
-  geom_line(data = fixed_effects_fati, aes(x = x, y = y), color = 'blue') +  # Plot fixed effects line
-  geom_ribbon(data = fixed_effects_fati, aes(x = x, ymin = ymin, ymax = ymax), fill = 'blue', alpha = 0.5)  # Plot fixed effects SE
+  geom_line(data = fixed_effects_nonf, aes(x = x, y = y), color = 'red') +  # Plot control
+  geom_point(data = fixed_effects_nonf[2:5,], aes(x = x, y = y), color = 'red') +
+  geom_errorbar(data = fixed_effects_nonf[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'red', width = 0.02) +
+  geom_line(data = fixed_effects_fati, aes(x = x, y = y), color = 'blue') +  # Plot fatigued
+  geom_point(data = fixed_effects_fati[2:5,], aes(x = x, y = y), color = 'blue') +
+  geom_errorbar(data = fixed_effects_fati[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'blue', width = 0.02)
   
-p_fe_training
-
-## Arrange the plots
-p_var_training <- p_var_pred_nonf + p_fe_training + p_var_pred_fati
-ggsave("p_var_training.png", plot = p_var_training, width = 6*3, height = 5, units = "cm", dpi = 300)
+p_fe_training   # print ggplot to R Studio Viewer
 
 ### control day
-Dd2 <- subset(D,D$day==2)
+#### modeling
+ # create day 2 subset
+Dd2 <- subset(D,D$day==2)    # create day 2 subset
+
+ # fit robust model to day 2 distinguishing all three groups
 modelD2 <- rlmer(distance~group*training+(1|identifier), data=Dd2, verbose=v_toggle)
-##### satterthwaite approximation of degrees of freedom -->
+
+ # satterthwaite approximation of degrees of freedom
 m <- lmer(distance~group*training+(1|identifier), data=Dd2)
 dfs <- data.frame(coef(summary(m)))$df
-##### p-values for the fixed effects -->
+
+ # caclulate p-values
 coefs <- coef(summary(modelD2))
 pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableD2 <- cbind(coefs,data.frame(pvalues))
-tableD2
+tableD2 # print model summary to console
 
+#### plotting
+ # predict fixed effects for controls
+intercept <- coefs["(Intercept)", "Estimate"]
+slope <- coefs["training", "Estimate"]
+se <- coefs["training", "Std. Error"]
+fixed_effects_con <- data.frame(
+  x = c(0, 0.125, 0.375, 0.625, 0.875, 1),               # X values for the line
+  y = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+)
 
+ # predict fixed effects for group 2
+intercept <- coefs["(Intercept)", "Estimate"] + coefs["group2", "Estimate"]
+slope <- coefs["training", "Estimate"] + coefs["group2:training", "Estimate"]
+se <- coefs["group2:training", "Std. Error"]
+fixed_effects_g2 <- data.frame(
+  x = c(0, 0.125, 0.375, 0.625, 0.875, 1),               # X values for the line
+  y = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+)
+
+ # predict fixed effects for group 3
+intercept <- coefs["(Intercept)", "Estimate"] + coefs["group3", "Estimate"]
+slope <- coefs["training", "Estimate"] + coefs["group3:training", "Estimate"]
+se <- coefs["group3:training", "Std. Error"]
+fixed_effects_g3 <- data.frame(
+  x = c(0, 0.125, 0.375, 0.625, 0.875, 1),               # X values for the line
+  y = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.125, 0.375, 0.625, 0.875, 1) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+)
+  
+ # create ggplot
+p_fe_control <- ggplot()+
+  ylim(y_limits_d2) +
+  labs(x = "session", y = "variability") +
+  scale_x_continuous(breaks = c(0.125, 0.375, 0.625, 0.875), labels = c(0, 0.5, 1.5, 2.5, 3.5, 4))+
+  mytheme +
+  geom_line(data = fixed_effects_con, aes(x = x, y = y), color = 'red') +  # Plot control
+  geom_point(data = fixed_effects_con[2:5,], aes(x = x, y = y), color = 'red') +
+  geom_errorbar(data = fixed_effects_con[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'red', width = 0.02) +
+  geom_line(data = fixed_effects_g2, aes(x = x, y = y), color = 'blue') +  # Plot fatigued
+  geom_point(data = fixed_effects_g2[2:5,], aes(x = x, y = y), color = 'blue') +
+  geom_errorbar(data = fixed_effects_g2[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'blue', width = 0.02) +
+  geom_line(data = fixed_effects_g3, aes(x = x, y = y), color = 'green') +  # Plot fatigued
+  geom_point(data = fixed_effects_g3[2:5,], aes(x = x, y = y), color = 'green') +
+  geom_errorbar(data = fixed_effects_g3[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'green', width = 0.02)
+  
+p_fe_control   # print ggplot to R Studio Viewer
 
 # 2. MODEL SKILL
 ## load data
-##### read in data from csv table, as created by matlab data processing script -->
+ # read in data from csv table, as created by matlab data processing script
 Dskill <- read.csv("table_skill.csv")
-##### mark categorical variables-->
+
+## preprocess
+ # mark categorical variables
 Dskill$group <- as.factor(Dskill$group)
 Dskill$ID <- as.factor(Dskill$ID)
 
 ## fit models
-### 2-day
-modelSkill <- lmer(skillp~group*day*BN+(1|ID), data=Dskill)
-tableSkill <- coef(summary(modelSkill))
-tableSkill
-
-### training-day-model
+### training day
+#### modeling
+ # create day 1 subset
 DskillD1 <- subset(Dskill,Dskill$day==1)
-modelSkillD1 <- lmer(skillp~group*BN+(1|ID), data=DskillD1)
+DskillD1 <- DskillD1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))    # add binary fatigue indicator
+
+ # define model - (1) for modeling all 3 groups, (2) for modeling fatigued as one
+ # model_formula = "skillp~group*BN+(1|ID)" # (1)
+model_formula = "skillp~fatigued*BN+(1|ID)" # (2)
+
+ # fit model
+modelSkillD1 <- lmer(model_formula, data=DskillD1)
 tableSkillD1 <- coef(summary(modelSkillD1))
-tableSkillD1
+tableSkillD1    # print model summary to console
 
-### training day - fatigued collective
-DskillD1 <- subset(Dskill,Dskill$day==1)
-DskillD1 <- DskillD1 %>% mutate(fatigued = ifelse(group == 1, 0, 1))
-modelSkillD1f <- lmer(skillp~fatigued*BN+(1|ID), data=DskillD1)
-tableSkillD1f <- coef(summary(modelSkillD1f))
-tableSkillD1f
+#### plotting
+ # predict fixed effects for controls
+intercept <- tableSkillD1["(Intercept)", "Estimate"]
+slope <- tableSkillD1["BN", "Estimate"]
+se <- tableSkillD1["BN", "Std. Error"]
+fixed_effects_nonf <- data.frame(
+  x = c(0, 0.5, 1.5, 2.5, 3.5, 4),               # X values for the line
+  y = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+)
+
+ # predict fixed effects for fatigued collective
+intercept <- tableSkillD1["(Intercept)", "Estimate"] + tableSkillD1["fatigued", "Estimate"]
+slope <- tableSkillD1["BN", "Estimate"] + tableSkillD1["fatigued:BN", "Estimate"]
+se <- tableSkillD1["fatigued:BN", "Std. Error"]
+fixed_effects_fati <- data.frame(
+  x = c(0, 0.5, 1.5, 2.5, 3.5, 4),               # X values for the line
+  y = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+)
+  
+ # create ggplot
+p_skill_training <- ggplot()+
+  ylim(y_limits_skill) +
+  labs(x = "session", y = "skill") +
+  scale_x_continuous(breaks = c(0.5, 1.5, 2.5, 3.5), labels = c(1, 2, 3, 4))+
+  mytheme +
+  geom_line(data = fixed_effects_nonf, aes(x = x, y = y), color = 'red') +  # Plot control
+  geom_point(data = fixed_effects_nonf[2:5,], aes(x = x, y = y), color = 'red') +
+  geom_errorbar(data = fixed_effects_nonf[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'red', width = 0.02) +
+  geom_line(data = fixed_effects_fati, aes(x = x, y = y), color = 'blue') +  # Plot fatigued
+  geom_point(data = fixed_effects_fati[2:5,], aes(x = x, y = y), color = 'blue') +
+  geom_errorbar(data = fixed_effects_fati[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'blue', width = 0.02)
+  
+p_skill_training   # print ggplot to R Studio Viewer
 
 ### control day
-DskillD2 <- subset(Dskill,Dskill$day==2)
-modelSkillD2 <- lmer(skillp~group*BN+(1|ID), data=DskillD2)
+#### modeling
+DskillD2 <- subset(Dskill,Dskill$day==2)    # create day 2 subset
+modelSkillD2 <- lmer(skillp~group*BN+(1|ID), data=DskillD2)   # fit model
 tableSkillD2 <- coef(summary(modelSkillD2))
-tableSkillD2
+tableSkillD2    # print model summary to console
 
-### control day FSD baseline
-DskillD2 <- subset(Dskill,Dskill$day==2)
-DskillD2$group <- factor(DskillD2$group, levels = c(2, 1, 3))
-modelSkillD2 <- lmer(skillp~group*BN+(1|ID), data=DskillD2)
-tableSkillD2 <- coef(summary(modelSkillD2))
-tableSkillD2
+#### plotting
+ # predict fixed effects for controls
+intercept <- tableSkillD2["(Intercept)", "Estimate"]
+slope <- tableSkillD2["BN", "Estimate"]
+se <- tableSkillD2["BN", "Std. Error"]
+fixed_effects_con <- data.frame(
+  x = c(0, 0.5, 1.5, 2.5, 3.5, 4),               # X values for the line
+  y = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+)
 
+ # predict fixed effects for group 2
+intercept <- tableSkillD2["(Intercept)", "Estimate"] + tableSkillD2["group2", "Estimate"]
+slope <- tableSkillD2["BN", "Estimate"] + tableSkillD2["group2:BN", "Estimate"]
+se <- tableSkillD2["group2:BN", "Std. Error"]
+fixed_effects_g2 <- data.frame(
+  x = c(0, 0.5, 1.5, 2.5, 3.5, 4),               # X values for the line
+  y = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+)
 
+ # predict fixed effects for group 3
+intercept <- tableSkillD2["(Intercept)", "Estimate"] + tableSkillD2["group3", "Estimate"]
+slope <- tableSkillD2["BN", "Estimate"] + tableSkillD2["group3:BN", "Estimate"]
+se <- tableSkillD2["group3:BN", "Std. Error"]
+fixed_effects_g3 <- data.frame(
+  x = c(0, 0.5, 1.5, 2.5, 3.5, 4),               # X values for the line
+  y = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4),  # Corresponding Y values for the line
+  ymin = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) - 1.96 * se,  # Lower bound
+  ymax = intercept + slope * c(0, 0.5, 1.5, 2.5, 3.5, 4) + 1.96 * se   # Upper bound (for a 95% confidence interval)
+)
+  
+ # create ggplot
+p_skill_control <- ggplot()+
+  ylim(y_limits_skill) +
+  labs(x = "session", y = "skill") +
+  scale_x_continuous(breaks = c(0.5, 1.5, 2.5, 3.5), labels = c(1, 2, 3, 4))+
+  mytheme +
+  geom_line(data = fixed_effects_con, aes(x = x, y = y), color = 'red') +  # Plot control
+  geom_point(data = fixed_effects_con[2:5,], aes(x = x, y = y), color = 'red') +
+  geom_errorbar(data = fixed_effects_con[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'red', width = 0.02) +
+  geom_line(data = fixed_effects_g2, aes(x = x, y = y), color = 'blue') +  # Plot fatigued
+  geom_point(data = fixed_effects_g2[2:5,], aes(x = x, y = y), color = 'blue') +
+  geom_errorbar(data = fixed_effects_g2[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'blue', width = 0.02) +
+  geom_line(data = fixed_effects_g3, aes(x = x, y = y), color = 'green') +  # Plot fatigued
+  geom_point(data = fixed_effects_g3[2:5,], aes(x = x, y = y), color = 'green') +
+  geom_errorbar(data = fixed_effects_g3[2:5,], aes(x = x, ymin = ymin, ymax = ymax), color = 'green', width = 0.02)
+  
+p_skill_control   # print ggplot to R Studio Viewer
 
-# 3. CORRELATIONS
+# 3. CREATE FIGURES
+## training
+figure_training <- p_fe_training + p_skill_training
+figure_training
+ggsave("figure_training.png", plot = figure_training, width = 6*2, height = 5, units = "cm", dpi = 300)
+
+## control
+figure_control <- p_fe_control + p_skill_control
+figure_control
+ggsave("figure_control.png", plot = figure_control, width = 6*2, height = 5, units = "cm", dpi = 300)
+
+# 4. CORRELATIONS
 ## create combined variability-skill table
 Dvs <- Dskill
 Dvs$variability <- NA
@@ -245,7 +366,7 @@ correlations
 
 
 
-# 4. SHAPE of VARIABILITY
+# 5. SHAPE of VARIABILITY
 ## kurtosis
 DshapeK <- read.csv("table_kurtosis_space5.csv") # load data
 DshapeK$group <- as.factor(DshapeK$group) # mark categorical as factor
@@ -272,7 +393,7 @@ tableShapeR
 
 
 
-# 5. DRIVERS of VARIABILITY CHANGE
+# 6. DRIVERS of VARIABILITY CHANGE
 ## link data
 filenames <- c(
   "table_spaceFDI.csv",
@@ -306,7 +427,7 @@ r2
 
 
 
-# 6. MAXIMUM EMG AMPLITUDE
+# 7. MAXIMUM EMG AMPLITUDE
 ## load data
 Dmax <- read.csv("table_maxemgamp_FDI.csv")
 Dmax$group <- as.factor(Dmax$group)
