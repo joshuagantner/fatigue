@@ -1,27 +1,37 @@
 # header
  # project: Peripheral fatigues detrimental effect on motor training - underlying mechanisms
- # script: statistics
  # Author: Joshua Gantner
  # eMail:  josh.gantner@gmail.com 
+ 
+ # READ ME ↓
+ # • View as R Markdown for outline and collapsible sections.
+ # • Make sure to update the working directory (line 12) to your working folder. It will serve as source for loading data and location to save figures.
 
 # 0. SETUP
  # set working directory
 setwd('/Users/joshuagantner/Library/CloudStorage/OneDrive-UniversitätZürichUZH/Files/Studium/Masterarbeit/0 v9')
 
- # load packages
-library(lmerTest)
-library(robustlmm)
-library(MuMIn)
-library(dplyr)
-library(ggplot2)
-library(tidyr)
-library(ggthemes)
-library(patchwork)
+## load packages, install if not yet present
+packages <- c(    # list of requiered packages to be loaded and installed if missing
+  "lmerTest", 
+  "robustlmm", 
+  "MuMIn", 
+  "dplyr", 
+  "ggplot2", 
+  "tidyr", 
+  "ggthemes", 
+  "patchwork"
+  )
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+invisible(lapply(packages, library, character.only = TRUE))
 
- # set parameters
+## set parameters
 v_toggle = 0 # toggle verbosity
 
- # set theme for plots
+## set theme for plots
 theme_set(theme_classic())
 mytheme <- theme(legend.position = "bottom", 
                  legend.margin = margin(-8, 1, 1, 1),
@@ -35,7 +45,7 @@ y_limits_skill = c(-0.03,0.4)
 x_values = c(0, 0.125, 0.375, 0.625, 0.875, 1)
 errorbar_width_skill = 0.2
 
-# 1. MODEL VARIABILITY
+# 1. VARIABILITY
 ## load data
  # read in data from csv table, as created by matlab data processing script
 D <- read.csv("table_space5.csv")
@@ -72,6 +82,8 @@ coefs <- coef(summary(modelD1))
 pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableD1 <- cbind(coefs,data.frame(pvalues))
 tableD1 # print model summary to console
+  # Save the table as a CSV file
+write.csv(tableD1, "tableD1.csv", row.names = TRUE)
 
 #### predict
  # predict fixed effects for controls
@@ -128,6 +140,8 @@ coefs <- coef(summary(modelD2))
 pvalues <- 2*pt(abs(coefs[,3]), dfs, lower=FALSE)
 tableD2 <- cbind(coefs,data.frame(pvalues))
 tableD2 # print model summary to console
+  # Save the table as a CSV file
+write.csv(tableD2, "tableD2.csv", row.names = TRUE)
 
 #### predict
  # predict fixed effects for controls
@@ -181,7 +195,7 @@ p_fe_control <- ggplot()+
   
 p_fe_control   # print ggplot to R Studio Viewer
 
-# 2. MODEL SKILL
+# 2. SKILL
 ## load data
  # read in data from csv table, as created by matlab data processing script
 Dskill <- read.csv("table_skill.csv")
@@ -206,6 +220,8 @@ model_formula = "skillp~fatigued*BN+(1|ID)" # (2)
 modelSkillD1 <- lmer(model_formula, data=DskillD1)
 tableSkillD1 <- coef(summary(modelSkillD1))
 tableSkillD1    # print model summary to console
+  # Save the table as a CSV file
+write.csv(tableSkillD1, "tableSkillD1.csv", row.names = TRUE)
 
 #### predict
  # predict fixed effects for controls
@@ -251,6 +267,8 @@ DskillD2 <- subset(Dskill,Dskill$day==2)    # create day 2 subset
 modelSkillD2 <- lmer(skillp~group*BN+(1|ID), data=DskillD2)   # fit model
 tableSkillD2 <- coef(summary(modelSkillD2))
 tableSkillD2    # print model summary to console
+  # Save the table as a CSV file
+write.csv(tableSkillD2, "tableSkillD2.csv", row.names = TRUE)
 
 #### predict
  # predict fixed effects for controls
@@ -305,19 +323,129 @@ p_skill_control <- ggplot()+
 p_skill_control   # print ggplot to R Studio Viewer
 
 # 3. CREATE FIGURES
-## training
+## training / result 1
 figure_training <- p_fe_training + guides(colour = "none") + p_skill_training + plot_layout(guides = "collect") & theme(legend.position = "bottom")
 
 figure_training
 
 ggsave("figure_training.png", plot = figure_training, width = 6*2, height = 6, units = "cm", dpi = 300)
 
-## control
+## followup / result 2
 figure_control <- p_fe_control + guides(colour = "none") + p_skill_control + plot_layout(guides = "collect") & theme(legend.position = "bottom")
 
 figure_control
 
 ggsave("figure_control.png", plot = figure_control, width = 6*2, height = 6, units = "cm", dpi = 300)
+
+## plot raw variability data
+D <- D %>% mutate(fatigued = ifelse(group == 1, 0, 1))    # add binary fatigue identifier
+
+### Lines by Fatigue State with 95% Confidence Interval
+#### Training
+ggplot(data = subset(D,D$day==1), aes(x = training, y = distance, group = factor(fatigued), color = factor(fatigued))) +
+  geom_smooth() + 
+  labs(x = "session", y = "variability") +
+  scale_x_continuous(breaks = c(0.125, 0.375, 0.625, 0.875), labels = c(1, 2, 3, 4)) +
+  mytheme +
+  scale_color_discrete(labels = c("CON", "Fatigued")) +
+  ggtitle("Lines by Fatigue State with 95% Confidence Interval during Training")
+
+#### Followup
+ggplot(data = subset(D,D$day==2), aes(x = training, y = distance, group = factor(group), color = factor(group))) +
+  geom_smooth() + 
+  labs(x = "session", y = "variability") +
+  scale_x_continuous(breaks = c(0.125, 0.375, 0.625, 0.875), labels = c(1, 2, 3, 4)) +
+  mytheme +
+  scale_color_discrete(labels = c("CON", "FSD", "FRD")) +
+  ggtitle("Lines by Group with 95% Confidence Interval during Follow-up")
+  
+### Whisker Plots by Fatigue State w/o outliers
+#### Training
+ggplot(data = subset(D,D$day==1), aes(x = factor(block), y = distance, fill = factor(fatigued))) +
+  geom_boxplot(outlier.shape = NA) +
+  ylim(0, 75) + 
+  labs(x = "session", y = "variability") +
+  mytheme +
+  scale_fill_discrete(labels = c("CON", "Fatigued"))  +
+  ggtitle("Whisker Plots by Fatigue State w/o outliers during Training")
+  
+#### Followup
+ggplot(data = subset(D,D$day==2), aes(x = factor(block), y = distance, fill = factor(group))) +
+  geom_boxplot(outlier.shape = NA) +
+  ylim(0, 75) + 
+  labs(x = "session", y = "variability") +
+  mytheme +
+  scale_fill_discrete(labels = c("CON", "FSD", "FRD"))  +
+  ggtitle("Whisker Plots by Fatigue State w/o outliers during Followup")
+
+
+## method figures
+library(png)
+
+ # Load PNG images
+img1 <- readPNG("image-electrodes.png")
+img2 <- readPNG("image-transducer.png")
+img3 <- readPNG("image-taskview.png")
+img4 <- readPNG("image-forceprofile.png")
+
+ # Create ggplots for each image
+image1 <- ggplot() +
+  annotation_custom(rasterGrob(img1), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+  ggtitle("(a)")
+image2 <- ggplot() +
+  annotation_custom(rasterGrob(img2), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+  ggtitle("(b)")
+image3 <- ggplot() +
+  annotation_custom(rasterGrob(img3), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+  ggtitle("(c)")
+image4 <- ggplot() +
+  annotation_custom(rasterGrob(img4), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+  ggtitle("(d)")
+  
+ # combine imgaes 2x2
+figure_methods <- image1 + image2 + image3 + image4
+
+figure_methods
+
+ggsave("figure_methods.png", plot = figure_methods, width = 17, height = 14, units = "cm", dpi = 600)
+
+ # Load PNG images
+img1 <- readPNG("image2_distribution_wide.png")
+img2 <- readPNG("image2_sphere_wide.png")
+img3 <- readPNG("image2_distribution_narrow.png")
+img4 <- readPNG("image2_sphere_narrow.png")
+img5 <- readPNG("image2_interpretation.png")
+
+ # Create ggplots for each image
+image1 <- ggplot() +
+  annotation_custom(rasterGrob(img1), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+  theme_minimal()
+image2 <- ggplot() +
+  annotation_custom(rasterGrob(img2), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+  theme_minimal()
+image3 <- ggplot() +
+  annotation_custom(rasterGrob(img3), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+  theme_minimal()
+image4 <- ggplot() +
+  annotation_custom(rasterGrob(img4), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+  theme_minimal()
+image5 <- ggplot() +
+  annotation_custom(rasterGrob(img5), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+  theme_minimal()
+
+ # combine images
+layout <- plot_layout(    # Create a 2-2-1 grid layout
+  ncol = 3,
+  nrow = 2,
+)
+
+  # Arrange the plots in the layout
+figure_shape <- image1 / image3 | image2 / image4 | image5
+
+figure_shape
+
+ggsave("figure_shape.png", plot = figure_shape, width = 12, height = 8, units = "cm", dpi = 300)
+
 
 # 4. CORRELATIONS
 ## create combined variability-skill table
