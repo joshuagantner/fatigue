@@ -380,71 +380,71 @@ ggplot(data = subset(D,D$day==2), aes(x = factor(block), y = distance, fill = fa
 
 
 ## method figures
-library(png)
-
- # Load PNG images
-img1 <- readPNG("image-electrodes.png")
-img2 <- readPNG("image-transducer.png")
-img3 <- readPNG("image-taskview.png")
-img4 <- readPNG("image-forceprofile.png")
-
- # Create ggplots for each image
-image1 <- ggplot() +
-  annotation_custom(rasterGrob(img1), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
-  ggtitle("(a)")
-image2 <- ggplot() +
-  annotation_custom(rasterGrob(img2), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
-  ggtitle("(b)")
-image3 <- ggplot() +
-  annotation_custom(rasterGrob(img3), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
-  ggtitle("(c)")
-image4 <- ggplot() +
-  annotation_custom(rasterGrob(img4), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
-  ggtitle("(d)")
-  
- # combine imgaes 2x2
-figure_methods <- image1 + image2 + image3 + image4
-
-figure_methods
-
-ggsave("figure_methods.png", plot = figure_methods, width = 17, height = 14, units = "cm", dpi = 600)
-
- # Load PNG images
-img1 <- readPNG("image2_distribution_wide.png")
-img2 <- readPNG("image2_sphere_wide.png")
-img3 <- readPNG("image2_distribution_narrow.png")
-img4 <- readPNG("image2_sphere_narrow.png")
-img5 <- readPNG("image2_interpretation.png")
-
- # Create ggplots for each image
-image1 <- ggplot() +
-  annotation_custom(rasterGrob(img1), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
-  theme_minimal()
-image2 <- ggplot() +
-  annotation_custom(rasterGrob(img2), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
-  theme_minimal()
-image3 <- ggplot() +
-  annotation_custom(rasterGrob(img3), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
-  theme_minimal()
-image4 <- ggplot() +
-  annotation_custom(rasterGrob(img4), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
-  theme_minimal()
-image5 <- ggplot() +
-  annotation_custom(rasterGrob(img5), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
-  theme_minimal()
-
- # combine images
-layout <- plot_layout(    # Create a 2-2-1 grid layout
-  ncol = 3,
-  nrow = 2,
-)
-
-  # Arrange the plots in the layout
-figure_shape <- image1 / image3 | image2 / image4 | image5
-
-figure_shape
-
-ggsave("figure_shape.png", plot = figure_shape, width = 12, height = 8, units = "cm", dpi = 300)
+ # library(png)
+ # 
+ #  # Load PNG images
+ # img1 <- readPNG("image-electrodes.png")
+ # img2 <- readPNG("image-transducer.png")
+ # img3 <- readPNG("image-taskview.png")
+ # img4 <- readPNG("image-forceprofile.png")
+ # 
+ #  # Create ggplots for each image
+ # image1 <- ggplot() +
+ #   annotation_custom(rasterGrob(img1), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+ #   ggtitle("(a)")
+ # image2 <- ggplot() +
+ #   annotation_custom(rasterGrob(img2), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+ #   ggtitle("(b)")
+ # image3 <- ggplot() +
+ #   annotation_custom(rasterGrob(img3), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+ #   ggtitle("(c)")
+ # image4 <- ggplot() +
+ #   annotation_custom(rasterGrob(img4), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+ #   ggtitle("(d)")
+ #   
+ #  # combine imgaes 2x2
+ # figure_methods <- image1 + image2 + image3 + image4
+ # 
+ # figure_methods
+ # 
+ # ggsave("figure_methods.png", plot = figure_methods, width = 17, height = 14, units = "cm", dpi = 600)
+ # 
+ #  # Load PNG images
+ # img1 <- readPNG("image2_distribution_wide.png")
+ # img2 <- readPNG("image2_sphere_wide.png")
+ # img3 <- readPNG("image2_distribution_narrow.png")
+ # img4 <- readPNG("image2_sphere_narrow.png")
+ # img5 <- readPNG("image2_interpretation.png")
+ # 
+ #  # Create ggplots for each image
+ # image1 <- ggplot() +
+ #   annotation_custom(rasterGrob(img1), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+ #   theme_minimal()
+ # image2 <- ggplot() +
+ #   annotation_custom(rasterGrob(img2), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+ #   theme_minimal()
+ # image3 <- ggplot() +
+ #   annotation_custom(rasterGrob(img3), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+ #   theme_minimal()
+ # image4 <- ggplot() +
+ #   annotation_custom(rasterGrob(img4), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+ #   theme_minimal()
+ # image5 <- ggplot() +
+ #   annotation_custom(rasterGrob(img5), xmin = 0, xmax = 1, ymin = 0, ymax = 1) +
+ #   theme_minimal()
+ # 
+ #  # combine images
+ # layout <- plot_layout(    # Create a 2-2-1 grid layout
+ #   ncol = 3,
+ #   nrow = 2,
+ # )
+ # 
+ #   # Arrange the plots in the layout
+ # figure_shape <- image1 / image3 | image2 / image4 | image5
+ # 
+ # figure_shape
+ # 
+ # ggsave("figure_shape.png", plot = figure_shape, width = 12, height = 8, units = "cm", dpi = 300)
 
 
 # 4. CORRELATIONS
